@@ -1,11 +1,33 @@
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
-from pydantic import BaseModel
+import os
+import secrets
 import time
+from fastapi import FastAPI, Request, Depends, HTTPException, status, Header
+from fastapi.responses import HTMLResponse
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from pydantic import BaseModel
 
 app = FastAPI(title="FMSecure Cloud C2")
 
-# In-memory database for the MVP
+# --- 🔒 SECURITY VAULT (Reads from Railway Variables) ---
+ADMIN_USER = os.getenv("ADMIN_USERNAME", "admin")
+ADMIN_PASS = os.getenv("ADMIN_PASSWORD", "password")
+API_KEY = os.getenv("API_KEY", "default-dev-key")
+
+security = HTTPBasic()
+
+def verify_admin(credentials: HTTPBasicCredentials = Depends(security)):
+    """Verifies the browser login prompt"""
+    correct_username = secrets.compare_digest(credentials.username, ADMIN_USER)
+    correct_password = secrets.compare_digest(credentials.password, ADMIN_PASS)
+    if not (correct_username and correct_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return credentials.username
+
+# --- DATABASE ---
 agents = {}
 commands = {}
 
@@ -16,9 +38,14 @@ class Heartbeat(BaseModel):
     tier: str
     is_armed: bool
 
+# --- 🚀 API ENDPOINTS ---
+
 @app.post("/api/heartbeat")
-async def receive_heartbeat(data: Heartbeat, request: Request):
-    # Update the agent's last seen time and status
+async def receive_heartbeat(data: Heartbeat, request: Request, x_api_key: str = Header(None)):
+    """Receives agent telemetry. Protected by API Key."""
+    if x_api_key != API_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized: Invalid API Key")
+        
     agents[data.machine_id] = {
         "hostname": data.hostname,
         "username": data.username,
@@ -28,28 +55,27 @@ async def receive_heartbeat(data: Heartbeat, request: Request):
         "ip": request.client.host
     }
     
-    # Check if the Cloud Admin clicked "Isolate Host"
     cmd = commands.get(data.machine_id, "NONE")
     if cmd != "NONE":
-        commands[data.machine_id] = "NONE" # Clear command after sending it once
+        commands[data.machine_id] = "NONE" 
         
     return {"status": "ok", "command": cmd}
 
 @app.post("/api/trigger_lockdown/{machine_id}")
-async def trigger_lockdown(machine_id: str):
-    """Endpoint for the web dashboard to trigger the killswitch"""
+async def trigger_lockdown(machine_id: str, username: str = Depends(verify_admin)):
+    """Triggers the killswitch. Protected by Admin Login."""
     commands[machine_id] = "LOCKDOWN"
     return {"status": "Lockdown command queued"}
 
+# --- 🖥️ WEB DASHBOARD ---
+
 @app.get("/", response_class=HTMLResponse)
-async def dashboard():
-    """The live Web Dashboard for the IT Admin"""
+async def dashboard(username: str = Depends(verify_admin)):
+    """The live Web Dashboard. Protected by Admin Login."""
     current_time = time.time()
     
-    # Generate the table rows dynamically
     rows = ""
     for mid, info in agents.items():
-        # If we haven't heard from them in 30 seconds, they are offline
         is_online = (current_time - info['last_seen']) < 30
         status_badge = '<span class="badge bg-success">ONLINE</span>' if is_online else '<span class="badge bg-secondary">OFFLINE</span>'
         armed_badge = '<span class="badge bg-primary">ARMED</span>' if info['is_armed'] else '<span class="badge bg-warning text-dark">UNARMED</span>'
@@ -90,7 +116,7 @@ async def dashboard():
     <body>
         <div class="container-fluid py-4 px-4">
             <h2 class="text-primary mb-0 fw-bold">☁️ FMSecure Global C2</h2>
-            <p class="text-muted">Enterprise Endpoint Telemetry Dashboard</p>
+            <p class="text-muted">Enterprise Endpoint Telemetry Dashboard | Logged in as: {username}</p>
             
             <div class="card mt-4 shadow-lg">
                 <div class="card-body p-0">
@@ -115,13 +141,12 @@ async def dashboard():
         </div>
 
         <script>
-            // Auto-refresh the dashboard every 5 seconds to see live telemetry
             setTimeout(() => window.location.reload(), 5000);
 
             async function triggerLockdown(machineId) {{
-                if (confirm("🚨 EMERGENCY ACTION 🚨\\n\\nAre you sure you want to isolate this host? This will trigger the Ransomware Killswitch on the target machine.")) {{
+                if (confirm("🚨 EMERGENCY ACTION 🚨\\n\\nAre you sure you want to isolate this host?")) {{
                     await fetch(`/api/trigger_lockdown/${{machineId}}`, {{ method: 'POST' }});
-                    alert("Lockdown command queued! The agent will execute it on the next heartbeat.");
+                    alert("Lockdown command queued!");
                 }}
             }}
         </script>
