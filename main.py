@@ -64,7 +64,7 @@ async def login_page(error: str = ""):
     </head>
     <body>
         <div class="login-card">
-            <h3 class="text-center fw-bold mb-1" style="color: #58a6ff;">☁️ FMSecure C2</h3>
+            <h3 class="text-center fw-bold mb-1" style="color: #58a6ff;"><span><img src="app_icon.png" alt="" height="50"></span> FMSecure C2</h3>
             <p class="text-center text-muted mb-4" style="font-size: 14px;">Enterprise Authentication</p>
             {error_msg}
             <form action="/login" method="post">
@@ -183,7 +183,7 @@ async def dashboard(is_authenticated: bool = Depends(verify_session)):
     <body>
         <nav class="navbar navbar-expand-lg px-4 py-3 mb-4">
             <div class="container-fluid">
-                <span class="navbar-brand text-primary fw-bold">☁️ FMSecure Global C2</span>
+                <span class="navbar-brand text-primary fw-bold"><span><img src="app_icon.png" alt="" height="50"></span> FMSecure Global C2</span>
                 <div class="d-flex">
                     <span class="navbar-text me-4 text-muted">Enterprise Endpoint Telemetry Dashboard</span>
                     <a href="/logout" class="btn btn-outline-danger btn-sm fw-bold">Logout</a>
