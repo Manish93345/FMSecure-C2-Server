@@ -588,23 +588,19 @@ async def create_order(request: Request, body: CreateOrderRequest):
 async def verify_payment(request: Request, body: VerifyPaymentRequest):
     """
     Called by the browser after the Razorpay popup closes successfully.
-
-    Security: Razorpay signs (order_id + "|" + payment_id) with your secret key.
-    We verify this signature. If it matches, the payment is 100% genuine.
-    No one can fake this without knowing your secret key.
     """
-    # Verify Razorpay signature
-    expected = _hmac.new(
-        RZP_KEY_SECRET.encode(),
-        f"{body.razorpay_order_id}|{body.razorpay_payment_id}".encode(),
-        hashlib.sha256
-    ).hexdigest()
-
-    if not secrets.compare_digest(expected, body.razorpay_signature):
-        print(f"[RZP] Signature mismatch — order {body.razorpay_order_id}")
+    # 1. Official Razorpay Signature Verification
+    try:
+        rzp_client.utility.verify_payment_signature({
+            'razorpay_order_id': body.razorpay_order_id,
+            'razorpay_payment_id': body.razorpay_payment_id,
+            'razorpay_signature': body.razorpay_signature
+        })
+    except razorpay.errors.SignatureVerificationError:
+        print(f"❌ [RZP ERROR] Signature mismatch! Check if RAZORPAY_KEY_SECRET is correct in Railway.")
         return JSONResponse({"success": False, "error": "Signature verification failed"}, status_code=400)
 
-    # Signature valid — create the license
+    # 2. Signature valid — generate the license
     tier        = body.tier.strip().lower()
     email       = body.email.strip().lower()
     payment_id  = body.razorpay_payment_id
@@ -613,13 +609,14 @@ async def verify_payment(request: Request, body: VerifyPaymentRequest):
     expires_iso = (datetime.now(timezone.utc) + timedelta(days=days)).isoformat()
     license_key = _generate_license_key(tier, email, payment_id)
 
+    # 3. Save to PostgreSQL Database
     try:
         _save_license(license_key, email, tier, payment_id, order_id, expires_iso)
     except Exception as e:
-        print(f"[DB] License save error: {e}")
+        print(f"❌ [DB ERROR] Failed to save license to Postgres: {e}")
         return JSONResponse({"success": False, "error": "Database error — please contact support"}, status_code=500)
 
-    # Clean up pending order
+    # 4. Clean up pending order
     try:
         conn = get_db()
         cur  = conn.cursor()
@@ -627,11 +624,12 @@ async def verify_payment(request: Request, body: VerifyPaymentRequest):
         conn.commit()
         cur.close()
         conn.close()
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"⚠️ [DB WARNING] Could not delete pending order: {e}")
 
+    # 5. Send Email and Return Success
     _send_license_email(email, license_key, tier, expires_iso)
-    print(f"[PAYMENT] Success: {license_key} for {email} tier={tier} expires={expires_iso[:10]}")
+    print(f"✅ [PAYMENT SUCCESS] Generated key {license_key} for {email}")
 
     return {"success": True, "license_key": license_key, "tier": tier, "expires_at": expires_iso}
 
