@@ -93,6 +93,11 @@ def get_db():
 def init_db():
     conn = get_db()
     cur  = conn.cursor()
+    
+    # --- 🚨 TEMPORARY FIX: Drop old tables to force a schema update ---
+    cur.execute("DROP TABLE IF EXISTS licenses;")
+    cur.execute("DROP TABLE IF EXISTS pending_orders;")
+    
     cur.execute("""
         CREATE TABLE IF NOT EXISTS licenses (
             license_key  TEXT PRIMARY KEY,
@@ -115,14 +120,7 @@ def init_db():
     conn.commit()
     cur.close()
     conn.close()
-    print("[DB] Tables ready.")
-
-@app.on_event("startup")
-async def startup():
-    if DATABASE_URL:
-        init_db()
-    else:
-        print("[DB] WARNING: No DATABASE_URL. Add the PostgreSQL plugin on Railway.")
+    print("[DB] Tables ready and schema updated.")
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
