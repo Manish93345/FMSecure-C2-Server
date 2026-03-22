@@ -1,6 +1,8 @@
 fastapi
 uvicorn
+psycopg2-binary
 pydantic
-python-multipart
 slowapi
 stripe
+python-multipart
+sendgrid
