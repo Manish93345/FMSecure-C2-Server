@@ -778,3 +778,27 @@ async def licenses_page(_: bool = Depends(verify_session)):
     <div class="container"><table><thead><tr>
       <th>LICENSE KEY</th><th>EMAIL</th><th>TIER</th><th>STATUS</th><th>EXPIRES</th>
     </tr></thead><tbody>{table_rows}</tbody></table></div></body></html>"""
+
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TEMPORARY DB PATCH ENDPOINT
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/api/db-fix")
+async def fix_db():
+    """Temporary endpoint to forcefully patch the database schema"""
+    try:
+        conn = get_db()
+        cur  = conn.cursor()
+        
+        # Forcefully inject the missing columns into the existing table
+        cur.execute("ALTER TABLE licenses ADD COLUMN IF NOT EXISTS payment_id TEXT;")
+        cur.execute("ALTER TABLE licenses ADD COLUMN IF NOT EXISTS order_id TEXT;")
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        return {"success": True, "message": "Database successfully patched! Missing columns added."}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
