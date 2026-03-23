@@ -1,6 +1,24 @@
 """
 main.py — FMSecure C2 + License Server
-Railway deployment — PostgreSQL + Razorpay + SMTP Hardware Binding
+Railway deployment — PostgreSQL + Razorpay
+
+Environment variables to set in Railway → Variables:
+  ADMIN_USERNAME        = your admin username
+  ADMIN_PASSWORD        = a strong password (not "password")
+  API_KEY               = same key as in your desktop agent's integrity_core.py
+  RAZORPAY_KEY_ID       = rzp_live_... (or rzp_test_... while testing)
+  RAZORPAY_KEY_SECRET   = your Razorpay key secret
+  LICENSE_HMAC_SECRET   = generate with: python -c "import secrets;print(secrets.token_hex(32))"
+  ADMIN_API_KEY         = any secret string for admin endpoints
+  APP_BASE_URL          = https://your-server.railway.app  (no trailing slash)
+  DATABASE_URL          = auto-set by Railway PostgreSQL plugin — do NOT add manually
+  SENDGRID_API_KEY      = (optional) auto-emails license keys to customers
+
+Add to requirements.txt:
+  razorpay
+  psycopg2-binary
+  slowapi
+  sendgrid   (optional)
 """
 
 import os
@@ -10,11 +28,6 @@ import hashlib
 import hmac as _hmac
 import uuid
 from datetime import datetime, timezone, timedelta
-
-# Email imports
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 
 from fastapi import FastAPI, Request, Depends, HTTPException, status, Form, Cookie
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -39,26 +52,20 @@ ADMIN_PASS     = os.getenv("ADMIN_PASSWORD", "password")
 API_KEY        = os.getenv("API_KEY", "default-dev-key")
 SESSION_TOKEN  = secrets.token_hex(16)
 
-# SMTP Config for sending Licenses
-SMTP_SERVER   = os.getenv("SMTP_SERVER", "smtp.gmail.com")
-SMTP_PORT     = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USERNAME = os.getenv("SMTP_USERNAME", "")
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")  # Gmail App Password
-
 rzp_client = razorpay.Client(auth=(RZP_KEY_ID, RZP_KEY_SECRET))
 
 # Amounts in PAISE (1 INR = 100 paise)
 PLANS = {
     "pro_monthly": {
         "label":       "PRO Monthly",
-        "amount":      99900,
+        "amount":      99900,   # Rs. 999
         "currency":    "INR",
         "description": "FMSecure PRO - Monthly Subscription",
         "days":        31,
     },
     "pro_annual": {
         "label":       "PRO Annual",
-        "amount":      999900,
+        "amount":      999900,  # Rs. 9,999
         "currency":    "INR",
         "description": "FMSecure PRO - Annual Subscription",
         "days":        365,
@@ -70,9 +77,14 @@ limiter = Limiter(key_func=get_remote_address)
 app     = FastAPI(title="FMSecure C2")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+try:
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+except Exception:
+    pass
 
-agents   = {}  
+agents   = {}  # C2 telemetry — in-memory, resets on restart by design
 commands = {}
+
 
 # ── Database ───────────────────────────────────────────────────────────────────
 def get_db():
@@ -81,7 +93,6 @@ def get_db():
 def init_db():
     conn = get_db()
     cur  = conn.cursor()
-    
     cur.execute("""
         CREATE TABLE IF NOT EXISTS licenses (
             license_key  TEXT PRIMARY KEY,
@@ -89,9 +100,9 @@ def init_db():
             tier         TEXT NOT NULL DEFAULT 'pro_monthly',
             payment_id   TEXT,
             order_id     TEXT,
-            machine_id   TEXT,  -- NEW: Locks license to a single PC
             expires_at   TIMESTAMPTZ NOT NULL,
             active       BOOLEAN NOT NULL DEFAULT TRUE,
+            machine_id   TEXT DEFAULT NULL,
             created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
         CREATE TABLE IF NOT EXISTS pending_orders (
@@ -101,10 +112,21 @@ def init_db():
             amount      INTEGER NOT NULL,
             created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name='licenses' AND column_name='machine_id'
+            ) THEN
+                ALTER TABLE licenses ADD COLUMN machine_id TEXT DEFAULT NULL;
+            END IF;
+        END $$;
     """)
     conn.commit()
     cur.close()
     conn.close()
+    print("[DB] Tables ready.")
+
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 def _is_expired(expires_at) -> bool:
@@ -118,15 +140,17 @@ def _is_expired(expires_at) -> bool:
         return True
 
 def _generate_license_key(tier: str, email: str, payment_id: str) -> str:
+    """Deterministic HMAC key — same inputs always give the same key."""
     payload = f"{tier}:{email.lower()}:{payment_id}"
-    sig = _hmac.new(LICENSE_SECRET.encode(), payload.encode(), hashlib.sha256).hexdigest()[:16].upper()
+    sig = _hmac.new(
+        LICENSE_SECRET.encode(), payload.encode(), hashlib.sha256
+    ).hexdigest()[:16].upper()
     prefix = "PRA" if "annual" in tier else "PRM"
     return f"FMSECURE-{prefix}-{sig}"
 
 def _save_license(license_key, email, tier, payment_id, order_id, expires_iso):
     conn = get_db()
     cur  = conn.cursor()
-    # machine_id starts as NULL. It gets populated on first activation.
     cur.execute("""
         INSERT INTO licenses (license_key, email, tier, payment_id, order_id, expires_at, active)
         VALUES (%s, %s, %s, %s, %s, %s, TRUE)
@@ -137,215 +161,616 @@ def _save_license(license_key, email, tier, payment_id, order_id, expires_iso):
     cur.close()
     conn.close()
 
+def _check_admin_key(api_key: str):
+    if api_key != ADMIN_API_KEY:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
 async def verify_session(fmsecure_session: str = Cookie(None)):
     if not fmsecure_session or not secrets.compare_digest(fmsecure_session, SESSION_TOKEN):
         raise HTTPException(status_code=302, headers={"Location": "/login"})
     return True
 
-def _send_license_email(email_to: str, license_key: str, tier: str, expires_iso: str):
-    """Sends the License Key via standard Gmail SMTP"""
-    tier_label  = PLANS.get(tier, {}).get("label", "PRO")
-    expires_str = expires_iso[:10]
-    
-    if not SMTP_USERNAME or not SMTP_PASSWORD:
-        print(f"[EMAIL ERROR] Missing SMTP Variables in Railway. Key: {license_key}")
+def _send_license_email(email: str, license_key: str, tier: str, expires_iso: str):
+    import smtplib
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+ 
+    sender_email    = os.getenv("SENDER_EMAIL", "")
+    sender_password = os.getenv("SENDER_PASSWORD", "")
+    tier_label      = PLANS.get(tier, {}).get("label", "PRO")
+    expires_str     = expires_iso[:10]
+ 
+    if not sender_email or not sender_password:
+        print(f"[EMAIL] No SENDER_EMAIL set. Key for {email}: {license_key}")
         return
-
-    html_content = f"""
-    <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;
-                background:#0d1117;color:#e6edf3;padding:32px;border-radius:12px;">
-      <h2 style="color:#2f81f7;margin-top:0">FMSecure PRO Activated</h2>
-      <p>Your <strong>{tier_label}</strong> is now active. Valid until {expires_str}.</p>
-      <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;
-                  padding:20px;text-align:center;margin:24px 0;">
-        <p style="margin:0 0 8px;color:#8b949e;font-size:12px">YOUR LICENSE KEY</p>
-        <code style="font-size:20px;color:#2f81f7;letter-spacing:2px;font-weight:bold">
-          {license_key}
-        </code>
+ 
+    html = f"""<html><body style="font-family:Arial,sans-serif;background:#f4f4f4;padding:20px">
+    <div style="max-width:520px;margin:0 auto;background:#fff;padding:32px;
+                border-radius:10px;border-top:4px solid #2f81f7">
+      <h2 style="color:#1a1a2e;margin-top:0">&#128737; FMSecure PRO Activated</h2>
+      <p style="color:#555;font-size:15px">Thank you! Your <strong>{tier_label}</strong>
+         is active until <strong>{expires_str}</strong>.</p>
+      <div style="background:#f8f9fa;border:1px solid #e0e0e0;border-radius:8px;
+                  padding:24px;text-align:center;margin:28px 0">
+        <p style="margin:0 0 10px;color:#888;font-size:12px;letter-spacing:1px;font-weight:600">
+          YOUR LICENSE KEY</p>
+        <div style="font-size:22px;font-weight:700;color:#2f81f7;letter-spacing:3px;
+                    font-family:Courier,monospace;word-break:break-all">{license_key}</div>
       </div>
-      <p style="color:#8b949e;font-size:13px">
-        To activate: Open FMSecure Desktop &rarr; Click your Username &rarr;
-        Click "Upgrade to PRO" &rarr; Enter this key.
+      <div style="background:#fff8e1;border-left:4px solid #f59e0b;border-radius:4px;
+                  padding:16px;margin-bottom:20px">
+        <p style="margin:0;color:#555;font-size:14px;line-height:1.8">
+          <strong>How to activate:</strong><br>
+          1. Open <strong>FMSecure</strong> on your PC<br>
+          2. Click your <strong>username</strong> (top-right)<br>
+          3. Click <strong>Activate License</strong><br>
+          4. Paste this key &#8594; click <strong>Activate</strong>
+        </p>
+      </div>
+      <p style="color:#999;font-size:12px;border-top:1px solid #eee;padding-top:16px;margin:0">
+        This key works on <strong>one device</strong>. To transfer to a new device,
+        reply to this email.<br>FMSecure v2.0 &bull; Enterprise EDR for Windows
       </p>
-    </div>"""
-    
-    msg = MIMEMultipart()
-    msg['From'] = SMTP_USERNAME
-    msg['To'] = email_to
-    msg['Subject'] = "Your FMSecure PRO License Key"
-    msg.attach(MIMEText(html_content, 'html'))
-
+    </div></body></html>"""
+ 
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = "Your FMSecure PRO License Key"
+    msg["From"]    = f"FMSecure <{sender_email}>"
+    msg["To"]      = email
+    msg.attach(MIMEText(html, "html"))
+ 
     try:
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        server.starttls()
-        server.login(SMTP_USERNAME, SMTP_PASSWORD)
-        server.send_message(msg)
-        server.quit()
-        print(f"[EMAIL SUCCESS] License sent to {email_to}")
+        srv = smtplib.SMTP("smtp.gmail.com", 587)
+        srv.starttls()
+        srv.login(sender_email, sender_password)
+        srv.send_message(msg)
+        srv.quit()
+        print(f"[EMAIL] License key sent to {email}")
     except Exception as e:
-        print(f"[EMAIL FAILED] Could not send to {email_to}: {e}")
+        # Don't crash the payment flow — key is still on the success page and in DB
+        print(f"[EMAIL] Failed to send to {email}: {e}")
+
 
 # ══════════════════════════════════════════════════════════════════════════════
-# AUTH, C2 DASHBOARD, PRICING, PAYMENT ENDPOINTS (Unchanged)
+# AUTH
 # ══════════════════════════════════════════════════════════════════════════════
-# [Keeping all your login, dashboard, and razorpay payment routing exactly the same]
-# I have intentionally compressed this section so you can just paste the whole file
+
 @app.get("/login", response_class=HTMLResponse)
-async def login_page(error: str = ""): return f"""<!DOCTYPE html><html><body><form method="post" action="/login"><input name="username" required><input name="password" type="password" required><button type="submit">Login</button></form></body></html>"""
+async def login_page(error: str = ""):
+    err = f'<p style="color:#f85149;background:#2d1c1c;padding:10px;border-radius:6px;margin-bottom:16px;font-size:14px">{error}</p>' if error else ""
+    return f"""<!DOCTYPE html><html><head><title>FMSecure | Login</title>
+    <style>*{{box-sizing:border-box;margin:0;padding:0}}
+    body{{background:#0a0a0a;color:#e6edf3;display:flex;align-items:center;
+          justify-content:center;min-height:100vh;font-family:system-ui,sans-serif}}
+    .card{{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:40px;width:360px}}
+    h3{{color:#2f81f7;text-align:center;margin-bottom:4px}}
+    p.sub{{color:#8b949e;text-align:center;font-size:13px;margin-bottom:24px}}
+    label{{display:block;color:#8b949e;font-size:11px;font-weight:600;letter-spacing:.5px;margin-bottom:6px}}
+    input{{width:100%;background:#0d1117;border:1px solid #30363d;border-radius:6px;
+           color:#e6edf3;padding:10px 14px;font-size:14px;outline:none;margin-bottom:16px}}
+    input:focus{{border-color:#2f81f7}}
+    button{{width:100%;background:#238636;border:none;border-radius:6px;color:#fff;
+             padding:12px;font-size:14px;font-weight:600;cursor:pointer}}
+    button:hover{{background:#2ea043}}</style></head><body>
+    <div class="card">
+      <h3>FMSecure C2</h3><p class="sub">Enterprise Authentication</p>
+      {err}
+      <form method="post" action="/login">
+        <label>USERNAME</label><input name="username" type="text" required autofocus>
+        <label>PASSWORD</label><input name="password" type="password" required>
+        <button type="submit">Authenticate</button>
+      </form>
+    </div></body></html>"""
+
 @app.post("/login")
 async def process_login(username: str = Form(...), password: str = Form(...)):
     if secrets.compare_digest(username, ADMIN_USER) and secrets.compare_digest(password, ADMIN_PASS):
         resp = RedirectResponse(url="/", status_code=302)
         resp.set_cookie("fmsecure_session", SESSION_TOKEN, httponly=True, max_age=86400)
         return resp
-    return RedirectResponse(url="/login?error=Invalid", status_code=302)
+    return RedirectResponse(url="/login?error=Invalid+credentials", status_code=302)
+
 @app.get("/logout")
 async def logout():
-    resp = RedirectResponse(url="/login", status_code=302); resp.delete_cookie("fmsecure_session"); return resp
+    resp = RedirectResponse(url="/login", status_code=302)
+    resp.delete_cookie("fmsecure_session")
+    return resp
 
-class Heartbeat(BaseModel): machine_id: str; hostname: str; username: str; tier: str; is_armed: bool
+
+# ══════════════════════════════════════════════════════════════════════════════
+# C2 DASHBOARD
+# ══════════════════════════════════════════════════════════════════════════════
+
+class Heartbeat(BaseModel):
+    machine_id: str
+    hostname: str
+    username: str
+    tier: str
+    is_armed: bool
+
 @app.post("/api/heartbeat")
 @limiter.limit("200/minute")
 async def receive_heartbeat(request: Request, data: Heartbeat):
-    if request.headers.get("x-api-key") != API_KEY: raise HTTPException(status_code=401, detail="Unauthorized")
-    agents[data.machine_id] = {"hostname": data.hostname, "username": data.username, "tier": data.tier, "is_armed": data.is_armed, "last_seen": time.time(), "ip": request.client.host}
+    if request.headers.get("x-api-key") != API_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    agents[data.machine_id] = {
+        "hostname": data.hostname, "username": data.username,
+        "tier": data.tier, "is_armed": data.is_armed,
+        "last_seen": time.time(), "ip": request.client.host
+    }
     cmd = commands.pop(data.machine_id, "NONE")
     return {"status": "ok", "command": cmd}
 
 @app.post("/api/trigger_lockdown/{machine_id}")
 async def trigger_lockdown(machine_id: str, _: bool = Depends(verify_session)):
-    commands[machine_id] = "LOCKDOWN"; return {"status": "Lockdown command queued"}
+    commands[machine_id] = "LOCKDOWN"
+    return {"status": "Lockdown command queued"}
 
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(_: bool = Depends(verify_session)):
-    now = time.time(); rows = ""
+    now = time.time()
+    rows = ""
     for mid, info in agents.items():
-        sb = '<span style="color:#238636">ONLINE</span>' if (now - info["last_seen"]) < 30 else '<span style="color:#8b949e">OFFLINE</span>'
-        rows += f"<tr><td>{mid[:14]}...</td><td>{info['hostname']}</td><td>{info['username']}</td><td>{info['ip']}</td><td>{sb}</td></tr>"
-    return f"<!DOCTYPE html><html><body><nav>FMSecure C2 <a href='/licenses'>Licenses</a></nav><table>{rows}</table></body></html>"
+        online = (now - info["last_seen"]) < 30
+        sb = ('<span style="background:#238636;color:#fff;padding:2px 8px;border-radius:4px;font-size:12px">ONLINE</span>'
+              if online else '<span style="background:#30363d;color:#8b949e;padding:2px 8px;border-radius:4px;font-size:12px">OFFLINE</span>')
+        ab = ('<span style="background:#1f6feb;color:#fff;padding:2px 8px;border-radius:4px;font-size:12px">ARMED</span>'
+              if info["is_armed"] else '<span style="background:#9e6a03;color:#fff;padding:2px 8px;border-radius:4px;font-size:12px">UNARMED</span>')
+        rows += (f"<tr><td style='font-family:monospace;color:#8b949e'>{mid[:14]}...</td>"
+                 f"<td><strong>{info['hostname']}</strong></td><td>{info['username']}</td>"
+                 f"<td>{info['ip']}</td><td>{sb}</td><td>{ab}</td>"
+                 f"<td><button onclick=\"lock('{mid}')\" style='background:#da3633;color:#fff;"
+                 f"border:none;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:13px'>ISOLATE</button></td></tr>")
+    if not rows:
+        rows = "<tr><td colspan='7' style='text-align:center;color:#484f58;padding:32px'>No endpoints connected</td></tr>"
+
+    return f"""<!DOCTYPE html><html><head><title>FMSecure C2</title>
+    <style>*{{box-sizing:border-box;margin:0;padding:0}}
+    body{{background:#0a0a0a;color:#e6edf3;font-family:system-ui,sans-serif}}
+    nav{{background:#161b22;border-bottom:1px solid #30363d;padding:16px 24px;
+         display:flex;justify-content:space-between;align-items:center}}
+    .brand{{color:#2f81f7;font-weight:700;font-size:18px}}
+    a{{color:#8b949e;text-decoration:none;font-size:13px;margin-left:16px}}a:hover{{color:#e6edf3}}
+    .container{{padding:24px}}
+    table{{width:100%;border-collapse:collapse;background:#161b22;border-radius:8px;overflow:hidden}}
+    th{{background:#0d1117;color:#8b949e;padding:12px 16px;text-align:left;
+        font-size:12px;font-weight:600;letter-spacing:.5px}}
+    td{{padding:12px 16px;border-top:1px solid #21262d;font-size:14px}}</style></head><body>
+    <nav><span class="brand">FMSecure Global C2</span>
+    <div><a href="/licenses">Licenses</a><a href="/pricing">Pricing</a><a href="/logout">Logout</a></div></nav>
+    <div class="container"><table><thead><tr>
+      <th>MACHINE ID</th><th>HOSTNAME</th><th>USER</th><th>IP</th>
+      <th>STATUS</th><th>ENGINE</th><th>ACTION</th>
+    </tr></thead><tbody>{rows}</tbody></table></div>
+    <script>
+      setTimeout(()=>location.reload(),5000);
+      async function lock(mid){{
+        if(confirm("Isolate this endpoint?")){{
+          await fetch("/api/trigger_lockdown/"+mid,{{method:"POST"}});
+          alert("Lockdown queued!");}}}}
+    </script></body></html>"""
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PRICING PAGE (public — no login required)
+# ══════════════════════════════════════════════════════════════════════════════
 
 @app.get("/pricing", response_class=HTMLResponse)
 async def pricing_page():
-    return f"""<!DOCTYPE html><html><head><title>FMSecure PRO</title><script src="https://checkout.razorpay.com/v1/checkout.js"></script></head>
-    <body style="background:#0d1117;color:#e6edf3;font-family:sans-serif;text-align:center;padding:50px;">
-    <h1>Get FMSecure PRO</h1>
-    <input type="email" id="email" placeholder="Enter email to receive license key" style="padding:10px;width:300px;margin:20px 0;"><br>
-    <button onclick="startPayment('pro_monthly')" style="padding:10px 20px;background:#2f81f7;color:#fff;border:none;border-radius:5px;cursor:pointer;margin:10px;">Buy Monthly (Rs.999)</button>
-    <button onclick="startPayment('pro_annual')" style="padding:10px 20px;background:#238636;color:#fff;border:none;border-radius:5px;cursor:pointer;margin:10px;">Buy Annual (Rs.9999)</button>
+    base   = APP_BASE_URL
+    rzpkey = RZP_KEY_ID
+    return f"""<!DOCTYPE html><html><head><title>FMSecure PRO — Pricing</title>
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <style>
+      *{{box-sizing:border-box;margin:0;padding:0}}
+      body{{background:#0d1117;color:#e6edf3;font-family:system-ui,sans-serif;min-height:100vh}}
+      nav{{background:#161b22;border-bottom:1px solid #30363d;padding:16px 48px;
+           display:flex;justify-content:space-between;align-items:center}}
+      .brand{{color:#2f81f7;font-weight:700;font-size:20px;text-decoration:none}}
+      main{{max-width:900px;margin:0 auto;padding:64px 24px}}
+      h1{{text-align:center;font-size:36px;font-weight:700;margin-bottom:12px}}
+      .sub{{text-align:center;color:#8b949e;font-size:16px;margin-bottom:56px}}
+      .cards{{display:flex;gap:24px;justify-content:center;flex-wrap:wrap}}
+      .card{{background:#161b22;border:1px solid #30363d;border-radius:16px;
+             padding:36px 32px;width:340px;position:relative}}
+      .card.featured{{border-color:#2f81f7}}
+      .badge{{position:absolute;top:-13px;left:50%;transform:translateX(-50%);
+              background:#2f81f7;color:#fff;padding:4px 16px;border-radius:20px;
+              font-size:12px;font-weight:600;letter-spacing:.5px;white-space:nowrap}}
+      .plan{{color:#8b949e;font-size:12px;font-weight:600;letter-spacing:.5px;margin-bottom:8px}}
+      .price{{font-size:42px;font-weight:700;margin-bottom:4px}}
+      .price span{{font-size:18px;color:#8b949e;font-weight:400}}
+      .period{{color:#8b949e;font-size:14px;margin-bottom:28px}}
+      .savings{{color:#3fb950}}
+      .email-row{{margin-bottom:16px}}
+      .email-row label{{display:block;font-size:11px;color:#8b949e;font-weight:600;
+                        letter-spacing:.5px;margin-bottom:6px}}
+      .email-row input{{width:100%;background:#0d1117;border:1px solid #30363d;
+                        border-radius:6px;color:#e6edf3;padding:10px 12px;
+                        font-size:14px;outline:none}}
+      .email-row input:focus{{border-color:#2f81f7}}
+      ul{{list-style:none;margin-bottom:28px}}
+      li{{padding:8px 0;font-size:14px;border-bottom:1px solid #21262d;color:#8b949e}}
+      li:last-child{{border-bottom:none}}
+      li strong{{color:#e6edf3}}
+      .check{{color:#3fb950;margin-right:8px;font-weight:700}}
+      .btn{{width:100%;padding:14px;border:none;border-radius:8px;font-size:15px;
+             font-weight:600;cursor:pointer;transition:opacity .15s}}
+      .btn:hover{{opacity:.85}}
+      .btn-blue{{background:#2f81f7;color:#fff}}
+      .btn-green{{background:#238636;color:#fff}}
+      .note{{text-align:center;color:#484f58;font-size:13px;margin-top:36px;line-height:1.7}}
+      footer{{text-align:center;color:#484f58;font-size:13px;padding:48px 24px}}
+    </style></head><body>
+    <nav>
+      <a class="brand" href="/pricing">FMSecure</a>
+      <span style="color:#8b949e;font-size:14px">Enterprise EDR for Windows</span>
+    </nav>
+    <main>
+      <h1>Simple, transparent pricing</h1>
+      <p class="sub">No hidden fees. Cancel anytime. Your license key is emailed instantly.</p>
+      <div class="cards">
+
+        <div class="card">
+          <p class="plan">PRO MONTHLY</p>
+          <div class="price">&#x20B9;999<span>/mo</span></div>
+          <p class="period">Billed monthly, cancel anytime</p>
+          <div class="email-row">
+            <label>YOUR EMAIL (license will be sent here)</label>
+            <input type="email" id="email-monthly" placeholder="you@example.com">
+          </div>
+          <ul>
+            <li><span class="check">&#10003;</span><strong>5 folders</strong> monitored simultaneously</li>
+            <li><span class="check">&#10003;</span><strong>Active Defense</strong> + auto-heal vault</li>
+            <li><span class="check">&#10003;</span><strong>Ransomware killswitch</strong></li>
+            <li><span class="check">&#10003;</span><strong>USB DLP</strong> device control</li>
+            <li><span class="check">&#10003;</span><strong>Google Drive</strong> cloud backup</li>
+            <li><span class="check">&#10003;</span><strong>Forensic vault</strong> + incident snapshots</li>
+            <li><span class="check">&#10003;</span>Email security alerts</li>
+          </ul>
+          <button class="btn btn-blue" onclick="startPayment('pro_monthly')">
+            Buy Monthly &#x2014; &#x20B9;999
+          </button>
+        </div>
+
+        <div class="card featured">
+          <div class="badge">BEST VALUE &#x2014; SAVE &#x20B9;1,989</div>
+          <p class="plan">PRO ANNUAL</p>
+          <div class="price">&#x20B9;9,999<span>/yr</span></div>
+          <p class="period">&#x20B9;833/mo billed annually <span class="savings">&#x2714; 2 months free</span></p>
+          <div class="email-row">
+            <label>YOUR EMAIL (license will be sent here)</label>
+            <input type="email" id="email-annual" placeholder="you@example.com">
+          </div>
+          <ul>
+            <li><span class="check">&#10003;</span><strong>Everything</strong> in Monthly</li>
+            <li><span class="check">&#10003;</span><strong>Priority</strong> email support</li>
+            <li><span class="check">&#10003;</span><strong>Early access</strong> to new features</li>
+            <li><span class="check">&#10003;</span>Feature request priority</li>
+            <li><span class="check">&#10003;</span>Invoice / receipt for business</li>
+            <li><span class="check">&#10003;</span>Extended 30-day offline grace period</li>
+            <li><span class="check">&#10003;</span>2 months free vs monthly billing</li>
+          </ul>
+          <button class="btn btn-green" onclick="startPayment('pro_annual')">
+            Buy Annual &#x2014; &#x20B9;9,999
+          </button>
+        </div>
+
+      </div>
+      <p class="note">
+        Payments secured by Razorpay &bull; UPI, Net Banking, Credit/Debit Cards, Wallets accepted<br>
+        Your license key is emailed immediately after payment &bull; Works on Windows 10/11
+      </p>
+    </main>
+    <footer>FMSecure v2.0 &bull; Enterprise Endpoint Detection &amp; Response &bull; Made in India</footer>
+
     <script>
     async function startPayment(tier) {{
-      const email = document.getElementById('email').value.trim();
-      if (!email) return alert('Enter email');
-      const resp = await fetch('{APP_BASE_URL}/payment/create-order', {{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{tier,email}})}});
-      const orderData = await resp.json();
-      new Razorpay({{
-        key: '{RZP_KEY_ID}', amount: orderData.amount, currency: orderData.currency, name: 'FMSecure', order_id: orderData.order_id, prefill: {{email: email}},
-        handler: async function(response) {{
-          const vResp = await fetch('{APP_BASE_URL}/payment/verify', {{method:'POST',headers:{{'Content-Type':'application/json'}},
-            body:JSON.stringify({{razorpay_order_id:response.razorpay_order_id,razorpay_payment_id:response.razorpay_payment_id,razorpay_signature:response.razorpay_signature,email:email,tier:tier}})}});
-          const result = await vResp.json();
-          if(result.success) window.location.href = '{APP_BASE_URL}/payment/success?key='+result.license_key+'&email='+email;
-          else alert('Failed');
-        }}
-      }}).open();
-    }}
-    </script></body></html>"""
+      const emailField = tier === 'pro_monthly' ? 'email-monthly' : 'email-annual';
+      const email = document.getElementById(emailField).value.trim();
 
-class CreateOrderRequest(BaseModel): tier: str; email: str
-class VerifyPaymentRequest(BaseModel): razorpay_order_id: str; razorpay_payment_id: str; razorpay_signature: str; email: str; tier: str
+      if (!email || !email.includes('@') || !email.includes('.')) {{
+        alert('Please enter a valid email address before paying.\\nYour license key will be sent there.');
+        document.getElementById(emailField).focus();
+        return;
+      }}
+
+      // Step 1: Ask our server to create a Razorpay order
+      let orderData;
+      try {{
+        const resp = await fetch('{base}/payment/create-order', {{
+          method: 'POST',
+          headers: {{'Content-Type': 'application/json'}},
+          body: JSON.stringify({{ tier, email }})
+        }});
+        orderData = await resp.json();
+      }} catch(e) {{
+        alert('Could not connect to payment server. Please try again in a moment.');
+        return;
+      }}
+
+      if (orderData.error) {{
+        alert('Error: ' + orderData.error);
+        return;
+      }}
+
+      // Step 2: Open Razorpay checkout popup
+      const options = {{
+        key:         '{rzpkey}',
+        amount:      orderData.amount,
+        currency:    orderData.currency,
+        name:        'FMSecure',
+        description: orderData.description,
+        order_id:    orderData.order_id,
+        prefill:     {{ email: email }},
+        theme:       {{ color: '#2f81f7' }},
+
+        handler: async function(response) {{
+          // Step 3: Payment done — verify the signature on our server
+          let result;
+          try {{
+            const vResp = await fetch('{base}/payment/verify', {{
+              method: 'POST',
+              headers: {{'Content-Type': 'application/json'}},
+              body: JSON.stringify({{
+                razorpay_order_id:   response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature:  response.razorpay_signature,
+                email: email,
+                tier:  tier
+              }})
+            }});
+            result = await vResp.json();
+          }} catch(e) {{
+            alert('Verification error. Please contact support with your payment ID: ' + response.razorpay_payment_id);
+            return;
+          }}
+
+          if (result.success) {{
+            window.location.href = '{base}/payment/success?key='
+              + encodeURIComponent(result.license_key)
+              + '&email=' + encodeURIComponent(email)
+              + '&tier=' + encodeURIComponent(tier);
+          }} else {{
+            alert('Payment verification failed. Please contact support.\\nPayment ID: ' + response.razorpay_payment_id);
+          }}
+        }},
+
+        modal: {{ ondismiss: function() {{}} }}
+      }};
+
+      new Razorpay(options).open();
+    }}
+    </script>
+    </body></html>"""
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PAYMENT ENDPOINTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+class CreateOrderRequest(BaseModel):
+    tier:  str
+    email: str
+
+class VerifyPaymentRequest(BaseModel):
+    razorpay_order_id:   str
+    razorpay_payment_id: str
+    razorpay_signature:  str
+    email:               str
+    tier:                str
+
 
 @app.post("/payment/create-order")
 @limiter.limit("20/minute")
 async def create_order(request: Request, body: CreateOrderRequest):
-    tier = body.tier.strip().lower(); email = body.email.strip().lower()
+    """
+    Called by the browser before the checkout popup opens.
+    Creates a Razorpay order and returns the order_id.
+    """
+    tier  = body.tier.strip().lower()
+    email = body.email.strip().lower()
+
+    if tier not in PLANS:
+        return JSONResponse({"error": "Invalid plan"}, status_code=400)
+    if not email or "@" not in email:
+        return JSONResponse({"error": "Invalid email"}, status_code=400)
+
     plan = PLANS[tier]
-    order = rzp_client.order.create({"amount": plan["amount"], "currency": plan["currency"], "receipt": f"fm_{uuid.uuid4().hex[:8]}"})
     try:
-        conn = get_db(); cur = conn.cursor()
-        cur.execute("INSERT INTO pending_orders (order_id, email, tier, amount) VALUES (%s, %s, %s, %s) ON CONFLICT DO NOTHING", (order["id"], email, tier, plan["amount"]))
-        conn.commit(); cur.close(); conn.close()
-    except: pass
-    return {"order_id": order["id"], "amount": plan["amount"], "currency": plan["currency"]}
+        order = rzp_client.order.create({
+            "amount":   plan["amount"],
+            "currency": plan["currency"],
+            "receipt":  f"fm_{uuid.uuid4().hex[:8]}",
+            "notes":    {"email": email, "tier": tier}
+        })
+    except Exception as e:
+        print(f"[RZP] Order creation failed: {e}")
+        return JSONResponse({"error": "Payment gateway error"}, status_code=500)
+
+    # Save pending order so we can reference it later
+    try:
+        conn = get_db()
+        cur  = conn.cursor()
+        cur.execute("""
+            INSERT INTO pending_orders (order_id, email, tier, amount)
+            VALUES (%s, %s, %s, %s) ON CONFLICT (order_id) DO NOTHING
+        """, (order["id"], email, tier, plan["amount"]))
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        print(f"[DB] Pending order save error: {e}")
+
+    return {
+        "order_id":    order["id"],
+        "amount":      plan["amount"],
+        "currency":    plan["currency"],
+        "description": plan["description"],
+    }
+
 
 @app.post("/payment/verify")
 @limiter.limit("20/minute")
 async def verify_payment(request: Request, body: VerifyPaymentRequest):
-    try: rzp_client.utility.verify_payment_signature({'razorpay_order_id': body.razorpay_order_id, 'razorpay_payment_id': body.razorpay_payment_id, 'razorpay_signature': body.razorpay_signature})
-    except: return JSONResponse({"success": False}, status_code=400)
-    tier = body.tier.strip().lower(); email = body.email.strip().lower()
-    days = PLANS.get(tier, {}).get("days", 31)
+    """
+    Called by the browser after the Razorpay popup closes successfully.
+    """
+    # 1. Official Razorpay Signature Verification
+    try:
+        rzp_client.utility.verify_payment_signature({
+            'razorpay_order_id': body.razorpay_order_id,
+            'razorpay_payment_id': body.razorpay_payment_id,
+            'razorpay_signature': body.razorpay_signature
+        })
+    except razorpay.errors.SignatureVerificationError:
+        print(f"❌ [RZP ERROR] Signature mismatch! Check if RAZORPAY_KEY_SECRET is correct in Railway.")
+        return JSONResponse({"success": False, "error": "Signature verification failed"}, status_code=400)
+
+    # 2. Signature valid — generate the license
+    tier        = body.tier.strip().lower()
+    email       = body.email.strip().lower()
+    payment_id  = body.razorpay_payment_id
+    order_id    = body.razorpay_order_id
+    days        = PLANS.get(tier, {}).get("days", 31)
     expires_iso = (datetime.now(timezone.utc) + timedelta(days=days)).isoformat()
-    license_key = _generate_license_key(tier, email, body.razorpay_payment_id)
-    _save_license(license_key, email, tier, body.razorpay_payment_id, body.razorpay_order_id, expires_iso)
+    license_key = _generate_license_key(tier, email, payment_id)
+
+    # 3. Save to PostgreSQL Database
+    try:
+        _save_license(license_key, email, tier, payment_id, order_id, expires_iso)
+    except Exception as e:
+        print(f"❌ [DB ERROR] Failed to save license to Postgres: {e}")
+        return JSONResponse({"success": False, "error": "Database error — please contact support"}, status_code=500)
+
+    # 4. Clean up pending order
+    try:
+        conn = get_db()
+        cur  = conn.cursor()
+        cur.execute("DELETE FROM pending_orders WHERE order_id = %s", (order_id,))
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        print(f"⚠️ [DB WARNING] Could not delete pending order: {e}")
+
+    # 5. Send Email and Return Success
     _send_license_email(email, license_key, tier, expires_iso)
+    print(f"✅ [PAYMENT SUCCESS] Generated key {license_key} for {email}")
+
     return {"success": True, "license_key": license_key, "tier": tier, "expires_at": expires_iso}
 
+
 @app.get("/payment/success", response_class=HTMLResponse)
-async def payment_success(key: str = "", email: str = ""):
-    return f"""<!DOCTYPE html><html><body style="background:#0d1117;color:#e6edf3;font-family:sans-serif;text-align:center;padding:50px;">
-    <h2 style="color:#3fb950">Payment successful!</h2>
-    <p>We've emailed this key to <strong>{email}</strong></p>
-    <div style="background:#161b22;padding:20px;margin:20px auto;width:300px;border-radius:8px">
-      <div style="font-family:monospace;color:#2f81f7;font-size:20px">{key}</div>
-    </div>
-    <p style="color:#8b949e">Enter this key in the FMSecure Desktop App to activate PRO.</p>
-    </body></html>"""
+async def payment_success(key: str = "", email: str = "", tier: str = ""):
+    tier_label = PLANS.get(tier, {}).get("label", "PRO")
+    return f"""<!DOCTYPE html><html><head><title>Payment Successful | FMSecure</title>
+    <style>*{{box-sizing:border-box;margin:0;padding:0}}
+    body{{background:#0d1117;color:#e6edf3;font-family:system-ui,sans-serif;
+         display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px}}
+    .card{{background:#161b22;border:1px solid #238636;border-radius:16px;
+           padding:48px 40px;max-width:480px;width:100%;text-align:center}}
+    .icon{{font-size:56px;margin-bottom:16px}}
+    h2{{color:#3fb950;font-size:24px;margin-bottom:8px}}
+    p{{color:#8b949e;font-size:15px;margin-bottom:0;line-height:1.6}}
+    .key-box{{background:#0d1117;border:1px solid #30363d;border-radius:8px;
+              padding:20px;margin:24px 0}}
+    .key-label{{color:#484f58;font-size:11px;letter-spacing:1px;margin-bottom:10px}}
+    .key{{color:#2f81f7;font-size:20px;font-family:monospace;font-weight:700;
+          letter-spacing:2px;word-break:break-all}}
+    .copy-btn{{margin-top:14px;background:#30363d;border:none;color:#e6edf3;
+               padding:8px 20px;border-radius:6px;cursor:pointer;font-size:13px}}
+    .copy-btn:hover{{background:#3d444d}}
+    .steps{{text-align:left;background:#0d1117;border-radius:8px;padding:20px 24px;
+            font-size:14px;color:#8b949e;line-height:2.2;margin-top:0}}
+    strong{{color:#e6edf3}}</style></head><body>
+    <div class="card">
+      <div class="icon">&#9989;</div>
+      <h2>Payment successful!</h2>
+      <p>Your <strong>{tier_label}</strong> is now active.<br>
+         We've also emailed this key to <strong>{email}</strong></p>
+      <div class="key-box">
+        <div class="key-label">YOUR LICENSE KEY</div>
+        <div class="key" id="lk">{key}</div>
+        <button class="copy-btn" onclick="navigator.clipboard.writeText('{key}');this.textContent='&#10003; Copied!'">
+          Copy key
+        </button>
+      </div>
+      <div class="steps">
+        <strong>How to activate in FMSecure:</strong><br>
+        1. Open <strong>FMSecure</strong> on your PC<br>
+        2. Click your <strong>username</strong> (top-right corner)<br>
+        3. Click <strong>Activate License</strong><br>
+        4. Enter your email + paste this key<br>
+        5. Click <strong>Activate</strong> &#x2014; PRO unlocked!
+      </div>
+    </div></body></html>"""
+
 
 # ══════════════════════════════════════════════════════════════════════════════
-# NEW: DEVICE-BOUND LICENSE VALIDATION 
+# LICENSE VALIDATION (called by the desktop app)
 # ══════════════════════════════════════════════════════════════════════════════
 
 class LicenseValidateRequest(BaseModel):
     license_key: str
-    machine_id: str  # We now require Hardware ID instead of an Email
+    machine_id:  str   # sent by the desktop app; email is NOT required
 
 @app.post("/api/license/validate")
 async def validate_license(req: LicenseValidateRequest):
-    key  = req.license_key.strip()
-    hwid = req.machine_id.strip()  # Hardware ID passed from desktop app
-    
+    """
+    Device-based license validation.
+    Reasons returned:
+      key_not_found        — key doesn't exist in DB
+      subscription_expired — key exists but expired or deactivated
+      device_mismatch      — key is bound to a different machine
+      activated            — first-time activation (just bound to this device)
+      ok                   — valid, returning device
+    """
+    key = req.license_key.strip()
+    mid = req.machine_id.strip()
+ 
     if not DATABASE_URL:
         return {"valid": False, "tier": "free", "reason": "db_not_configured"}
-        
+    if not key or not mid:
+        return {"valid": False, "tier": "free", "reason": "missing_fields"}
+ 
     try:
         conn = get_db()
         cur  = conn.cursor()
         cur.execute("SELECT * FROM licenses WHERE license_key = %s", (key,))
         r = cur.fetchone()
-        
-        # 1. Does the key exist?
-        if not r:
-            cur.close()
-            conn.close()
-            return {"valid": False, "tier": "free", "reason": "key_not_found", "message": "Invalid License Key."}
-
-        # 2. Is it expired?
-        if not r["active"] or _is_expired(r["expires_at"]):
-            cur.close()
-            conn.close()
-            return {"valid": False, "tier": "free", "reason": "subscription_expired", "message": "License expired."}
-
-        # 3. DEVICE BINDING LOGIC
-        if r["machine_id"] is None:
-            # First time use! Bind it to this PC permanently
-            cur.execute("UPDATE licenses SET machine_id = %s WHERE license_key = %s", (hwid, key))
-            conn.commit()
-            print(f"🔒 Bounded License {key} to Machine ID {hwid}")
-            
-        elif r["machine_id"] != hwid:
-            # Somebody is trying to use this key on a 2nd computer! Block it.
-            cur.close()
-            conn.close()
-            return {"valid": False, "tier": "free", "reason": "device_mismatch", 
-                    "message": "This License is already in use on another computer."}
-
-        cur.close()
-        conn.close()
-        return {"valid": True, "tier": r["tier"], "expires_at": r["expires_at"].isoformat(), "reason": "ok"}
-        
     except Exception as e:
-        print(f"Validation Error: {e}")
         return {"valid": False, "tier": "free", "reason": "db_error"}
+ 
+    if not r:
+        cur.close(); conn.close()
+        return {"valid": False, "tier": "free", "expires_at": None, "reason": "key_not_found"}
+ 
+    if not r["active"] or _is_expired(r["expires_at"]):
+        cur.close(); conn.close()
+        return {"valid": False, "tier": "free",
+                "expires_at": r["expires_at"].isoformat() if r["expires_at"] else None,
+                "reason": "subscription_expired"}
+ 
+    bound = r["machine_id"]
+ 
+    if bound is None:
+        # First activation — bind key to this device
+        cur.execute("UPDATE licenses SET machine_id = %s WHERE license_key = %s", (mid, key))
+        conn.commit()
+        cur.close(); conn.close()
+        print(f"[LICENSE] Bound {key[:20]}... to device {mid[:20]}...")
+        return {"valid": True, "tier": r["tier"],
+                "expires_at": r["expires_at"].isoformat(), "reason": "activated"}
+ 
+    if bound == mid:
+        cur.close(); conn.close()
+        return {"valid": True, "tier": r["tier"],
+                "expires_at": r["expires_at"].isoformat(), "reason": "ok"}
+ 
+    # Different device
+    cur.close(); conn.close()
+    return {"valid": False, "tier": "free", "expires_at": None, "reason": "device_mismatch"}
 
 @app.post("/api/license/activate")
 async def activate_license(req: LicenseValidateRequest):
@@ -353,27 +778,116 @@ async def activate_license(req: LicenseValidateRequest):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# DB PATCH ENDPOINT
+# ADMIN ENDPOINTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/api/license/list")
+async def list_licenses(api_key: str = ""):
+    _check_admin_key(api_key)
+    conn = get_db()
+    cur  = conn.cursor()
+    cur.execute("SELECT * FROM licenses ORDER BY created_at DESC")
+    rows = [dict(r) for r in cur.fetchall()]
+    cur.close()
+    conn.close()
+    return {"count": len(rows), "licenses": rows}
+
+@app.post("/api/license/create_manual")
+async def create_manual_license(email: str, tier: str = "pro_monthly",
+                                 days: int = 30, api_key: str = ""):
+    """Create a license without payment — for testers and beta users."""
+    _check_admin_key(api_key)
+    sub_id      = f"manual_{uuid.uuid4().hex[:8]}"
+    expires_iso = (datetime.now(timezone.utc) + timedelta(days=days)).isoformat()
+    license_key = _generate_license_key(tier, email, sub_id)
+    _save_license(license_key, email, tier, sub_id, sub_id, expires_iso)
+    return {"license_key": license_key, "email": email,
+            "tier": tier, "expires_at": expires_iso}
+
+@app.post("/api/license/release_device")
+async def release_device_binding(license_key: str, api_key: str = ""):
+    """
+    Admin: release a key's device binding so the customer can activate
+    on a new device (e.g. they bought a new PC).
+ 
+    Call it:
+      POST /api/license/release_device
+           ?license_key=FMSECURE-PRM-XXXXXXXX&api_key=YOUR_ADMIN_KEY
+    """
+    _check_admin_key(api_key)
+    conn = get_db()
+    cur  = conn.cursor()
+    cur.execute(
+        "UPDATE licenses SET machine_id = NULL WHERE license_key = %s RETURNING email, tier",
+        (license_key,)
+    )
+    row = cur.fetchone()
+    conn.commit()
+    cur.close()
+    conn.close()
+    if not row:
+        raise HTTPException(status_code=404, detail="License key not found")
+    return {
+        "message":     "Device binding released. Customer can now activate on a new device.",
+        "license_key": license_key,
+        "email":       row["email"],
+    }
+
+@app.get("/licenses", response_class=HTMLResponse)
+async def licenses_page(_: bool = Depends(verify_session)):
+    conn = get_db()
+    cur  = conn.cursor()
+    cur.execute("SELECT * FROM licenses ORDER BY created_at DESC LIMIT 500")
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    table_rows = ""
+    for r in rows:
+        expired = _is_expired(r["expires_at"])
+        sb = ('<span style="background:#238636;color:#fff;padding:2px 8px;border-radius:4px;font-size:12px">Active</span>'
+              if not expired and r["active"]
+              else '<span style="background:#da3633;color:#fff;padding:2px 8px;border-radius:4px;font-size:12px">Expired</span>')
+        exp = r["expires_at"].strftime("%Y-%m-%d") if r["expires_at"] else "—"
+        table_rows += (f"<tr><td style='font-family:monospace;font-size:12px'>{r['license_key']}</td>"
+                       f"<td>{r['email']}</td><td>{r['tier']}</td><td>{sb}</td><td>{exp}</td></tr>")
+    return f"""<!DOCTYPE html><html><head><title>FMSecure | Licenses</title>
+    <style>*{{box-sizing:border-box;margin:0;padding:0}}
+    body{{background:#0a0a0a;color:#e6edf3;font-family:system-ui,sans-serif}}
+    nav{{background:#161b22;border-bottom:1px solid #30363d;padding:16px 24px;
+         display:flex;justify-content:space-between;align-items:center}}
+    .brand{{color:#2f81f7;font-weight:700}}
+    a{{color:#8b949e;text-decoration:none;font-size:13px;margin-left:16px}}a:hover{{color:#e6edf3}}
+    .container{{padding:24px}}
+    table{{width:100%;border-collapse:collapse;background:#161b22;border-radius:8px;overflow:hidden}}
+    th{{background:#0d1117;color:#8b949e;padding:12px 16px;text-align:left;
+        font-size:12px;font-weight:600;letter-spacing:.5px}}
+    td{{padding:12px 16px;border-top:1px solid #21262d;font-size:13px}}</style></head><body>
+    <nav><span class="brand">License Manager</span>
+    <div><a href="/">&#x2190; C2 Dashboard</a><a href="/logout">Logout</a></div></nav>
+    <div class="container"><table><thead><tr>
+      <th>LICENSE KEY</th><th>EMAIL</th><th>TIER</th><th>STATUS</th><th>EXPIRES</th>
+    </tr></thead><tbody>{table_rows}</tbody></table></div></body></html>"""
+
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TEMPORARY DB PATCH ENDPOINT
 # ══════════════════════════════════════════════════════════════════════════════
 
 @app.get("/api/db-fix")
 async def fix_db():
-    """Patches the database to add the new machine_id column"""
+    """Temporary endpoint to forcefully patch the database schema"""
     try:
         conn = get_db()
         cur  = conn.cursor()
+        
+        # Forcefully inject the missing columns into the existing table
         cur.execute("ALTER TABLE licenses ADD COLUMN IF NOT EXISTS payment_id TEXT;")
         cur.execute("ALTER TABLE licenses ADD COLUMN IF NOT EXISTS order_id TEXT;")
-        cur.execute("ALTER TABLE licenses ADD COLUMN IF NOT EXISTS machine_id TEXT;")
+        
         conn.commit()
         cur.close()
         conn.close()
-        return {"success": True, "message": "Database patched! Hardware Binding enabled."}
+        return {"success": True, "message": "Database successfully patched! Missing columns added."}
     except Exception as e:
         return {"success": False, "error": str(e)}
-
-@app.get("/licenses", response_class=HTMLResponse)
-async def licenses_page(_: bool = Depends(verify_session)):
-    conn = get_db(); cur = conn.cursor(); cur.execute("SELECT * FROM licenses ORDER BY created_at DESC"); rows = cur.fetchall(); cur.close(); conn.close()
-    tr = "".join([f"<tr><td>{r['license_key']}</td><td>{r['email']}</td><td>{r['machine_id'] or 'Unbound'}</td><td>{r['expires_at'].strftime('%Y-%m-%d')}</td></tr>" for r in rows])
-    return f"<!DOCTYPE html><html><body><nav>License Manager <a href='/'>C2 Dashboard</a></nav><table border=1><tr><th>KEY</th><th>EMAIL</th><th>MACHINE ID</th><th>EXPIRES</th></tr>{tr}</table></body></html>"
