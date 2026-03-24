@@ -305,71 +305,148 @@ async def dashboard(_: bool = Depends(verify_session)):
 @app.get("/home", response_class=HTMLResponse)
 async def landing_page():
     base = APP_BASE_URL
-    return f"""<!DOCTYPE html><html><head><title>FMSecure — Enterprise EDR for Windows</title>
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FMSecure — Enterprise EDR for Windows</title>
+    <link rel="icon" href="/static/app_icon.png" type="image/png">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
     <style>
-      *{{box-sizing:border-box;margin:0;padding:0}}body{{background:#0d1117;color:#e6edf3;font-family:system-ui,sans-serif;line-height:1.6}}
-      nav{{background:#161b22;border-bottom:1px solid #30363d;padding:16px 48px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:10}}
-      .brand{{color:#2f81f7;font-weight:700;font-size:20px;text-decoration:none}}
-      .nav-links a{{color:#8b949e;text-decoration:none;font-size:14px;margin-left:28px}}
-      .nav-links a:hover{{color:#e6edf3}}
-      .btn-nav{{background:#238636;color:#fff!important;padding:8px 20px;border-radius:6px;font-weight:600!important}}
-      .hero{{max-width:800px;margin:0 auto;padding:100px 24px 80px;text-align:center}}
-      .badge{{display:inline-block;background:#1f2937;border:1px solid #30363d;color:#8b949e;font-size:12px;padding:4px 14px;border-radius:20px;margin-bottom:24px}}
-      .badge span{{color:#3fb950}}
-      h1{{font-size:52px;font-weight:700;line-height:1.15;margin-bottom:20px}}
-      h1 span{{color:#2f81f7}}
-      .hero p{{color:#8b949e;font-size:18px;max-width:560px;margin:0 auto 40px}}
-      .hero-btns{{display:flex;gap:16px;justify-content:center;flex-wrap:wrap}}
-      .btn-primary{{background:#2f81f7;color:#fff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:16px}}
-      .btn-secondary{{background:transparent;color:#e6edf3;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:16px;border:1px solid #30363d}}
-      .btn-primary:hover{{background:#1a6fd0}}.btn-secondary:hover{{border-color:#8b949e}}
-      .features{{max-width:1100px;margin:0 auto;padding:80px 24px}}
-      .features h2{{text-align:center;font-size:32px;margin-bottom:56px}}
-      .grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px}}
-      .feat{{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:28px}}
-      .feat-icon{{font-size:28px;margin-bottom:16px}}
-      .feat h3{{font-size:17px;margin-bottom:8px;color:#e6edf3}}
-      .feat p{{color:#8b949e;font-size:14px;line-height:1.6}}
-      .cta{{background:#161b22;border-top:1px solid #30363d;border-bottom:1px solid #30363d;padding:80px 24px;text-align:center}}
-      .cta h2{{font-size:36px;margin-bottom:16px}}.cta p{{color:#8b949e;font-size:16px;margin-bottom:36px}}
-      footer{{text-align:center;color:#484f58;font-size:13px;padding:40px 24px}}
-    </style></head><body>
-    <nav>
-      <a class="brand" href="/home">FMSecure</a>
-      <div class="nav-links">
-        <a href="#features">Features</a>
-        <a href="{base}/pricing">Pricing</a>
-        <a href="{base}/pricing" class="btn-nav">Buy PRO</a>
-      </div>
-    </nav>
-    <div class="hero">
-      <div class="badge"><span>&#x2714;</span> Enterprise-grade EDR for Windows</div>
-      <h1>Protect your files.<br><span>Stop ransomware</span> before it strikes.</h1>
-      <p>FMSecure monitors your critical files in real time, detects ransomware instantly,
-         and locks down your system before damage spreads.</p>
-      <div class="hero-btns">
-        <a href="{base}/pricing" class="btn-primary">Get PRO — from &#x20B9;999/mo</a>
-        <a href="#features" class="btn-secondary">See features</a>
-      </div>
+        *{{margin:0;padding:0;box-sizing:border-box}}
+        body{{background:#0a0c10;font-family:'Inter',system-ui,sans-serif;color:#e6edf3;line-height:1.5;scroll-behavior:smooth}}
+        .container{{max-width:1200px;margin:0 auto;padding:0 24px}}
+        nav{{position:sticky;top:0;z-index:100;background:rgba(10,12,16,0.85);backdrop-filter:blur(12px);border-bottom:1px solid rgba(48,54,61,0.5);padding:16px 0}}
+        .nav-wrapper{{display:flex;justify-content:space-between;align-items:center;max-width:1200px;margin:0 auto;padding:0 24px}}
+        .brand{{font-size:1.5rem;font-weight:700;background:linear-gradient(135deg,#2f81f7,#58a6ff);-webkit-background-clip:text;background-clip:text;color:transparent;text-decoration:none;letter-spacing:-0.5px}}
+        .nav-links{{display:flex;align-items:center;gap:32px}}
+        .nav-links a{{color:#8b949e;text-decoration:none;font-size:0.9rem;font-weight:500;transition:color 0.2s}}
+        .nav-links a:hover{{color:#e6edf3}}
+        .btn-nav{{background:#238636;color:#fff!important;padding:8px 18px;border-radius:6px;font-weight:600!important;transition:background 0.2s}}
+        .btn-nav:hover{{background:#2ea043}}
+        .hero{{position:relative;padding:120px 0 80px;text-align:center;overflow:hidden}}
+        .hero::before{{content:'';position:absolute;width:400px;height:400px;background:radial-gradient(circle,rgba(47,129,247,0.15) 0%,rgba(10,12,16,0) 70%);top:-200px;left:50%;transform:translateX(-50%);z-index:0;border-radius:50%;animation:float 8s infinite ease-in-out}}
+        @keyframes float{{0%{{transform:translateX(-50%) translateY(0px);opacity:0.6}}50%{{transform:translateX(-50%) translateY(20px);opacity:1}}100%{{transform:translateX(-50%) translateY(0px);opacity:0.6}}}}
+        .badge{{display:inline-block;background:rgba(31,41,55,0.8);backdrop-filter:blur(4px);border:1px solid rgba(48,54,61,0.6);color:#8b949e;font-size:0.75rem;padding:6px 14px;border-radius:30px;margin-bottom:28px;font-weight:500}}
+        .badge span{{color:#3fb950;margin-right:4px}}
+        h1{{font-size:3.5rem;font-weight:700;line-height:1.2;margin-bottom:24px;letter-spacing:-0.02em}}
+        .gradient-text{{background:linear-gradient(120deg,#2f81f7,#58a6ff);-webkit-background-clip:text;background-clip:text;color:transparent}}
+        .hero p{{color:#8b949e;font-size:1.125rem;max-width:560px;margin:0 auto 40px}}
+        .hero-btns{{display:flex;gap:20px;justify-content:center;flex-wrap:wrap}}
+        .btn-primary{{background:#2f81f7;color:#fff;padding:14px 32px;border-radius:10px;text-decoration:none;font-weight:600;font-size:1rem;transition:all 0.2s;box-shadow:0 2px 8px rgba(47,129,247,0.2);display:inline-block}}
+        .btn-primary:hover{{background:#1f6feb;transform:translateY(-2px);box-shadow:0 8px 20px rgba(47,129,247,0.3)}}
+        .btn-secondary{{background:transparent;color:#e6edf3;padding:14px 32px;border-radius:10px;text-decoration:none;font-weight:600;font-size:1rem;border:1px solid #30363d;transition:all 0.2s;display:inline-block}}
+        .btn-secondary:hover{{border-color:#8b949e;background:rgba(48,54,61,0.3);transform:translateY(-2px)}}
+        .hero-image{{max-width:900px;margin:60px auto 0;border-radius:24px;overflow:hidden;box-shadow:0 20px 35px -10px rgba(0,0,0,0.5);border:1px solid #30363d}}
+        .hero-image img{{width:100%;display:block}}
+        .features{{padding:100px 0}}
+        .section-title{{text-align:center;font-size:2.5rem;font-weight:700;margin-bottom:16px;letter-spacing:-0.02em}}
+        .section-sub{{text-align:center;color:#8b949e;max-width:600px;margin:0 auto 56px;font-size:1.1rem}}
+        .feature-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:32px}}
+        .feature-card{{background:#161b22;border:1px solid #30363d;border-radius:20px;padding:32px;transition:all 0.25s ease;text-align:center}}
+        .feature-card:hover{{transform:translateY(-6px);border-color:#2f81f7;box-shadow:0 12px 24px -12px rgba(0,0,0,0.4)}}
+        .feature-icon{{width:64px;height:64px;margin:0 auto 24px;background:rgba(47,129,247,0.1);border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:32px;transition:background 0.2s}}
+        .feature-card:hover .feature-icon{{background:rgba(47,129,247,0.2)}}
+        .feature-card h3{{font-size:1.25rem;font-weight:600;margin-bottom:12px}}
+        .feature-card p{{color:#8b949e;font-size:0.9rem;line-height:1.6}}
+        .demo{{padding:60px 0}}
+        .demo .container{{text-align:center}}
+        .demo img{{max-width:100%;border-radius:24px;border:1px solid #30363d;box-shadow:0 20px 35px -10px rgba(0,0,0,0.4)}}
+        .cta{{background:linear-gradient(135deg,#0d1117 0%,#161b22 100%);border-top:1px solid #30363d;border-bottom:1px solid #30363d;padding:100px 0;text-align:center}}
+        .cta h2{{font-size:2.5rem;margin-bottom:16px}}
+        .cta p{{color:#8b949e;font-size:1.1rem;margin-bottom:40px}}
+        footer{{text-align:center;color:#484f58;font-size:0.8rem;padding:40px 0;border-top:1px solid #21262d}}
+        .fade-up{{opacity:0;transform:translateY(30px);transition:opacity 0.7s ease,transform 0.7s ease}}
+        .fade-up.visible{{opacity:1;transform:translateY(0)}}
+        @media (max-width:768px){{h1{{font-size:2.2rem}}.section-title{{font-size:2rem}}.hero{{padding:80px 0 60px}}.feature-grid{{gap:20px}}.nav-links{{gap:16px}}.btn-nav{{padding:6px 14px}}}}
+    </style>
+</head>
+<body>
+<nav>
+    <div class="nav-wrapper">
+        <a class="brand" href="/home">FMSecure</a>
+        <div class="nav-links">
+            <a href="#features">Features</a>
+            <a href="{base}/pricing">Pricing</a>
+            <a href="{base}/pricing" class="btn-nav">Buy PRO</a>
+        </div>
     </div>
-    <div class="features" id="features">
-      <h2>Everything you need to stay protected</h2>
-      <div class="grid">
-        <div class="feat"><div class="feat-icon">&#128274;</div><h3>File Integrity Monitoring</h3><p>HMAC-signed hash records detect any unauthorised change to your critical files the moment it happens.</p></div>
-        <div class="feat"><div class="feat-icon">&#128165;</div><h3>Ransomware Killswitch</h3><p>Burst-detection triggers an OS-level folder lockdown via icacls the instant ransomware behaviour is detected.</p></div>
-        <div class="feat"><div class="feat-icon">&#9883;</div><h3>Auto-Heal Vault</h3><p>AES-encrypted local backups. Deleted or modified by malware? Restored in seconds from the vault.</p></div>
-        <div class="feat"><div class="feat-icon">&#9729;</div><h3>Google Drive Cloud Backup</h3><p>Encrypted vault files sync to your Google Drive automatically. Even if your drive is destroyed, your files are safe.</p></div>
-        <div class="feat"><div class="feat-icon">&#128270;</div><h3>Forensic Incident Vault</h3><p>Every security event generates an AES-encrypted forensic snapshot. Readable only inside FMSecure.</p></div>
-        <div class="feat"><div class="feat-icon">&#128203;</div><h3>USB DLP Control</h3><p>Block USB drives from writing to your system at the registry level. Prevent data exfiltration.</p></div>
-      </div>
+</nav>
+<main>
+    <section class="hero">
+        <div class="container">
+            <div class="badge fade-up"><span>✓</span> Enterprise-grade EDR for Windows</div>
+            <h1 class="fade-up">Protect your files.<br><span class="gradient-text">Stop ransomware</span> before it strikes.</h1>
+            <p class="fade-up">FMSecure monitors your critical files in real time, detects ransomware instantly, and locks down your system before damage spreads.</p>
+            <div class="hero-btns fade-up">
+                <a href="{base}/pricing" class="btn-primary">Get PRO — from ₹999/mo</a>
+                <a href="#features" class="btn-secondary">See features</a>
+            </div>
+        </div>
+        <div class="hero-image fade-up">
+            <img src="/static/hero_image.png" alt="FMSecure Dashboard Preview">
+        </div>
+    </section>
+    <section class="features" id="features">
+        <div class="container">
+            <h2 class="section-title fade-up">Everything you need to stay protected</h2>
+            <p class="section-sub fade-up">Enterprise-grade security features built for Windows environments.</p>
+            <div class="feature-grid">
+                <div class="feature-card fade-up"><div class="feature-icon">🔒</div><h3>File Integrity Monitoring</h3><p>HMAC-signed hash records detect any unauthorised change to your critical files the moment it happens.</p></div>
+                <div class="feature-card fade-up"><div class="feature-icon">💥</div><h3>Ransomware Killswitch</h3><p>Burst-detection triggers an OS-level folder lockdown via icacls the instant ransomware behaviour is detected.</p></div>
+                <div class="feature-card fade-up"><div class="feature-icon">⚡</div><h3>Auto-Heal Vault</h3><p>AES-encrypted local backups. Deleted or modified by malware? Restored in seconds from the vault.</p></div>
+                <div class="feature-card fade-up"><div class="feature-icon">☁️</div><h3>Google Drive Cloud Backup</h3><p>Encrypted vault files sync to your Google Drive automatically. Even if your drive is destroyed, your files are safe.</p></div>
+                <div class="feature-card fade-up"><div class="feature-icon">🔍</div><h3>Forensic Incident Vault</h3><p>Every security event generates an AES-encrypted forensic snapshot. Readable only inside FMSecure.</p></div>
+                <div class="feature-card fade-up"><div class="feature-icon">📀</div><h3>USB DLP Control</h3><p>Block USB drives from writing to your system at the registry level. Prevent data exfiltration.</p></div>
+            </div>
+        </div>
+    </section>
+    <section class="demo">
+        <div class="container">
+            <h2 class="section-title fade-up">Centralized Command & Control</h2>
+            <p class="section-sub fade-up">Monitor your entire fleet from our live C2 dashboard — real‑time alerts, remote lockdown, and forensic insights.</p>
+            <div class="fade-up">
+                <img src="/static/c2.png" alt="FMSecure C2 Dashboard">
+            </div>
+        </div>
+    </section>
+    <section class="cta">
+        <div class="container">
+            <h2 class="fade-up">Ready to protect your business?</h2>
+            <p class="fade-up">Cancel anytime. License key delivered instantly after payment.</p>
+            <a href="{base}/pricing" class="btn-primary fade-up" style="display:inline-block; font-size:1.1rem; padding:16px 44px;">See pricing →</a>
+        </div>
+    </section>
+</main>
+<footer>
+    <div class="container">
+        <p>FMSecure v2.0 &bull; Enterprise Endpoint Detection &amp; Response &bull; Made in India</p>
     </div>
-    <div class="cta">
-      <h2>Ready to protect your business?</h2>
-      <p>Cancel anytime. License key delivered instantly after payment.</p>
-      <a href="{base}/pricing" class="btn-primary" style="display:inline-block;font-size:17px;padding:16px 40px">See pricing &#x2192;</a>
-    </div>
-    <footer>FMSecure v2.0 &bull; Enterprise Endpoint Detection &amp; Response &bull; Made in India</footer>
-    </body></html>"""
+</footer>
+<script>
+    const fadeElements = document.querySelectorAll('.fade-up');
+    const observer = new IntersectionObserver((entries) => {{
+        entries.forEach(entry => {{
+            if (entry.isIntersecting) {{
+                entry.target.classList.add('visible');
+                observer.unobserve(entry.target);
+            }}
+        }});
+    }}, {{ threshold: 0.1, rootMargin: "0px 0px -30px 0px" }});
+    fadeElements.forEach(el => observer.observe(el));
+    window.addEventListener('load', () => {{
+        fadeElements.forEach(el => {{
+            const rect = el.getBoundingClientRect();
+            if (rect.top < window.innerHeight) {{
+                el.classList.add('visible');
+                observer.unobserve(el);
+            }}
+        }});
+    }});
+</script>
+</body>
+</html>"""
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PRICING PAGE
