@@ -52,6 +52,13 @@ API_KEY           = os.getenv("API_KEY", "default-dev-key")
 SENDGRID_API_KEY  = os.getenv("SENDGRID_API_KEY", "")
 SENDER_EMAIL      = os.getenv("SENDER_EMAIL", "glimpsefilmy@gmail.com")
 SESSION_TOKEN     = secrets.token_hex(16)
+DRIVE_FILE_ID     = os.getenv("DRIVE_FILE_ID", "1fyGcoP-Q2dn_nt8B6amHzhfivskebs1I")   # Google Drive file ID for download
+
+# Download URL — auto-derived. Just set DRIVE_FILE_ID env var on Railway.
+DOWNLOAD_URL = (
+    f"https://drive.google.com/uc?export=download&id={DRIVE_FILE_ID}"
+    if DRIVE_FILE_ID else "#"
+)
 
 rzp_client = razorpay.Client(auth=(RZP_KEY_ID, RZP_KEY_SECRET))
 
@@ -244,7 +251,7 @@ async def login_page(error: str = ""):
 @app.post("/login")
 async def process_login(username: str = Form(...), password: str = Form(...)):
     if secrets.compare_digest(username, ADMIN_USER) and secrets.compare_digest(password, ADMIN_PASS):
-        resp = RedirectResponse(url="/", status_code=302)
+        resp = RedirectResponse(url="/dashboard", status_code=302)
         resp.set_cookie("fmsecure_session", SESSION_TOKEN, httponly=True, max_age=86400)
         return resp
     return RedirectResponse(url="/login?error=Invalid+credentials", status_code=302)
@@ -276,7 +283,7 @@ async def trigger_lockdown(machine_id: str, _: bool = Depends(verify_session)):
     commands[machine_id] = "LOCKDOWN"
     return {"status": "Lockdown queued"}
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(_: bool = Depends(verify_session)):
     now = time.time(); rows = ""
     for mid, info in agents.items():
@@ -293,7 +300,7 @@ async def dashboard(_: bool = Depends(verify_session)):
     th{{background:#0d1117;color:#8b949e;padding:12px 16px;text-align:left;font-size:12px;font-weight:600;letter-spacing:.5px}}
     td{{padding:12px 16px;border-top:1px solid #21262d;font-size:14px}}</style></head><body>
     <nav><span class="brand">FMSecure Global C2</span>
-    <div><a href="/licenses">Licenses</a><a href="/home">Product Page</a><a href="/pricing">Pricing</a><a href="/logout">Logout</a></div></nav>
+    <div><a href="/licenses">Licenses</a><a href="/">Product Page</a><a href="/pricing">Pricing</a><a href="/logout">Logout</a></div></nav>
     <div class="container"><table><thead><tr><th>MACHINE ID</th><th>HOSTNAME</th><th>USER</th><th>IP</th><th>STATUS</th><th>ENGINE</th><th>ACTION</th></tr></thead>
     <tbody>{rows}</tbody></table></div>
     <script>setTimeout(()=>location.reload(),5000);async function lock(mid){{if(confirm("Isolate?")){{await fetch("/api/trigger_lockdown/"+mid,{{method:"POST"}});alert("Queued!")}}}}</script>
@@ -302,6 +309,19 @@ async def dashboard(_: bool = Depends(verify_session)):
 # ══════════════════════════════════════════════════════════════════════════════
 # PRODUCT LANDING PAGE
 # ══════════════════════════════════════════════════════════════════════════════
+@app.get("/", response_class=HTMLResponse)
+async def landing_page_root():
+    return await landing_page()
+
+@app.get("/download")
+async def download_redirect():
+    """Permanent redirect to latest EXE on Google Drive."""
+    if not DRIVE_FILE_ID:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Download not configured. Set DRIVE_FILE_ID env var.")
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url=DOWNLOAD_URL, status_code=302)
+
 @app.get("/home", response_class=HTMLResponse)
 async def landing_page():
     base = APP_BASE_URL
@@ -380,8 +400,8 @@ async def landing_page():
             <h1 class="fade-up">Protect your files.<br><span class="gradient-text">Stop ransomware</span> before it strikes.</h1>
             <p class="fade-up">FMSecure monitors your critical files in real time, detects ransomware instantly, and locks down your system before damage spreads.</p>
             <div class="hero-btns fade-up">
-                <a href="{base}/pricing" class="btn-primary">Get PRO — from ₹999/mo</a>
-                <a href="#features" class="btn-secondary">See features</a>
+                <a href="{base}/download" class="btn-primary">&#x2B07; Download Free</a>
+                <a href="{base}/pricing" class="btn-secondary">Get PRO — from ₹999/mo</a>
             </div>
         </div>
         <div class="hero-image fade-up">
@@ -768,7 +788,7 @@ async def licenses_page(_: bool = Depends(verify_session)):
     th{{background:#0d1117;color:#8b949e;padding:12px 16px;text-align:left;font-size:12px;font-weight:600;letter-spacing:.5px}}
     td{{padding:12px 16px;border-top:1px solid #21262d;font-size:13px}}</style></head><body>
     <nav><span class="brand">License Manager</span>
-    <div><a href="/">&#x2190; C2 Dashboard</a><a href="/logout">Logout</a></div></nav>
+    <div><a href="/dashboard">&#x2190; C2 Dashboard</a><a href="/logout">Logout</a></div></nav>
     <div class="container"><table><thead><tr>
       <th>LICENSE KEY</th><th>EMAIL</th><th>TIER</th><th>STATUS</th><th>EXPIRES</th><th>DEVICE ID</th>
     </tr></thead><tbody>{trs}</tbody></table></div></body></html>"""
