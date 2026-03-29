@@ -28,6 +28,7 @@ requirements.txt:
 import os, secrets, time, hashlib, hmac as _hmac, uuid, threading
 from datetime import datetime, timezone, timedelta
 
+from fastapi import Response
 from fastapi import FastAPI, Request, Depends, HTTPException, Form, Cookie
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -328,142 +329,809 @@ async def landing_page():
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FMSecure — Enterprise EDR for Windows</title>
-    <link rel="icon" href="/static/app_icon.png" type="image/png">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
-    <style>
-        *{{margin:0;padding:0;box-sizing:border-box}}
-        body{{background:#0a0c10;font-family:'Inter',system-ui,sans-serif;color:#e6edf3;line-height:1.5;scroll-behavior:smooth}}
-        .container{{max-width:1200px;margin:0 auto;padding:0 24px}}
-        nav{{position:sticky;top:0;z-index:100;background:rgba(10,12,16,0.85);backdrop-filter:blur(12px);border-bottom:1px solid rgba(48,54,61,0.5);padding:16px 0}}
-        .nav-wrapper{{display:flex;justify-content:space-between;align-items:center;max-width:1200px;margin:0 auto;padding:0 24px}}
-        .brand{{font-size:1.5rem;font-weight:700;background:linear-gradient(135deg,#2f81f7,#58a6ff);-webkit-background-clip:text;background-clip:text;color:transparent;text-decoration:none;letter-spacing:-0.5px}}
-        .nav-links{{display:flex;align-items:center;gap:32px}}
-        .nav-links a{{color:#8b949e;text-decoration:none;font-size:0.9rem;font-weight:500;transition:color 0.2s}}
-        .nav-links a:hover{{color:#e6edf3}}
-        .btn-nav{{background:#238636;color:#fff!important;padding:8px 18px;border-radius:6px;font-weight:600!important;transition:background 0.2s}}
-        .btn-nav:hover{{background:#2ea043}}
-        .hero{{position:relative;padding:120px 0 80px;text-align:center;overflow:hidden}}
-        .hero::before{{content:'';position:absolute;width:400px;height:400px;background:radial-gradient(circle,rgba(47,129,247,0.15) 0%,rgba(10,12,16,0) 70%);top:-200px;left:50%;transform:translateX(-50%);z-index:0;border-radius:50%;animation:float 8s infinite ease-in-out}}
-        @keyframes float{{0%{{transform:translateX(-50%) translateY(0px);opacity:0.6}}50%{{transform:translateX(-50%) translateY(20px);opacity:1}}100%{{transform:translateX(-50%) translateY(0px);opacity:0.6}}}}
-        .badge{{display:inline-block;background:rgba(31,41,55,0.8);backdrop-filter:blur(4px);border:1px solid rgba(48,54,61,0.6);color:#8b949e;font-size:0.75rem;padding:6px 14px;border-radius:30px;margin-bottom:28px;font-weight:500}}
-        .badge span{{color:#3fb950;margin-right:4px}}
-        h1{{font-size:3.5rem;font-weight:700;line-height:1.2;margin-bottom:24px;letter-spacing:-0.02em}}
-        .gradient-text{{background:linear-gradient(120deg,#2f81f7,#58a6ff);-webkit-background-clip:text;background-clip:text;color:transparent}}
-        .hero p{{color:#8b949e;font-size:1.125rem;max-width:560px;margin:0 auto 40px}}
-        .hero-btns{{display:flex;gap:20px;justify-content:center;flex-wrap:wrap}}
-        .btn-primary{{background:#2f81f7;color:#fff;padding:14px 32px;border-radius:10px;text-decoration:none;font-weight:600;font-size:1rem;transition:all 0.2s;box-shadow:0 2px 8px rgba(47,129,247,0.2);display:inline-block}}
-        .btn-primary:hover{{background:#1f6feb;transform:translateY(-2px);box-shadow:0 8px 20px rgba(47,129,247,0.3)}}
-        .btn-secondary{{background:transparent;color:#e6edf3;padding:14px 32px;border-radius:10px;text-decoration:none;font-weight:600;font-size:1rem;border:1px solid #30363d;transition:all 0.2s;display:inline-block}}
-        .btn-secondary:hover{{border-color:#8b949e;background:rgba(48,54,61,0.3);transform:translateY(-2px)}}
-        .hero-image{{max-width:900px;margin:60px auto 0;border-radius:24px;overflow:hidden;box-shadow:0 20px 35px -10px rgba(0,0,0,0.5);border:1px solid #30363d}}
-        .hero-image img{{width:100%;display:block}}
-        .features{{padding:100px 0}}
-        .section-title{{text-align:center;font-size:2.5rem;font-weight:700;margin-bottom:16px;letter-spacing:-0.02em}}
-        .section-sub{{text-align:center;color:#8b949e;max-width:600px;margin:0 auto 56px;font-size:1.1rem}}
-        .feature-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:32px}}
-        .feature-card{{background:#161b22;border:1px solid #30363d;border-radius:20px;padding:32px;transition:all 0.25s ease;text-align:center}}
-        .feature-card:hover{{transform:translateY(-6px);border-color:#2f81f7;box-shadow:0 12px 24px -12px rgba(0,0,0,0.4)}}
-        .feature-icon{{width:64px;height:64px;margin:0 auto 24px;background:rgba(47,129,247,0.1);border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:32px;transition:background 0.2s}}
-        .feature-card:hover .feature-icon{{background:rgba(47,129,247,0.2)}}
-        .feature-card h3{{font-size:1.25rem;font-weight:600;margin-bottom:12px}}
-        .feature-card p{{color:#8b949e;font-size:0.9rem;line-height:1.6}}
-        .demo{{padding:60px 0}}
-        .demo .container{{text-align:center}}
-        .demo img{{max-width:100%;border-radius:24px;border:1px solid #30363d;box-shadow:0 20px 35px -10px rgba(0,0,0,0.4)}}
-        .cta{{background:linear-gradient(135deg,#0d1117 0%,#161b22 100%);border-top:1px solid #30363d;border-bottom:1px solid #30363d;padding:100px 0;text-align:center}}
-        .cta h2{{font-size:2.5rem;margin-bottom:16px}}
-        .cta p{{color:#8b949e;font-size:1.1rem;margin-bottom:40px}}
-        footer{{text-align:center;color:#484f58;font-size:0.8rem;padding:40px 0;border-top:1px solid #21262d}}
-        .fade-up{{opacity:0;transform:translateY(30px);transition:opacity 0.7s ease,transform 0.7s ease}}
-        .fade-up.visible{{opacity:1;transform:translateY(0)}}
-        @media (max-width:768px){{h1{{font-size:2.2rem}}.section-title{{font-size:2rem}}.hero{{padding:80px 0 60px}}.feature-grid{{gap:20px}}.nav-links{{gap:16px}}.btn-nav{{padding:6px 14px}}}}
-    </style>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>FMSecure — Enterprise EDR for Windows</title>
+<meta name="description" content="Real-time file integrity monitoring, ransomware killswitch, auto-healing vault, and cloud disaster recovery for Windows endpoints."/>
+<link rel="icon" href="/static/app_icon.png" type="image/png"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+<style>
+:root{{
+  --bg:#050810;--bg2:#090d1a;--bgc:#0d1424;--bgch:#111b30;
+  --bd:rgba(47,129,247,0.13);--bdh:rgba(47,129,247,0.32);
+  --t1:#e6edf3;--t2:#7d8ba8;--t3:#3d4a5e;
+  --blue:#2f81f7;--cyan:#22d3ee;--green:#22c55e;
+  --red:#ef4444;--amber:#f59e0b;--purple:#a78bfa;
+  --r:12px;--rl:20px;
+}}
+*,*::before,*::after{{box-sizing:border-box;margin:0;padding:0}}
+html{{scroll-behavior:smooth}}
+body{{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var(--t1);line-height:1.6;overflow-x:hidden;-webkit-font-smoothing:antialiased}}
+::-webkit-scrollbar{{width:5px}}
+::-webkit-scrollbar-track{{background:var(--bg)}}
+::-webkit-scrollbar-thumb{{background:var(--bdh);border-radius:3px}}
+ 
+/* Canvas */
+#bgc{{position:fixed;inset:0;z-index:0;pointer-events:none}}
+.z1{{position:relative;z-index:1}}
+ 
+/* Nav */
+nav{{
+  position:fixed;top:0;left:0;right:0;z-index:200;
+  height:66px;padding:0 48px;
+  display:flex;align-items:center;justify-content:space-between;
+  background:rgba(5,8,16,0.7);backdrop-filter:blur(20px) saturate(1.3);
+  border-bottom:1px solid var(--bd);transition:background .3s;
+}}
+.nav-brand{{display:flex;align-items:center;gap:10px;text-decoration:none}}
+.nav-brand img{{width:30px;height:30px}}
+.nav-brand-txt{{font-size:18px;font-weight:800;letter-spacing:-0.4px;color:var(--t1)}}
+.nav-brand-txt em{{font-style:normal;color:var(--blue)}}
+.nav-links{{display:flex;align-items:center;gap:32px;list-style:none}}
+.nav-links a{{color:var(--t2);text-decoration:none;font-size:14px;font-weight:500;transition:color .2s}}
+.nav-links a:hover{{color:var(--t1)}}
+.nav-right{{display:flex;align-items:center;gap:12px}}
+.btn-ghost{{padding:8px 16px;border-radius:8px;background:transparent;border:1px solid var(--bd);color:var(--t2);font-size:13px;font-weight:500;cursor:pointer;text-decoration:none;transition:all .2s}}
+.btn-ghost:hover{{border-color:var(--bdh);color:var(--t1)}}
+.btn-nav-cta{{padding:8px 20px;border-radius:8px;background:var(--blue);border:none;color:#fff;font-size:13px;font-weight:600;cursor:pointer;text-decoration:none;transition:all .2s}}
+.btn-nav-cta:hover{{background:#4f96ff;transform:translateY(-1px);box-shadow:0 4px 16px rgba(47,129,247,.35)}}
+ 
+/* Hero */
+.hero{{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:110px 48px 80px;text-align:center}}
+.hero-inner{{max-width:860px}}
+.badge{{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:6px 16px;border-radius:100px;
+  border:1px solid rgba(34,211,238,.22);background:rgba(34,211,238,.05);
+  color:var(--cyan);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  margin-bottom:32px;
+}}
+.badge::before{{content:'';width:6px;height:6px;border-radius:50%;background:var(--cyan);box-shadow:0 0 6px var(--cyan);animation:bdot 2s ease-in-out infinite}}
+@keyframes bdot{{0%,100%{{opacity:1;transform:scale(1)}}50%{{opacity:.4;transform:scale(.7)}}}}
+h1{{font-size:clamp(38px,6vw,70px);font-weight:800;letter-spacing:-2px;line-height:1.06;margin-bottom:24px}}
+.gt{{background:linear-gradient(120deg,#2f81f7 0%,#22d3ee 55%,#22c55e 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}}
+.hero-sub{{font-size:clamp(16px,2vw,19px);color:var(--t2);max-width:620px;margin:0 auto 44px;line-height:1.7}}
+.hero-acts{{display:flex;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap}}
+.btn-hp{{display:inline-flex;align-items:center;gap:8px;padding:14px 32px;border-radius:10px;background:var(--blue);color:#fff;font-size:15px;font-weight:700;text-decoration:none;transition:all .25s;border:none;cursor:pointer}}
+.btn-hp:hover{{background:#4f96ff;transform:translateY(-2px);box-shadow:0 8px 28px rgba(47,129,247,.4)}}
+.btn-hg{{display:inline-flex;align-items:center;gap:8px;padding:14px 32px;border-radius:10px;background:transparent;border:1px solid var(--bd);color:var(--t2);font-size:15px;font-weight:500;text-decoration:none;transition:all .25s}}
+.btn-hg:hover{{border-color:var(--bdh);color:var(--t1);background:rgba(255,255,255,.03)}}
+.hero-stats{{display:flex;justify-content:center;gap:56px;margin-top:72px;flex-wrap:wrap}}
+.hstat-n{{font-size:30px;font-weight:800;letter-spacing:-1px}}
+.hstat-n em{{font-style:normal;color:var(--blue)}}
+.hstat-l{{font-size:12px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-top:2px;font-weight:600}}
+ 
+/* Terminal */
+.term-wrap{{padding:0 48px 100px;display:flex;justify-content:center}}
+.term{{width:100%;max-width:780px;background:#080b14;border:1px solid var(--bd);border-radius:var(--rl);overflow:hidden;box-shadow:0 32px 72px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,.025)}}
+.term-bar{{display:flex;align-items:center;gap:7px;padding:13px 20px;background:#0b0f1c;border-bottom:1px solid var(--bd)}}
+.tdot{{width:12px;height:12px;border-radius:50%}}
+.tlabel{{font-size:12px;color:var(--t3);font-family:'JetBrains Mono',monospace;margin-left:8px}}
+.term-body{{padding:22px 26px;font-family:'JetBrains Mono',monospace;font-size:12.5px;line-height:1.95}}
+.tok{{color:var(--green)}}.twn{{color:var(--amber)}}.tcr{{color:var(--red);font-weight:600}}.tin{{color:var(--cyan)}}.tout{{color:var(--t2)}}
+.tcu{{display:inline-block;width:7px;height:13px;background:var(--green);vertical-align:middle;animation:blink 1.1s step-end infinite}}
+@keyframes blink{{0%,100%{{opacity:1}}50%{{opacity:0}}}}
+ 
+/* Divider */
+.dvd{{height:1px;background:linear-gradient(90deg,transparent,var(--bd),transparent);margin:0 48px}}
+ 
+/* Section */
+section{{padding:100px 48px}}
+.slbl{{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--blue);margin-bottom:14px}}
+.stit{{font-size:clamp(26px,4vw,44px);font-weight:800;letter-spacing:-1px;line-height:1.1;margin-bottom:14px}}
+.ssub{{font-size:17px;color:var(--t2);line-height:1.7;max-width:580px}}
+.scen{{text-align:center}}
+.scen .ssub{{margin:0 auto}}
+ 
+/* Feature grid */
+.fg{{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:18px;margin-top:56px;max-width:1200px;margin-left:auto;margin-right:auto}}
+.fc{{
+  background:var(--bgc);border:1px solid var(--bd);border-radius:var(--rl);
+  padding:30px;transition:all .3s;opacity:0;transform:translateY(24px);
+}}
+.fc:hover{{border-color:var(--bdh);background:var(--bgch);transform:translateY(-4px);box-shadow:0 16px 48px rgba(0,0,0,.45)}}
+.fci{{width:46px;height:46px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:18px}}
+.fc h3{{font-size:16px;font-weight:700;margin-bottom:9px}}
+.fc p{{font-size:13.5px;color:var(--t2);line-height:1.65}}
+.ftag{{display:inline-block;margin-top:14px;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase}}
+.tpro{{background:rgba(245,158,11,.1);color:var(--amber);border:1px solid rgba(245,158,11,.2)}}
+.tfree{{background:rgba(34,197,94,.08);color:var(--green);border:1px solid rgba(34,197,94,.2)}}
+.tall{{background:rgba(167,139,250,.08);color:var(--purple);border:1px solid rgba(167,139,250,.2)}}
+ 
+/* Comparison table */
+.cmp-wrap{{max-width:900px;margin:64px auto 0}}
+.cmp-tbl{{width:100%;border-collapse:collapse;background:var(--bgc);border:1px solid var(--bd);border-radius:var(--rl);overflow:hidden}}
+.cmp-tbl th{{padding:18px 24px;font-size:13px;font-weight:700;text-align:center;border-bottom:1px solid var(--bd)}}
+.cmp-tbl th:first-child{{text-align:left}}
+.cmp-tbl .th-free{{color:var(--green)}}
+.cmp-tbl .th-pro{{color:var(--amber)}}
+.cmp-tbl td{{padding:15px 24px;font-size:13.5px;color:var(--t2);border-bottom:1px solid rgba(47,129,247,.06);text-align:center}}
+.cmp-tbl td:first-child{{text-align:left;color:var(--t1);font-weight:500}}
+.cmp-tbl tr:last-child td{{border-bottom:none}}
+.cmp-tbl tr:hover td{{background:rgba(47,129,247,.03)}}
+.chk{{color:var(--green);font-weight:700;font-size:16px}}
+.crs{{color:var(--t3);font-size:16px}}
+.cnum{{color:var(--amber);font-weight:700}}
+ 
+/* How it works */
+.hw{{display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin-top:72px;max-width:960px;margin-left:auto;margin-right:auto;position:relative}}
+.hw::before{{content:'';position:absolute;top:31px;left:calc(16.7% + 28px);right:calc(16.7% + 28px);height:1px;background:var(--bd);z-index:0}}
+.hws{{text-align:center;padding:0 28px;position:relative;z-index:1}}
+.hws-n{{width:62px;height:62px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 26px;font-size:18px;font-weight:800;background:var(--bgc);border:1px solid var(--bd);color:var(--blue);transition:all .3s}}
+.hws:hover .hws-n{{background:var(--blue);color:#fff;border-color:var(--blue);box-shadow:0 0 28px rgba(47,129,247,.4)}}
+.hws h3{{font-size:16px;font-weight:700;margin-bottom:10px}}
+.hws p{{font-size:13.5px;color:var(--t2);line-height:1.65}}
+ 
+/* Architecture */
+.arch{{display:flex;gap:72px;align-items:center;max-width:1160px;margin:0 auto;padding:100px 48px}}
+.arch-t{{flex:1}}
+.arch-t h2{{font-size:clamp(24px,3.5vw,38px);font-weight:800;letter-spacing:-1px;margin-bottom:14px}}
+.arch-t p{{font-size:15px;color:var(--t2);line-height:1.7;margin-bottom:22px}}
+.arch-li{{list-style:none;display:flex;flex-direction:column;gap:11px}}
+.arch-li li{{display:flex;align-items:flex-start;gap:10px;font-size:14px;color:var(--t2)}}
+.arch-li li::before{{content:'✓';color:var(--green);font-weight:700;flex-shrink:0;margin-top:2px}}
+.arch-v{{flex:1;min-width:340px}}
+.arch-stack{{display:flex;flex-direction:column;gap:3px}}
+.alyr{{
+  padding:15px 22px;border-radius:10px;border:1px solid var(--bd);
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--bgc);transition:all .25s;opacity:0;transform:translateX(20px);
+}}
+.alyr:hover{{border-color:var(--bdh);background:var(--bgch)}}
+.alyr-l{{display:flex;align-items:center;gap:11px}}
+.alyr-ic{{font-size:17px}}
+.alyr-nm{{font-size:13.5px;font-weight:600}}
+.alyr-dt{{font-size:11px;color:var(--t3);font-family:'JetBrains Mono',monospace}}
+.alyr-st{{font-size:10px;font-weight:700;padding:3px 9px;border-radius:6px;text-transform:uppercase;letter-spacing:.05em}}
+.st-live{{background:rgba(34,197,94,.1);color:var(--green)}}
+.st-cloud{{background:rgba(47,129,247,.1);color:var(--blue)}}
+.st-local{{background:rgba(34,211,238,.08);color:var(--cyan)}}
+.st-kern{{background:rgba(167,139,250,.08);color:var(--purple)}}
+ 
+/* Pricing */
+.pg{{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:60px;max-width:1000px;margin-left:auto;margin-right:auto}}
+.pc{{
+  background:var(--bgc);border:1px solid var(--bd);border-radius:var(--rl);
+  padding:34px;transition:all .3s;position:relative;opacity:0;transform:translateY(20px);
+}}
+.pc:hover{{transform:translateY(-6px);box-shadow:0 24px 60px rgba(0,0,0,.45)}}
+.pc.feat{{border-color:var(--blue);background:linear-gradient(180deg,rgba(47,129,247,.07) 0%,var(--bgc) 100%)}}
+.pbadge{{
+  position:absolute;top:-12px;left:50%;transform:translateX(-50%);
+  padding:4px 14px;border-radius:100px;background:var(--blue);
+  color:#fff;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;white-space:nowrap;
+}}
+.pplan{{font-size:12px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px}}
+.pprice{{font-size:42px;font-weight:800;letter-spacing:-2px;margin-bottom:4px}}
+.pprice sup{{font-size:18px;font-weight:600;vertical-align:top;margin-top:9px;display:inline-block}}
+.pprice span{{font-size:15px;font-weight:400;color:var(--t2);letter-spacing:0}}
+.pdesc{{font-size:13.5px;color:var(--t2);margin-bottom:26px}}
+.pdvd{{height:1px;background:var(--bd);margin:22px 0}}
+.pfl{{list-style:none;display:flex;flex-direction:column;gap:11px;margin-bottom:28px}}
+.pfl li{{display:flex;align-items:flex-start;gap:9px;font-size:13.5px;color:var(--t2)}}
+.pfl .c{{color:var(--green);font-weight:700;flex-shrink:0}}
+.pfl .x{{color:var(--t3);flex-shrink:0}}
+.pbtn{{
+  display:block;width:100%;padding:12px;border-radius:10px;
+  text-align:center;font-size:14px;font-weight:700;text-decoration:none;
+  cursor:pointer;transition:all .25s;border:none;
+}}
+.pbo{{background:transparent;border:1px solid var(--bd);color:var(--t2)}}
+.pbo:hover{{border-color:var(--bdh);color:var(--t1)}}
+.pbp{{background:var(--blue);color:#fff}}
+.pbp:hover{{background:#4f96ff;box-shadow:0 6px 22px rgba(47,129,247,.42);transform:translateY(-1px)}}
+ 
+/* FAQ */
+.faq-list{{max-width:760px;margin:60px auto 0;display:flex;flex-direction:column;gap:10px}}
+.fi{{background:var(--bgc);border:1px solid var(--bd);border-radius:var(--r);overflow:hidden;transition:border-color .2s}}
+.fi:hover{{border-color:var(--bdh)}}
+.fq{{width:100%;padding:19px 22px;display:flex;justify-content:space-between;align-items:center;background:none;border:none;color:var(--t1);font-size:14.5px;font-weight:600;text-align:left;cursor:pointer;gap:16px}}
+.fq .chv{{transition:transform .25s;color:var(--t3);flex-shrink:0;font-style:normal;font-size:18px}}
+.fi.open .fq .chv{{transform:rotate(90deg)}}
+.fa{{max-height:0;overflow:hidden;transition:max-height .35s ease}}
+.fa p{{padding:0 22px 18px;font-size:13.5px;color:var(--t2);line-height:1.7}}
+.fi.open .fa{{max-height:280px}}
+ 
+/* CTA */
+.cta-sec{{padding:100px 48px;text-align:center}}
+.cta-box{{
+  max-width:740px;margin:0 auto;padding:72px 60px;
+  border:1px solid var(--bd);border-radius:24px;
+  background:linear-gradient(135deg,rgba(47,129,247,.07) 0%,var(--bgc) 50%,rgba(34,211,238,.04) 100%);
+  position:relative;overflow:hidden;
+}}
+.cta-box::before{{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:80%;height:1px;background:linear-gradient(90deg,transparent,var(--blue),transparent)}}
+.cta-box h2{{font-size:clamp(24px,4vw,40px);font-weight:800;letter-spacing:-1px;margin-bottom:14px}}
+.cta-box p{{font-size:16px;color:var(--t2);margin-bottom:38px;line-height:1.6}}
+.cta-acts{{display:flex;justify-content:center;gap:16px;flex-wrap:wrap}}
+ 
+/* Footer */
+footer{{padding:56px 48px 36px;border-top:1px solid var(--bd)}}
+.ft{{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:44px;flex-wrap:wrap;gap:36px}}
+.fb p{{font-size:13.5px;color:var(--t3);line-height:1.6;max-width:270px;margin-top:10px}}
+.flg h4{{font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:14px}}
+.flg ul{{list-style:none;display:flex;flex-direction:column;gap:9px}}
+.flg a{{font-size:13.5px;color:var(--t2);text-decoration:none;transition:color .2s}}
+.flg a:hover{{color:var(--t1)}}
+.fb2{{display:flex;justify-content:space-between;align-items:center;padding-top:22px;border-top:1px solid var(--bd);flex-wrap:wrap;gap:10px}}
+.fb2 p{{font-size:12px;color:var(--t3)}}
+ 
+/* Mobile */
+@media(max-width:900px){{
+  nav{{padding:0 20px}}
+  .nav-links{{display:none}}
+  section{{padding:72px 20px}}
+  .hero{{padding:110px 20px 60px}}
+  .term-wrap{{padding:0 20px 72px}}
+  .hw{{grid-template-columns:1fr;gap:36px}}
+  .hw::before{{display:none}}
+  .arch{{flex-direction:column;padding:72px 20px}}
+  .arch-v{{min-width:unset;width:100%}}
+  .pg{{grid-template-columns:1fr;max-width:400px}}
+  .cta-box{{padding:44px 24px}}
+  footer{{padding:44px 20px 28px}}
+  .ft{{flex-direction:column}}
+}}
+</style>
 </head>
 <body>
-<nav>
-    <div class="nav-wrapper">
-        <a class="brand" href="/home">FMSecure</a>
-        <div class="nav-links">
-            <a href="#features">Features</a>
-            <a href="{base}/pricing">Pricing</a>
-            <a href="{base}/pricing" class="btn-nav">Buy PRO</a>
-        </div>
-    </div>
+ 
+<canvas id="bgc"></canvas>
+ 
+<div class="z1">
+ 
+<!-- NAV -->
+<nav id="mnav">
+  <a href="{base}/home" class="nav-brand">
+    <img src="/static/app_icon.png" alt="FMSecure" onerror="this.style.display='none'"/>
+    <span class="nav-brand-txt">FM<em>Secure</em></span>
+  </a>
+  <ul class="nav-links">
+    <li><a href="#features">Features</a></li>
+    <li><a href="#compare">Compare</a></li>
+    <li><a href="#architecture">Architecture</a></li>
+    <li><a href="#pricing">Pricing</a></li>
+    <li><a href="#faq">FAQ</a></li>
+  </ul>
+  <div class="nav-right">
+    <a href="{base}/download" class="btn-ghost">Free download</a>
+    <a href="{base}/pricing" class="btn-nav-cta">Get PRO &rarr;</a>
+  </div>
 </nav>
-<main>
-    <section class="hero">
-        <div class="container">
-            <div class="badge fade-up"><span>✓</span> Enterprise-grade EDR for Windows</div>
-            <h1 class="fade-up">Protect your files.<br><span class="gradient-text">Stop ransomware</span> before it strikes.</h1>
-            <p class="fade-up">FMSecure monitors your critical files in real time, detects ransomware instantly, and locks down your system before damage spreads.</p>
-            <div class="hero-btns fade-up">
-                <a href="{base}/download" class="btn-primary">&#x2B07; Download Free</a>
-                <a href="{base}/pricing" class="btn-secondary">Get PRO — from ₹999/mo</a>
-            </div>
-        </div>
-        <div class="hero-image fade-up">
-            <img src="/static/hero_image.png" alt="FMSecure Dashboard Preview">
-        </div>
-    </section>
-    <section class="features" id="features">
-        <div class="container">
-            <h2 class="section-title fade-up">Everything you need to stay protected</h2>
-            <p class="section-sub fade-up">Enterprise-grade security features built for Windows environments.</p>
-            <div class="feature-grid">
-                <div class="feature-card fade-up"><div class="feature-icon">🔒</div><h3>File Integrity Monitoring</h3><p>HMAC-signed hash records detect any unauthorised change to your critical files the moment it happens.</p></div>
-                <div class="feature-card fade-up"><div class="feature-icon">💥</div><h3>Ransomware Killswitch</h3><p>Burst-detection triggers an OS-level folder lockdown via icacls the instant ransomware behaviour is detected.</p></div>
-                <div class="feature-card fade-up"><div class="feature-icon">⚡</div><h3>Auto-Heal Vault</h3><p>AES-encrypted local backups. Deleted or modified by malware? Restored in seconds from the vault.</p></div>
-                <div class="feature-card fade-up"><div class="feature-icon">☁️</div><h3>Google Drive Cloud Backup</h3><p>Encrypted vault files sync to your Google Drive automatically. Even if your drive is destroyed, your files are safe.</p></div>
-                <div class="feature-card fade-up"><div class="feature-icon">🔍</div><h3>Forensic Incident Vault</h3><p>Every security event generates an AES-encrypted forensic snapshot. Readable only inside FMSecure.</p></div>
-                <div class="feature-card fade-up"><div class="feature-icon">📀</div><h3>USB DLP Control</h3><p>Block USB drives from writing to your system at the registry level. Prevent data exfiltration.</p></div>
-            </div>
-        </div>
-    </section>
-    <section class="demo">
-        <div class="container">
-            <h2 class="section-title fade-up">Centralized Command & Control</h2>
-            <p class="section-sub fade-up">Monitor your entire fleet from our live C2 dashboard — real‑time alerts, remote lockdown, and forensic insights.</p>
-            <div class="fade-up">
-                <img src="/static/c2.png" alt="FMSecure C2 Dashboard">
-            </div>
-        </div>
-    </section>
-    <section class="cta">
-        <div class="container">
-            <h2 class="fade-up">Ready to protect your business?</h2>
-            <p class="fade-up">Cancel anytime. License key delivered instantly after payment.</p>
-            <a href="{base}/pricing" class="btn-primary fade-up" style="display:inline-block; font-size:1.1rem; padding:16px 44px;">See pricing →</a>
-        </div>
-    </section>
-</main>
-<footer>
-    <div class="container">
-        <p>FMSecure v2.0 &bull; Enterprise Endpoint Detection &amp; Response &bull; Made in India</p>
+ 
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-inner">
+    <div class="badge">Windows EDR — v2.0 production release</div>
+    <h1>Stop ransomware.<br/><span class="gt">Before damage is done.</span></h1>
+    <p class="hero-sub">
+      FMSecure is a production-grade Endpoint Detection &amp; Response agent for Windows.
+      Real-time file integrity monitoring, behavioral ransomware detection, auto-healing vault,
+      and live C2 telemetry — all in a single executable.
+    </p>
+    <div class="hero-acts">
+      <a href="{base}/download" class="btn-hp">
+        &#x2B07; Download Free
+      </a>
+      <a href="{base}/pricing" class="btn-hg">
+        View PRO pricing &rarr;
+      </a>
     </div>
+    <div class="hero-stats">
+      <div>
+        <div class="hstat-n">AES<em>-256</em></div>
+        <div class="hstat-l">Encryption at rest</div>
+      </div>
+      <div>
+        <div class="hstat-n"><em>&lt;</em>50ms</div>
+        <div class="hstat-l">Threat response</div>
+      </div>
+      <div>
+        <div class="hstat-n">1.8<em>GB/s</em></div>
+        <div class="hstat-l">Scan throughput</div>
+      </div>
+      <div>
+        <div class="hstat-n">0<em> dep</em></div>
+        <div class="hstat-l">Single EXE deploy</div>
+      </div>
+    </div>
+  </div>
+</section>
+ 
+<!-- TERMINAL -->
+<div class="term-wrap">
+  <div class="term">
+    <div class="term-bar">
+      <div class="tdot" style="background:#ff5f57"></div>
+      <div class="tdot" style="background:#febc2e"></div>
+      <div class="tdot" style="background:#28c840"></div>
+      <span class="tlabel">FMSecure v2.0 &mdash; Live Agent Log &mdash; WORKSTATION-01</span>
+    </div>
+    <div class="term-body">
+      <div><span class="tok">[22:14:03]</span> <span class="tout">[INFO ] Monitor started &mdash; 2 folders indexed, 15,842 files baseline captured</span></div>
+      <div><span class="tok">[22:14:11]</span> <span class="tout">[INFO ] CREATED: D:\Dev\api\main.py &mdash; hash recorded, vault backup stored</span></div>
+      <div><span class="twn">[22:16:44]</span> <span class="tout">[MED  ] MODIFIED: D:\TEST\config.json &mdash; content delta, Active Defense intercept</span></div>
+      <div><span class="tok">[22:16:44]</span> <span class="tout">[INFO ] RESTORED: D:\TEST\config.json &mdash; malware modification reverted in 12ms</span></div>
+      <div><span class="tcr">[22:17:02]</span> <span class="tout">[CRIT ] BURST: 8 files encrypted in 4.2s &mdash; ransomware behaviour confirmed</span></div>
+      <div><span class="tcr">[22:17:02]</span> <span class="tout">[LOCK ] icacls /deny Everyone:(W,D) applied &mdash; D:\TEST write access REVOKED</span></div>
+      <div><span class="tcr">[22:17:02]</span> <span class="tout">[SNAP ] Forensic snapshot BF9A2C1D &rarr; forensics\forensic_2026-03-29_22-17-02.dat</span></div>
+      <div><span class="tok">[22:17:03]</span> <span class="tout">[MAIL ] Critical alert dispatched &rarr; admin@corp.com (SMTP, attachment: .dat)</span></div>
+      <div><span class="tin">[22:17:03]</span> <span class="tout">[C2  ] Heartbeat pushed &rarr; fmsecure-c2-server.railway.app (LOCKDOWN queued)</span></div>
+      <div><span class="tok">[22:17:04]</span> <span class="tout">[KEY  ] Cloud key backup complete &rarr; Google Drive / FMSecure_FM-A3C9 / keys/</span></div>
+      <div style="margin-top:8px"><span class="tok">root@WORKSTATION-01</span><span class="tout"> ~/fmsecure $ </span><span class="tcu"></span></div>
+    </div>
+  </div>
+</div>
+ 
+<div class="dvd"></div>
+ 
+<!-- FEATURES -->
+<section id="features">
+  <div class="scen">
+    <div class="slbl">Platform capabilities</div>
+    <h2 class="stit">Everything an EDR demands. Nothing it doesn&apos;t.</h2>
+    <p class="ssub">Designed after the same layered defense model used by CrowdStrike and SentinelOne &mdash; shipped as a single signed Windows executable with zero runtime dependencies.</p>
+  </div>
+  <div class="fg">
+ 
+    <div class="fc">
+      <div class="fci" style="background:rgba(34,211,238,.09)">&#x1F50D;</div>
+      <h3>Real-time File Integrity</h3>
+      <p>SHA-256 + OS metadata state hashing via watchdog. Detects content changes, hidden/system flag flips, renames, and deletions. Debounce engine prevents false alerts during large file transfers.</p>
+      <span class="ftag tfree">Free tier</span>
+    </div>
+ 
+    <div class="fc">
+      <div class="fci" style="background:rgba(239,68,68,.09)">&#x1F6D1;</div>
+      <h3>Ransomware Killswitch</h3>
+      <p>Behavioral burst detection (&#x2265;5 operations in 10s) fires an OS-level <code style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--cyan)">icacls /deny</code> lockdown. Strips Write and Delete permissions at the NTFS kernel layer before encryption completes.</p>
+      <span class="ftag tpro">PRO only</span>
+    </div>
+ 
+    <div class="fc">
+      <div class="fci" style="background:rgba(34,197,94,.09)">&#x1F6E1;&#xFE0F;</div>
+      <h3>Active Defense Auto-Heal Vault</h3>
+      <p>AES-256 (Fernet) encrypted vault backed by the hardware KEK. Malicious modifications and deletions are intercepted and reverted in milliseconds. Falls back to cloud vault/ subfolder if local copy is wiped.</p>
+      <span class="ftag tpro">PRO only</span>
+    </div>
+ 
+    <div class="fc">
+      <div class="fci" style="background:rgba(47,129,247,.1)">&#x2601;&#xFE0F;</div>
+      <h3>Cloud Disaster Recovery</h3>
+      <p>Google Drive OAuth 2.0 sync keyed on hardware machine ID &mdash; never email. Encrypted logs, vault files, AppData, and key files sync automatically. Full recovery from a blank machine in under 3 minutes.</p>
+      <span class="ftag tpro">PRO only</span>
+    </div>
+ 
+    <div class="fc">
+      <div class="fci" style="background:rgba(245,158,11,.09)">&#x1F52C;</div>
+      <h3>AES-Encrypted Forensic Vault</h3>
+      <p>Every CRITICAL event generates an AES-256 snapshot capturing disk state, process memory, critical file hashes, and the last 15 decrypted log lines. Viewable only inside the FMSecure agent &mdash; never in plaintext.</p>
+      <span class="ftag tpro">PRO only</span>
+    </div>
+ 
+    <div class="fc">
+      <div class="fci" style="background:rgba(167,139,250,.09)">&#x1F4E1;</div>
+      <h3>Live C2 Fleet Console</h3>
+      <p>Agent heartbeats stream telemetry to your hosted FastAPI C2 dashboard every 10 seconds. IT admins can push a remote ISOLATE HOST command that triggers emergency lockdown from any browser &mdash; no VPN required.</p>
+      <span class="ftag tpro">PRO only</span>
+    </div>
+ 
+    <div class="fc">
+      <div class="fci" style="background:rgba(34,197,94,.07)">&#x1F511;</div>
+      <h3>Hardware-Bound Key Encryption</h3>
+      <p>Master AES key is wrapped in a KEK derived from the physical hardware fingerprint via PBKDF2 (200k iterations). A stolen <code style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--cyan)">sys.key</code> file is permanently unreadable on any other machine.</p>
+      <span class="ftag tall">All tiers</span>
+    </div>
+ 
+    <div class="fc">
+      <div class="fci" style="background:rgba(239,68,68,.07)">&#x1FA7A;</div>
+      <h3>Honeypot Tripwire</h3>
+      <p>A hidden decoy file acts as a silent alarm. First access from ransomware or a rogue insider instantly detonates the killswitch, generates a forensic snapshot, and dispatches a critical alert &mdash; all before a single byte is encrypted.</p>
+      <span class="ftag tpro">PRO only</span>
+    </div>
+ 
+    <div class="fc">
+      <div class="fci" style="background:rgba(34,211,238,.07)">&#x1F50C;</div>
+      <h3>USB Device Control (DLP)</h3>
+      <p>Enforces Windows Registry <code style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--cyan)">StorageDevicePolicies WriteProtect</code> at the OS level. Blocks all USB mass storage write access &mdash; no kernel driver, no code signing required.</p>
+      <span class="ftag tpro">PRO only</span>
+    </div>
+ 
+  </div>
+</section>
+ 
+<div class="dvd"></div>
+ 
+<!-- FREE VS PRO COMPARE -->
+<section id="compare">
+  <div class="scen">
+    <div class="slbl">Plan comparison</div>
+    <h2 class="stit">Free vs PRO &mdash; at a glance.</h2>
+    <p class="ssub">Every capability, side by side. No hidden limits.</p>
+  </div>
+  <div class="cmp-wrap">
+    <table class="cmp-tbl">
+      <thead>
+        <tr>
+          <th style="text-align:left;color:var(--t2)">Capability</th>
+          <th class="th-free">Free</th>
+          <th class="th-pro">PRO Monthly / Annual</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Monitored folders</td><td class="cnum">1</td><td class="cnum">Up to 5</td></tr>
+        <tr><td>SHA-256 file integrity monitoring</td><td><span class="chk">&#10003;</span></td><td><span class="chk">&#10003;</span></td></tr>
+        <tr><td>Real-time watchdog (create / modify / delete / rename)</td><td><span class="chk">&#10003;</span></td><td><span class="chk">&#10003;</span></td></tr>
+        <tr><td>HMAC-signed tamper-proof audit logs</td><td><span class="chk">&#10003;</span></td><td><span class="chk">&#10003;</span></td></tr>
+        <tr><td>AES-256 encryption at rest (logs, vault, records)</td><td><span class="chk">&#10003;</span></td><td><span class="chk">&#10003;</span></td></tr>
+        <tr><td>Hardware-bound KEK (PBKDF2 200k iter.)</td><td><span class="chk">&#10003;</span></td><td><span class="chk">&#10003;</span></td></tr>
+        <tr><td>Email OTP registration + password recovery</td><td><span class="chk">&#10003;</span></td><td><span class="chk">&#10003;</span></td></tr>
+        <tr><td>Google SSO with device PIN 2FA</td><td><span class="chk">&#10003;</span></td><td><span class="chk">&#10003;</span></td></tr>
+        <tr><td>PDF report export + severity charts</td><td><span class="chk">&#10003;</span></td><td><span class="chk">&#10003;</span></td></tr>
+        <tr><td>Self-healing Watchdog process (WinSysHost.exe)</td><td><span class="chk">&#10003;</span></td><td><span class="chk">&#10003;</span></td></tr>
+        <tr><td>Discord / Slack webhook alerts</td><td><span class="chk">&#10003;</span></td><td><span class="chk">&#10003;</span></td></tr>
+        <tr><td>Active Defense auto-heal vault</td><td><span class="crs">&#8212;</span></td><td><span class="chk">&#10003;</span></td></tr>
+        <tr><td>Ransomware behavioral killswitch (icacls)</td><td><span class="crs">&#8212;</span></td><td><span class="chk">&#10003;</span></td></tr>
+        <tr><td>Honeypot tripwire</td><td><span class="crs">&#8212;</span></td><td><span class="chk">&#10003;</span></td></tr>
+        <tr><td>Google Drive cloud disaster recovery</td><td><span class="crs">&#8212;</span></td><td><span class="chk">&#10003;</span></td></tr>
+        <tr><td>AES-encrypted forensic incident vault</td><td><span class="crs">&#8212;</span></td><td><span class="chk">&#10003;</span></td></tr>
+        <tr><td>USB device control (DLP)</td><td><span class="crs">&#8212;</span></td><td><span class="chk">&#10003;</span></td></tr>
+        <tr><td>Live C2 fleet telemetry dashboard</td><td><span class="crs">&#8212;</span></td><td><span class="chk">&#10003;</span></td></tr>
+        <tr><td>Remote host isolation (cloud-triggered lockdown)</td><td><span class="crs">&#8212;</span></td><td><span class="chk">&#10003;</span></td></tr>
+        <tr><td>Folder structure backup &amp; restore</td><td><span class="crs">&#8212;</span></td><td><span class="chk">&#10003;</span></td></tr>
+        <tr><td>SMTP security alert email (with forensic .dat attachment)</td><td><span class="crs">&#8212;</span></td><td><span class="chk">&#10003;</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+ 
+<div class="dvd"></div>
+ 
+<!-- HOW IT WORKS -->
+<section id="howitworks">
+  <div class="scen">
+    <div class="slbl">Deployment</div>
+    <h2 class="stit">Up and protecting in 3 steps.</h2>
+    <p class="ssub">No kernel driver signing. No IT department approval. One EXE with UAC elevation and an optional invisible Watchdog service.</p>
+  </div>
+  <div class="hw">
+    <div class="hws">
+      <div class="hws-n">01</div>
+      <h3>Download &amp; run</h3>
+      <p>Run <code style="font-family:'JetBrains Mono',monospace;color:var(--cyan)">SecureFIM.exe</code> as Administrator. Register your admin account with email OTP. The Watchdog installs silently as a background process that survives Task Manager kills and reboots.</p>
+    </div>
+    <div class="hws">
+      <div class="hws-n">02</div>
+      <h3>Configure your folders</h3>
+      <p>Add up to 5 monitored directories. Baseline hashes are generated concurrently across all CPU threads (verified at 1.8 GB/s on NVMe). PRO users get cloud sync and vault backup enabled automatically on first folder add.</p>
+    </div>
+    <div class="hws">
+      <div class="hws-n">03</div>
+      <h3>Monitor &amp; respond</h3>
+      <p>Real-time alerts via dashboard, Discord/Slack webhook, and SMTP email with forensic .dat attachments. Forensic snapshots auto-generated on every CRITICAL event. Remote lockdown from the C2 browser console.</p>
+    </div>
+  </div>
+</section>
+ 
+<div class="dvd"></div>
+ 
+<!-- ARCHITECTURE -->
+<div class="arch" id="architecture">
+  <div class="arch-t">
+    <div class="slbl">Technical architecture</div>
+    <h2>Multi-layer defense.<br/>Single binary.</h2>
+    <p>FMSecure is not a script wrapper. It is a layered security architecture where each tier is independently functional &mdash; a failure in one layer never compromises the others.</p>
+    <ul class="arch-li">
+      <li>HMAC SHA-256 signed on every log line &mdash; tamper detection at write time</li>
+      <li>Hardware KEK ensures stolen key files are permanently unreadable elsewhere</li>
+      <li>Two-tier vault: local AES-256, automatic cloud fallback on recovery</li>
+      <li>Watchdog survives Task Manager, Admin override required to stop</li>
+      <li>icacls lockdown operates at NTFS kernel level, not Python file locks</li>
+      <li>Machine ID &mdash; not email &mdash; is the cloud identity anchor</li>
+    </ul>
+  </div>
+  <div class="arch-v">
+    <div class="arch-stack">
+      <div class="alyr"><div class="alyr-l"><span class="alyr-ic">&#x1F310;</span><div><div class="alyr-nm">C2 cloud server</div><div class="alyr-dt">FastAPI &bull; Railway &bull; PostgreSQL</div></div></div><span class="alyr-st st-live">Live</span></div>
+      <div class="alyr"><div class="alyr-l"><span class="alyr-ic">&#x2601;&#xFE0F;</span><div><div class="alyr-nm">Cloud key escrow</div><div class="alyr-dt">Google Drive &bull; machine_id KEK</div></div></div><span class="alyr-st st-cloud">PRO</span></div>
+      <div class="alyr"><div class="alyr-l"><span class="alyr-ic">&#x1F512;</span><div><div class="alyr-nm">AES-256 local vault</div><div class="alyr-dt">AppData &bull; PBKDF2 KEK &bull; .enc</div></div></div><span class="alyr-st st-local">Local</span></div>
+      <div class="alyr"><div class="alyr-l"><span class="alyr-ic">&#x1F441;&#xFE0F;</span><div><div class="alyr-nm">Watchdog process</div><div class="alyr-dt">WinSysHost.exe &bull; daemon &bull; --recovery</div></div></div><span class="alyr-st st-local">Local</span></div>
+      <div class="alyr"><div class="alyr-l"><span class="alyr-ic">&#x1F50D;</span><div><div class="alyr-nm">File integrity engine</div><div class="alyr-dt">watchdog &bull; SHA-256 &bull; HMAC &bull; debounce</div></div></div><span class="alyr-st st-local">Local</span></div>
+      <div class="alyr"><div class="alyr-l"><span class="alyr-ic">&#x2699;&#xFE0F;</span><div><div class="alyr-nm">OS permission layer</div><div class="alyr-dt">icacls &bull; Registry &bull; WMI &bull; NTFS</div></div></div><span class="alyr-st st-kern">Kernel</span></div>
+    </div>
+  </div>
+</div>
+ 
+<div class="dvd"></div>
+ 
+<!-- PRICING -->
+<section id="pricing">
+  <div class="scen">
+    <div class="slbl">Pricing</div>
+    <h2 class="stit">Simple, transparent pricing.</h2>
+    <p class="ssub">Start free. Upgrade when your threat model demands it. License key delivered within 60 seconds of payment.</p>
+  </div>
+  <div class="pg">
+ 
+    <div class="pc">
+      <div class="pplan">Free</div>
+      <div class="pprice">&#x20B9;0</div>
+      <div class="pdesc">For personal use and learning</div>
+      <div class="pdvd"></div>
+      <ul class="pfl">
+        <li><span class="c">&#10003;</span> 1 monitored folder</li>
+        <li><span class="c">&#10003;</span> SHA-256 file integrity monitoring</li>
+        <li><span class="c">&#10003;</span> HMAC-signed tamper-proof logs</li>
+        <li><span class="c">&#10003;</span> AES-256 encryption at rest</li>
+        <li><span class="c">&#10003;</span> Hardware-bound KEK</li>
+        <li><span class="c">&#10003;</span> Google SSO + email OTP</li>
+        <li><span class="c">&#10003;</span> Discord / Slack webhooks</li>
+        <li><span class="x">&#8212;</span> <span style="color:var(--t3)">Active defense vault</span></li>
+        <li><span class="x">&#8212;</span> <span style="color:var(--t3)">Ransomware killswitch</span></li>
+        <li><span class="x">&#8212;</span> <span style="color:var(--t3)">Cloud backup &amp; C2</span></li>
+      </ul>
+      <a href="{base}/download" class="pbtn pbo">Download free</a>
+    </div>
+ 
+    <div class="pc feat">
+      <div class="pbadge">Most popular</div>
+      <div class="pplan">PRO Monthly</div>
+      <div class="pprice"><sup>&#x20B9;</sup>999<span>/mo</span></div>
+      <div class="pdesc">For professionals protecting real systems</div>
+      <div class="pdvd"></div>
+      <ul class="pfl">
+        <li><span class="c">&#10003;</span> Up to 5 monitored folders</li>
+        <li><span class="c">&#10003;</span> Everything in Free</li>
+        <li><span class="c">&#10003;</span> Active Defense auto-heal vault</li>
+        <li><span class="c">&#10003;</span> Ransomware behavioral killswitch</li>
+        <li><span class="c">&#10003;</span> Google Drive cloud disaster recovery</li>
+        <li><span class="c">&#10003;</span> AES forensic incident vault</li>
+        <li><span class="c">&#10003;</span> USB device control (DLP)</li>
+        <li><span class="c">&#10003;</span> Honeypot tripwire</li>
+        <li><span class="c">&#10003;</span> Live C2 fleet telemetry</li>
+        <li><span class="c">&#10003;</span> Remote host isolation</li>
+      </ul>
+      <!-- Replace href with your Razorpay / Stripe payment link -->
+      <a href="{base}/pricing" class="pbtn pbp">Activate PRO &rarr;</a>
+    </div>
+ 
+    <div class="pc">
+      <div class="pplan">PRO Annual</div>
+      <div class="pprice"><sup>&#x20B9;</sup>7999<span>/yr</span></div>
+      <div class="pdesc">2 months free &mdash; best value</div>
+      <div class="pdvd"></div>
+      <ul class="pfl">
+        <li><span class="c">&#10003;</span> Everything in PRO Monthly</li>
+        <li><span class="c">&#10003;</span> Priority email support</li>
+        <li><span class="c">&#10003;</span> Early access to new features</li>
+        <li><span class="c">&#10003;</span> Annual GST invoice for claims</li>
+      </ul>
+      <a href="{base}/pricing" class="pbtn pbo">Activate Annual &rarr;</a>
+    </div>
+ 
+  </div>
+  <p style="text-align:center;font-size:12.5px;color:var(--t3);margin-top:26px">
+    Payments processed securely via Razorpay / Stripe &bull; Cancel anytime &bull; License key delivered by email within 60 seconds
+  </p>
+</section>
+ 
+<div class="dvd"></div>
+ 
+<!-- FAQ -->
+<section id="faq">
+  <div class="scen">
+    <div class="slbl">FAQ</div>
+    <h2 class="stit">Common questions.</h2>
+  </div>
+  <div class="faq-list">
+ 
+    <div class="fi">
+      <button class="fq" onclick="tfaq(this)">How does license activation work?<i class="chv">&#x203A;</i></button>
+      <div class="fa"><p>After payment, Razorpay fires a webhook to our Railway server which generates a unique license key and emails it within 60 seconds. Paste it into FMSecure&apos;s "Activate PRO" dialog &mdash; the agent validates it against our server and unlocks all PRO features instantly. Keys are device-bound by hardware machine ID, not email.</p></div>
+    </div>
+ 
+    <div class="fi">
+      <button class="fq" onclick="tfaq(this)">What happens if my encryption key is deleted?<i class="chv">&#x203A;</i></button>
+      <div class="fa"><p>PRO users get three-tier key protection: (1) primary local key, (2) shadow backup copy, (3) cloud escrow on Google Drive identified by hardware machine ID. On startup, FMSecure automatically attempts all three in order. Full disaster recovery &mdash; including logs, forensics, user accounts, and vault files &mdash; runs from the dashboard in under 3 minutes.</p></div>
+    </div>
+ 
+    <div class="fi">
+      <button class="fq" onclick="tfaq(this)">Does FMSecure require a kernel driver or code signing?<i class="chv">&#x203A;</i></button>
+      <div class="fa"><p>No. FMSecure runs as a standard Windows application with UAC Administrator elevation. The Ransomware Killswitch uses the built-in Windows <code style="font-family:'JetBrains Mono',monospace;font-size:12px">icacls</code> command to revoke NTFS permissions at the OS level &mdash; no kernel driver, no Authenticode signing required for that path.</p></div>
+    </div>
+ 
+    <div class="fi">
+      <button class="fq" onclick="tfaq(this)">What if I kill the FMSecure process in Task Manager?<i class="chv">&#x203A;</i></button>
+      <div class="fa"><p>The Watchdog process (masquerading as <code style="font-family:'JetBrains Mono',monospace;font-size:12px">WinSysHost.exe</code>) detects the termination within seconds and relaunches the agent in Recovery Mode &mdash; bypassing the login screen, auto-logging in the last admin, and resuming monitoring of all previously configured folders without any user interaction.</p></div>
+    </div>
+ 
+    <div class="fi">
+      <button class="fq" onclick="tfaq(this)">Does it monitor network shares and USB drives?<i class="chv">&#x203A;</i></button>
+      <div class="fa"><p>FMSecure monitors any path accessible from the Windows filesystem including local NTFS drives, mapped network shares, and USB drives. The watchdog library hooks into native Windows file system events at the OS level, so it receives change notifications regardless of the underlying storage type.</p></div>
+    </div>
+ 
+    <div class="fi">
+      <button class="fq" onclick="tfaq(this)">Do you ever have access to my Google Drive or my files?<i class="chv">&#x203A;</i></button>
+      <div class="fa"><p>No. FMSecure uses your own Google OAuth credentials to write to your personal Google Drive. All backups land in a <code style="font-family:'JetBrains Mono',monospace;font-size:12px">FMSecure_{{MACHINE_ID}}</code> folder that only your account controls. Files are AES-256 encrypted before upload &mdash; we never see plaintext content, and your Google credentials are never sent to our servers.</p></div>
+    </div>
+ 
+    <div class="fi">
+      <button class="fq" onclick="tfaq(this)">How fast is the ransomware killswitch?<i class="chv">&#x203A;</i></button>
+      <div class="fa"><p>The burst detector fires after 5 file operations are detected within a 10-second sliding window. The <code style="font-family:'JetBrains Mono',monospace;font-size:12px">icacls</code> lockdown executes as a subprocess immediately &mdash; typical wall-clock time from detection to permission revocation is under 200ms. Real ransomware like WannaCry encrypts roughly 1 file per 300ms, so this window stops the attack after 5&ndash;8 files rather than thousands.</p></div>
+    </div>
+ 
+  </div>
+</section>
+ 
+<!-- CTA -->
+<section class="cta-sec">
+  <div class="cta-box">
+    <h2>Start protecting your endpoints today.</h2>
+    <p>Free tier available with no credit card. PRO features activate within 60 seconds of payment.</p>
+    <div class="cta-acts">
+      <a href="{base}/download" class="btn-hp">Download FMSecure free</a>
+      <a href="{base}/pricing" class="btn-hg">See PRO pricing &rarr;</a>
+    </div>
+  </div>
+</section>
+ 
+<!-- FOOTER -->
+<footer>
+  <div class="ft">
+    <div class="fb">
+      <a href="{base}/home" class="nav-brand">
+        <img src="/static/app_icon.png" alt="FMSecure" width="26" height="26" onerror="this.style.display='none'"/>
+        <span class="nav-brand-txt" style="font-size:16px">FM<em>Secure</em></span>
+      </a>
+      <p>Enterprise-grade endpoint detection and response for Windows. Built by a security engineer, for security engineers.</p>
+    </div>
+    <div class="flg">
+      <h4>Product</h4>
+      <ul>
+        <li><a href="#features">Features</a></li>
+        <li><a href="#compare">Free vs PRO</a></li>
+        <li><a href="#pricing">Pricing</a></li>
+        <li><a href="#faq">FAQ</a></li>
+      </ul>
+    </div>
+    <div class="flg">
+      <h4>Resources</h4>
+      <ul>
+        <li><a href="#">Documentation</a></li>
+        <li><a href="#">Changelog</a></li>
+        <li><a href="#">GitHub</a></li>
+        <li><a href="{base}/dashboard">C2 Dashboard</a></li>
+      </ul>
+    </div>
+    <div class="flg">
+      <h4>Legal</h4>
+      <ul>
+        <li><a href="#">Privacy policy</a></li>
+        <li><a href="#">Terms of service</a></li>
+        <li><a href="#">License agreement</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="fb2">
+    <p>&copy; 2026 FMSecure &bull; All rights reserved &bull; Made in India</p>
+    <p>FastAPI &bull; Python &bull; Google Drive API &bull; Razorpay</p>
+  </div>
 </footer>
+ 
+</div><!-- end z1 -->
+ 
 <script>
-    const fadeElements = document.querySelectorAll('.fade-up');
-    const observer = new IntersectionObserver((entries) => {{
-        entries.forEach(entry => {{
-            if (entry.isIntersecting) {{
-                entry.target.classList.add('visible');
-                observer.unobserve(entry.target);
-            }}
-        }});
-    }}, {{ threshold: 0.1, rootMargin: "0px 0px -30px 0px" }});
-    fadeElements.forEach(el => observer.observe(el));
-    window.addEventListener('load', () => {{
-        fadeElements.forEach(el => {{
-            const rect = el.getBoundingClientRect();
-            if (rect.top < window.innerHeight) {{
-                el.classList.add('visible');
-                observer.unobserve(el);
-            }}
-        }});
-    }});
+/* ── THREE.JS NETWORK ── */
+(function(){{
+  const cv = document.getElementById('bgc');
+  const scene = new THREE.Scene();
+  const cam = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 1000);
+  const renderer = new THREE.WebGLRenderer({{canvas:cv, alpha:true, antialias:true}});
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+  renderer.setSize(innerWidth, innerHeight);
+  cam.position.z = 3;
+ 
+  const N = 110;
+  const pos = new Float32Array(N * 3);
+  const vel = [];
+  for(let i=0;i<N;i++){{
+    pos[i*3]   = (Math.random()-.5)*14;
+    pos[i*3+1] = (Math.random()-.5)*8;
+    pos[i*3+2] = (Math.random()-.5)*5;
+    vel.push((Math.random()-.5)*.004,(Math.random()-.5)*.003,(Math.random()-.5)*.002);
+  }}
+  const pg = new THREE.BufferGeometry();
+  pg.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  const pm = new THREE.PointsMaterial({{color:0x2f81f7,size:.032,transparent:true,opacity:.55}});
+  scene.add(new THREE.Points(pg, pm));
+ 
+  const maxL = N*5;
+  const lpos = new Float32Array(maxL*6);
+  const lg = new THREE.BufferGeometry();
+  lg.setAttribute('position', new THREE.BufferAttribute(lpos,3));
+  const lm = new THREE.LineBasicMaterial({{color:0x2f81f7,transparent:true,opacity:.07}});
+  const lines = new THREE.LineSegments(lg, lm);
+  scene.add(lines);
+ 
+  let fr=0;
+  function animate(){{
+    requestAnimationFrame(animate); fr++;
+    for(let i=0;i<N;i++){{
+      pos[i*3]  +=vel[i*3];   pos[i*3+1]+=vel[i*3+1]; pos[i*3+2]+=vel[i*3+2];
+      if(Math.abs(pos[i*3])>7)   vel[i*3]  *=-1;
+      if(Math.abs(pos[i*3+1])>4) vel[i*3+1]*=-1;
+      if(Math.abs(pos[i*3+2])>2.5) vel[i*3+2]*=-1;
+    }}
+    pg.attributes.position.needsUpdate=true;
+    if(fr%3===0){{
+      let lc=0; const th=2.4;
+      for(let i=0;i<N&&lc<maxL;i++)for(let j=i+1;j<N&&lc<maxL;j++){{
+        const dx=pos[i*3]-pos[j*3],dy=pos[i*3+1]-pos[j*3+1],dz=pos[i*3+2]-pos[j*3+2];
+        if(dx*dx+dy*dy+dz*dz<th*th){{
+          const b=lc*6;
+          lpos[b]=pos[i*3];lpos[b+1]=pos[i*3+1];lpos[b+2]=pos[i*3+2];
+          lpos[b+3]=pos[j*3];lpos[b+4]=pos[j*3+1];lpos[b+5]=pos[j*3+2];
+          lc++;
+        }}
+      }}
+      lg.setDrawRange(0,lc*2); lg.attributes.position.needsUpdate=true;
+    }}
+    renderer.render(scene,cam);
+  }}
+  animate();
+  window.addEventListener('resize',()=>{{
+    cam.aspect=innerWidth/innerHeight; cam.updateProjectionMatrix();
+    renderer.setSize(innerWidth,innerHeight);
+  }});
+}})();
+ 
+/* ── GSAP SCROLL ── */
+gsap.registerPlugin(ScrollTrigger);
+ 
+gsap.utils.toArray('.fc').forEach((el,i)=>{{
+  gsap.to(el,{{opacity:1,y:0,duration:.55,delay:(i%3)*.09,
+    scrollTrigger:{{trigger:el,start:'top 88%'}}
+  }});
+}});
+ 
+gsap.utils.toArray('.alyr').forEach((el,i)=>{{
+  gsap.to(el,{{opacity:1,x:0,duration:.45,delay:i*.07,
+    scrollTrigger:{{trigger:'.arch',start:'top 75%'}}
+  }});
+}});
+ 
+gsap.utils.toArray('.pc').forEach((el,i)=>{{
+  gsap.to(el,{{opacity:1,y:0,duration:.5,delay:i*.12,
+    scrollTrigger:{{trigger:'.pg',start:'top 82%'}}
+  }});
+}});
+ 
+/* Nav opacity on scroll */
+const mnav = document.getElementById('mnav');
+window.addEventListener('scroll',()=>{{
+  mnav.style.background = scrollY>20 ? 'rgba(5,8,16,.97)' : 'rgba(5,8,16,.7)';
+}});
+ 
+/* FAQ */
+function tfaq(btn){{
+  const it=btn.closest('.fi');
+  const op=it.classList.contains('open');
+  document.querySelectorAll('.fi.open').forEach(e=>e.classList.remove('open'));
+  if(!op) it.classList.add('open');
+}}
+ 
+/* Smooth anchor */
+document.querySelectorAll('a[href^="#"]').forEach(a=>{{
+  a.addEventListener('click',e=>{{
+    const t=document.querySelector(a.getAttribute('href'));
+    if(t){{e.preventDefault();t.scrollIntoView({{behavior:'smooth',block:'start'}})}}
+  }});
+}});
 </script>
 </body>
 </html>"""

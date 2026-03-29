@@ -3,7 +3,8 @@ uvicorn
 psycopg2-binary
 pydantic
 slowapi
-stripe
 python-multipart
 sendgrid
 razorpay
+jinja2
+requests
