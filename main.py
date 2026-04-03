@@ -25,7 +25,7 @@ requirements.txt:
   slowapi
   sendgrid
 """
-import os, secrets, time, hashlib, hmac as _hmac, uuid, threading
+import os, secrets, time, hashlib, hmac as _hmac, uuid, threading, random
 from datetime import datetime, timezone, timedelta
 
 from fastapi import Response
@@ -83,6 +83,12 @@ except Exception:
     pass
 
 agents = {}; commands = {}
+
+# In-memory OTP store for license transfer flow
+# key: license_key → {"otp": str, "email": str, "expires": float}
+# Railway runs a single process so in-memory is safe here.
+_pending_transfers: dict = {}
+_TRANSFER_OTP_TTL = 300   # 5 minutes
 
 # ── Database ───────────────────────────────────────────────────────────────────
 def get_db():
@@ -1406,6 +1412,157 @@ async def validate_license(req: LicenseValidateRequest):
 @app.post("/api/license/activate")
 async def activate_license(req: LicenseValidateRequest):
     return await validate_license(req)
+
+# ══════════════════════════════════════════════════════════════════════════════
+# LICENSE TRANSFER  — lets a user re-bind a key to a new device after reinstall
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TransferRequestBody(BaseModel):
+    license_key: str
+    email:       str   # must match the purchase email on record
+
+class TransferConfirmBody(BaseModel):
+    license_key:    str
+    otp:            str
+    new_machine_id: str
+
+@app.post("/api/license/request_transfer")
+async def request_transfer(req: TransferRequestBody):
+    """
+    Step 1 — user proves ownership by providing their purchase email.
+    If it matches the DB record, a 6-digit OTP is sent via SendGrid.
+    """
+    key   = req.license_key.strip()
+    email = req.email.strip().lower()
+
+    if not DATABASE_URL:
+        return {"ok": False, "reason": "db_not_configured"}
+    if not key or not email:
+        return {"ok": False, "reason": "missing_fields"}
+
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("SELECT email, active FROM licenses WHERE license_key = %s", (key,))
+        row = cur.fetchone()
+        cur.close(); conn.close()
+    except Exception as e:
+        print(f"[TRANSFER] DB error: {e}")
+        return {"ok": False, "reason": "db_error"}
+
+    if not row:
+        return {"ok": False, "reason": "key_not_found"}
+
+    # Constant-time comparison — don't reveal whether key exists
+    stored_email = (row["email"] or "").strip().lower()
+    if not secrets.compare_digest(stored_email, email):
+        return {"ok": False,
+                "reason": "Email does not match the purchase record for this key."}
+
+    if not row["active"]:
+        return {"ok": False, "reason": "subscription_expired"}
+
+    # Generate OTP and stash it
+    otp = str(random.randint(100000, 999999))
+    _pending_transfers[key] = {
+        "otp":     otp,
+        "email":   email,
+        "expires": time.time() + _TRANSFER_OTP_TTL,
+    }
+
+    # Send via SendGrid (same helper pattern as _send_license_email)
+    def _send_transfer_otp():
+        if not SENDGRID_API_KEY:
+            print(f"[TRANSFER] No SENDGRID_API_KEY. OTP for {email}: {otp}")
+            return
+        html = f"""
+        <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;
+                    background:#0d1117;color:#e6edf3;padding:32px;border-radius:10px;">
+          <h2 style="color:#2f81f7;margin-top:0">&#128273; FMSecure License Transfer</h2>
+          <p style="color:#a0a8b8;font-size:15px">
+            A request was made to transfer your license key to a new device.
+            Use the verification code below to confirm. It expires in 5 minutes.
+          </p>
+          <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;
+                      padding:24px;text-align:center;margin:24px 0;">
+            <p style="margin:0 0 10px;color:#8b949e;font-size:11px;
+                      letter-spacing:1px;font-weight:600">VERIFICATION CODE</p>
+            <div style="font-size:36px;font-weight:700;color:#2f81f7;letter-spacing:8px;
+                        font-family:Courier,monospace;">{otp}</div>
+          </div>
+          <p style="color:#484f58;font-size:12px;border-top:1px solid #21262d;
+                    padding-top:16px;margin:0">
+            If you did not request this, your license is safe — ignore this email.<br>
+            FMSecure v2.0 &bull; Enterprise EDR for Windows
+          </p>
+        </div>"""
+        try:
+            import sendgrid as sg_mod
+            from sendgrid.helpers.mail import Mail
+            sg = sg_mod.SendGridAPIClient(api_key=SENDGRID_API_KEY)
+            msg = Mail(from_email=SENDER_EMAIL, to_emails=email,
+                       subject="FMSecure — License Transfer Verification Code",
+                       html_content=html)
+            resp = sg.send(msg)
+            print(f"[TRANSFER] OTP sent to {email} — status {resp.status_code}")
+        except Exception as e:
+            print(f"[TRANSFER] SendGrid failed for {email}: {e}")
+            print(f"[TRANSFER] OTP was: {otp}")
+
+    threading.Thread(target=_send_transfer_otp, daemon=True).start()
+    return {"ok": True}
+
+
+@app.post("/api/license/confirm_transfer")
+async def confirm_transfer(req: TransferConfirmBody):
+    """
+    Step 2 — user submits the OTP + their new machine_id.
+    On success the DB machine_id column is updated and the key works immediately.
+    """
+    key = req.license_key.strip()
+    otp = req.otp.strip()
+    mid = req.new_machine_id.strip()
+
+    if not DATABASE_URL:
+        return {"ok": False, "reason": "db_not_configured"}
+    if not key or not otp or not mid:
+        return {"ok": False, "reason": "missing_fields"}
+
+    pending = _pending_transfers.get(key)
+    if not pending:
+        return {"ok": False,
+                "reason": "No transfer request found. Please request a new code."}
+
+    if time.time() > pending["expires"]:
+        del _pending_transfers[key]
+        return {"ok": False,
+                "reason": "Verification code expired. Please request a new one."}
+
+    if not secrets.compare_digest(pending["otp"], otp):
+        return {"ok": False, "reason": "Incorrect verification code."}
+
+    # OTP is valid — re-bind the key to the new device
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute(
+            "UPDATE licenses SET machine_id = %s WHERE license_key = %s RETURNING tier",
+            (mid, key)
+        )
+        row = cur.fetchone()
+        conn.commit(); cur.close(); conn.close()
+    except Exception as e:
+        print(f"[TRANSFER] DB update error: {e}")
+        return {"ok": False, "reason": "db_error"}
+
+    if not row:
+        return {"ok": False, "reason": "key_not_found"}
+
+    # Clean up the pending entry
+    del _pending_transfers[key]
+
+    tier = row["tier"] or "pro_monthly"
+    print(f"[TRANSFER] ✅ Key {key[:16]}… transferred to device {mid[:20]}…")
+    return {"ok": True, "tier": tier}
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # ADMIN ENDPOINTS
