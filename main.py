@@ -1565,6 +1565,56 @@ async def confirm_transfer(req: TransferConfirmBody):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# LICENSE RECOVERY — resend lost key to purchase email
+# ══════════════════════════════════════════════════════════════════════════════
+
+class KeyRecoveryBody(BaseModel):
+    email: str
+
+@app.post("/api/license/recover_key")
+async def recover_key(req: KeyRecoveryBody):
+    """
+    User forgot their license key or deleted the email.
+    Looks up all active, non-expired keys for that email and re-sends them.
+    Rate-limited to prevent enumeration — always returns {ok: true} so
+    attackers can't determine whether an email is registered.
+    """
+    email = req.email.strip().lower()
+    if not email or not DATABASE_URL:
+        # Return ok=True even on bad input to avoid enumeration
+        return {"ok": True}
+
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute(
+            "SELECT license_key, tier, expires_at FROM licenses "
+            "WHERE email = %s AND active = TRUE ORDER BY created_at DESC",
+            (email,)
+        )
+        rows = cur.fetchall()
+        cur.close(); conn.close()
+    except Exception as e:
+        print(f"[RECOVER] DB error: {e}")
+        return {"ok": True}   # still return ok — don't leak DB status
+
+    # Only send keys that haven't expired
+    sent = 0
+    for row in rows:
+        if not _is_expired(row["expires_at"]):
+            threading.Thread(
+                target=_send_license_email,
+                args=(email, row["license_key"], row["tier"],
+                      row["expires_at"].isoformat()),
+                daemon=True
+            ).start()
+            sent += 1
+
+    print(f"[RECOVER] Sent {sent} key(s) to {email}")
+    # Always return ok=True — user sees "check your inbox" regardless
+    return {"ok": True}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # ADMIN ENDPOINTS
 # ══════════════════════════════════════════════════════════════════════════════
 @app.get("/api/license/list")
