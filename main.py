@@ -406,7 +406,22 @@ async def dashboard(_: bool = Depends(verify_session)):
         <tbody>{rows}</tbody></table>
     </div>
     
-    <script>setTimeout(()=>location.reload(),5000);async function lock(mid){{if(confirm("Isolate?")){{await fetch("/api/trigger_lockdown/"+mid,{{method:"POST"}});alert("Queued!")}}}}</script>
+    <script>
+        // SMART HEARTBEAT: Refreshes every 5s, BUT pauses if the admin is typing!
+        setInterval(() => {{
+            const isTyping = document.querySelector('input:focus, textarea:focus');
+            if (!isTyping) {{
+                location.reload();
+            }}
+        }}, 5000);
+
+        async function lock(mid) {{
+            if(confirm("Isolate?")) {{
+                await fetch("/api/trigger_lockdown/"+mid, {{method:"POST"}});
+                alert("Queued!");
+            }}
+        }}
+    </script>
     </body></html>"""
 
 # ══════════════════════════════════════════════════════════════════════════════
