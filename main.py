@@ -95,34 +95,81 @@ def get_db():
     return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
 
 def init_db():
-    conn = get_db(); cur = conn.cursor()
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS licenses (
-            license_key TEXT PRIMARY KEY,
-            email       TEXT NOT NULL,
-            tier        TEXT NOT NULL DEFAULT 'pro_monthly',
-            payment_id  TEXT,
-            order_id    TEXT,
-            expires_at  TIMESTAMPTZ NOT NULL,
-            active      BOOLEAN NOT NULL DEFAULT TRUE,
-            machine_id  TEXT DEFAULT NULL,
-            created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        );
-        CREATE TABLE IF NOT EXISTS pending_orders (
-            order_id   TEXT PRIMARY KEY,
-            email      TEXT NOT NULL,
-            tier       TEXT NOT NULL,
-            amount     INTEGER NOT NULL,
-            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        );
-        DO $$ BEGIN
-          IF NOT EXISTS (SELECT 1 FROM information_schema.columns
-                         WHERE table_name='licenses' AND column_name='machine_id')
-          THEN ALTER TABLE licenses ADD COLUMN machine_id TEXT DEFAULT NULL; END IF;
-        END $$;
-    """)
-    conn.commit(); cur.close(); conn.close()
-    print("[DB] Tables ready.")
+    conn = get_db()
+    cur = conn.cursor()
+    
+    try:
+        # 1. Execute standard SQL for creating tables and migrations
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS licenses (
+                license_key TEXT PRIMARY KEY,
+                email       TEXT NOT NULL,
+                tier        TEXT NOT NULL DEFAULT 'pro_monthly',
+                payment_id  TEXT,
+                order_id    TEXT,
+                expires_at  TIMESTAMPTZ NOT NULL,
+                active      BOOLEAN NOT NULL DEFAULT TRUE,
+                machine_id  TEXT DEFAULT NULL,
+                created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            
+            CREATE TABLE IF NOT EXISTS pending_orders (
+                order_id   TEXT PRIMARY KEY,
+                email      TEXT NOT NULL,
+                tier       TEXT NOT NULL,
+                amount     INTEGER NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            
+            CREATE TABLE IF NOT EXISTS versions (
+                id           SERIAL PRIMARY KEY,
+                version      TEXT NOT NULL,
+                release_notes TEXT NOT NULL DEFAULT '',
+                download_url TEXT NOT NULL DEFAULT '',
+                changelog_url TEXT NOT NULL DEFAULT '',
+                published_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                is_current   BOOLEAN NOT NULL DEFAULT TRUE
+            );
+
+            -- Run the migration for machine_id
+            DO $$ BEGIN
+              IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                             WHERE table_name='licenses' AND column_name='machine_id') 
+              THEN ALTER TABLE licenses ADD COLUMN machine_id TEXT DEFAULT NULL; END IF;
+            END $$;
+        """)
+
+        # 2. Back in Python land: Check count and seed the starter row
+        cur.execute("SELECT COUNT(*) FROM versions")
+        row = cur.fetchone()
+        
+        # NOTE: If you are using a standard cursor, row is a tuple, so we use row[0].
+        # If you are explicitly using a DictCursor (like RealDictCursor in psycopg2), use row["count"].
+        row_count = row["count"] if isinstance(row, dict) else row[0]
+
+        if row_count == 0:
+            cur.execute("""
+                INSERT INTO versions (version, release_notes, download_url, changelog_url, is_current)
+                VALUES (%s, %s, %s, %s, TRUE)
+            """, (
+                "2.5.0",
+                "Initial release",
+                f"{APP_BASE_URL}/download",
+                f"{APP_BASE_URL}/changelog",
+            ))
+
+        conn.commit()
+        print("[DB] Tables ready.")
+
+    except Exception as e:
+        conn.rollback() # Roll back if something goes wrong so the DB doesn't lock
+        print(f"[DB] Error initializing database: {e}")
+        raise e
+        
+    finally:
+        # Always close cursors and connections inside a finally block to prevent connection leaks!
+        cur.close()
+        conn.close()
 
 @app.on_event("startup")
 async def startup():
@@ -298,7 +345,10 @@ async def dashboard(_: bool = Depends(verify_session)):
         sb = '<span style="background:#238636;color:#fff;padding:2px 8px;border-radius:4px;font-size:12px">ONLINE</span>' if online else '<span style="background:#30363d;color:#8b949e;padding:2px 8px;border-radius:4px;font-size:12px">OFFLINE</span>'
         ab = '<span style="background:#1f6feb;color:#fff;padding:2px 8px;border-radius:4px;font-size:12px">ARMED</span>' if info["is_armed"] else '<span style="background:#9e6a03;color:#fff;padding:2px 8px;border-radius:4px;font-size:12px">UNARMED</span>'
         rows += f"<tr><td style='font-family:monospace;color:#8b949e'>{mid[:14]}...</td><td><strong>{info['hostname']}</strong></td><td>{info['username']}</td><td>{info['ip']}</td><td>{sb}</td><td>{ab}</td><td><button onclick=\"lock('{mid}')\" style='background:#da3633;color:#fff;border:none;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:13px'>ISOLATE</button></td></tr>"
-    if not rows: rows = "<tr><td colspan='7' style='text-align:center;color:#484f58;padding:32px'>No endpoints connected</td></tr>"
+    
+    if not rows: 
+        rows = "<tr><td colspan='7' style='text-align:center;color:#484f58;padding:32px'>No endpoints connected</td></tr>"
+    
     return f"""<!DOCTYPE html><html><head><title>FMSecure C2</title>
     <style>*{{box-sizing:border-box;margin:0;padding:0}}body{{background:#0a0a0a;color:#e6edf3;font-family:system-ui,sans-serif}}
     nav{{background:#161b22;border-bottom:1px solid #30363d;padding:16px 24px;display:flex;justify-content:space-between;align-items:center}}
@@ -308,8 +358,54 @@ async def dashboard(_: bool = Depends(verify_session)):
     td{{padding:12px 16px;border-top:1px solid #21262d;font-size:14px}}</style></head><body>
     <nav><span class="brand">FMSecure Global C2</span>
     <div><a href="/licenses">Licenses</a><a href="/">Product Page</a><a href="/pricing">Pricing</a><a href="/logout">Logout</a></div></nav>
-    <div class="container"><table><thead><tr><th>MACHINE ID</th><th>HOSTNAME</th><th>USER</th><th>IP</th><th>STATUS</th><th>ENGINE</th><th>ACTION</th></tr></thead>
-    <tbody>{rows}</tbody></table></div>
+    
+    <div class="container">
+        <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;
+                    padding:24px;margin-bottom:24px">
+          <h3 style="color:#e6edf3;margin:0 0 6px">🚀 Publish New Version</h3>
+          <p style="color:#8b949e;font-size:13px;margin:0 0 18px">
+            When you ship a new EXE, fill this in. Every running copy of FMSecure
+            will show an update banner within seconds.
+          </p>
+          <form method="POST" action="/api/version/publish-form"
+                style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div>
+              <label style="color:#8b949e;font-size:12px;display:block;margin-bottom:4px">VERSION NUMBER *</label>
+              <input name="version" placeholder="e.g. 2.6.0" required
+                     style="width:100%;background:#0d1117;color:#e6edf3;border:1px solid #30363d;
+                            border-radius:6px;padding:8px 12px;font-size:14px">
+            </div>
+            <div>
+              <label style="color:#8b949e;font-size:12px;display:block;margin-bottom:4px">RELEASE NOTES (shown in banner)</label>
+              <input name="release_notes" placeholder="Bug fixes, new cloud features…"
+                     style="width:100%;background:#0d1117;color:#e6edf3;border:1px solid #30363d;
+                            border-radius:6px;padding:8px 12px;font-size:14px">
+            </div>
+            <div>
+              <label style="color:#8b949e;font-size:12px;display:block;margin-bottom:4px">DOWNLOAD URL (leave blank for default)</label>
+              <input name="download_url" placeholder="https://…"
+                     style="width:100%;background:#0d1117;color:#e6edf3;border:1px solid #30363d;
+                            border-radius:6px;padding:8px 12px;font-size:14px">
+            </div>
+            <div>
+              <label style="color:#8b949e;font-size:12px;display:block;margin-bottom:4px">CHANGELOG URL (leave blank for default)</label>
+              <input name="changelog_url" placeholder="https://…"
+                     style="width:100%;background:#0d1117;color:#e6edf3;border:1px solid #30363d;
+                            border-radius:6px;padding:8px 12px;font-size:14px">
+            </div>
+            <div style="grid-column:1/-1">
+              <button type="submit"
+                      style="background:#238636;color:#fff;border:none;border-radius:6px;
+                             padding:10px 24px;font-size:14px;font-weight:600;cursor:pointer">
+                Publish Version →
+              </button>
+            </div>
+          </form>
+        </div>
+        <table><thead><tr><th>MACHINE ID</th><th>HOSTNAME</th><th>USER</th><th>IP</th><th>STATUS</th><th>ENGINE</th><th>ACTION</th></tr></thead>
+        <tbody>{rows}</tbody></table>
+    </div>
+    
     <script>setTimeout(()=>location.reload(),5000);async function lock(mid){{if(confirm("Isolate?")){{await fetch("/api/trigger_lockdown/"+mid,{{method:"POST"}});alert("Queued!")}}}}</script>
     </body></html>"""
 
@@ -1667,6 +1763,120 @@ async def licenses_page(_: bool = Depends(verify_session)):
     <div class="container"><table><thead><tr>
       <th>LICENSE KEY</th><th>EMAIL</th><th>TIER</th><th>STATUS</th><th>EXPIRES</th><th>DEVICE ID</th>
     </tr></thead><tbody>{trs}</tbody></table></div></body></html>"""
+
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PUBLIC VERSION ENDPOINT — checked by FMSecure desktop app on startup
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.post("/api/version/publish-form")
+async def publish_version_form(
+    request: Request,
+    version:       str = Form(...),
+    release_notes: str = Form(""),
+    download_url:  str = Form(""),
+    changelog_url: str = Form(""),
+    _: bool = Depends(verify_session)
+):
+    """Dashboard form handler — same logic as the JSON endpoint but session-auth."""
+    dl = download_url  or f"{APP_BASE_URL}/download"
+    cl = changelog_url or f"{APP_BASE_URL}/changelog"
+
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("UPDATE versions SET is_current = FALSE")
+        cur.execute("""
+            INSERT INTO versions (version, release_notes, download_url, changelog_url, is_current)
+            VALUES (%s, %s, %s, %s, TRUE)
+        """, (version.strip(), release_notes.strip(), dl, cl))
+        conn.commit(); cur.close(); conn.close()
+        print(f"[VERSION] Published v{version} via dashboard")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return RedirectResponse("/dashboard", status_code=303)
+
+@app.get("/version.json")
+async def version_json():
+    """
+    Returns the current latest version metadata.
+    The desktop client fetches this on every startup to check for updates.
+    Cache-control headers prevent stale CDN caching.
+    """
+    if not DATABASE_URL:
+        return JSONResponse({"latest_version": "2.5.0",
+                             "release_notes": "",
+                             "download_url": f"{APP_BASE_URL}/download",
+                             "changelog_url": f"{APP_BASE_URL}/changelog"})
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute(
+            "SELECT version, release_notes, download_url, changelog_url "
+            "FROM versions WHERE is_current = TRUE "
+            "ORDER BY published_at DESC LIMIT 1"
+        )
+        row = cur.fetchone()
+        cur.close(); conn.close()
+
+        if not row:
+            return JSONResponse({"latest_version": "2.5.0",
+                                 "release_notes": "",
+                                 "download_url": f"{APP_BASE_URL}/download",
+                                 "changelog_url": f"{APP_BASE_URL}/changelog"})
+
+        return JSONResponse(
+            content={
+                "latest_version": row["version"],
+                "release_notes":  row["release_notes"],
+                "download_url":   row["download_url"],
+                "changelog_url":  row["changelog_url"],
+            },
+            headers={
+                "Cache-Control": "no-store, no-cache, must-revalidate",
+                "Pragma":        "no-cache",
+            }
+        )
+    except Exception as e:
+        print(f"[VERSION] DB error: {e}")
+        return JSONResponse({"latest_version": "2.5.0",
+                             "release_notes": "",
+                             "download_url": f"{APP_BASE_URL}/download",
+                             "changelog_url": f"{APP_BASE_URL}/changelog"})
+
+
+# ── Admin: push a new version ──────────────────────────────────────────────
+class VersionBody(BaseModel):
+    version:       str
+    release_notes: str  = ""
+    download_url:  str  = ""
+    changelog_url: str  = ""
+    api_key:       str  = ""
+
+@app.post("/api/version/publish")
+async def publish_version(body: VersionBody):
+    """
+    Call this from your admin dashboard to publish a new version.
+    All existing rows are marked is_current=FALSE, new row inserted as TRUE.
+    """
+    _check_admin(body.api_key)
+
+    dl  = body.download_url  or f"{APP_BASE_URL}/download"
+    cl  = body.changelog_url or f"{APP_BASE_URL}/changelog"
+
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("UPDATE versions SET is_current = FALSE")
+        cur.execute("""
+            INSERT INTO versions (version, release_notes, download_url, changelog_url, is_current)
+            VALUES (%s, %s, %s, %s, TRUE)
+        """, (body.version.strip(), body.release_notes.strip(), dl, cl))
+        conn.commit(); cur.close(); conn.close()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    print(f"[VERSION] Published v{body.version}")
+    return {"ok": True, "version": body.version}
 # ══════════════════════════════════════════════════════════════════════════════
 # TEMPORARY DB PATCH ENDPOINT
 # ══════════════════════════════════════════════════════════════════════════════
