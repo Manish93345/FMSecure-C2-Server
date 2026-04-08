@@ -2001,7 +2001,6 @@ async def version_json():
     The desktop client fetches this on every startup to check for updates.
     Cache-control headers prevent stale CDN caching.
     """
-    dl = download_url or f"{APP_BASE_URL}/download"
     if not DATABASE_URL:
         return JSONResponse({"latest_version": "2.5.0",
                              "release_notes": "",
