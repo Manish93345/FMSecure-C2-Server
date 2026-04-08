@@ -53,14 +53,14 @@ API_KEY           = os.getenv("API_KEY", "default-dev-key")
 SENDGRID_API_KEY  = os.getenv("SENDGRID_API_KEY", "")
 SENDER_EMAIL      = os.getenv("SENDER_EMAIL", "glimpsefilmy@gmail.com")
 SESSION_TOKEN     = secrets.token_hex(16)
-DRIVE_FILE_ID     = os.getenv("DRIVE_FILE_ID", "1fyGcoP-Q2dn_nt8B6amHzhfivskebs1I")   # Google Drive file ID for download
+DRIVE_FILE_ID     = os.getenv("DRIVE_FILE_ID", "14EH6jZM37cSXaZmoessxdVMT3Ec3tQMT")   # Google Drive file ID for download
 
 # Download URL — auto-derived. Just set DRIVE_FILE_ID env var on Railway.
 DOWNLOAD_URL = (
     f"https://drive.google.com/uc?export=download&id={DRIVE_FILE_ID}"
     if DRIVE_FILE_ID else "#"
 )
-
+PRODUCT_PAGE_URL = os.getenv("PRODUCT_PAGE_URL", f"{APP_BASE_URL}/download")
 rzp_client = razorpay.Client(auth=(RZP_KEY_ID, RZP_KEY_SECRET))
 
 # ── Plans — amounts in PAISE (Rs 999 = 99900) ─────────────────────────────────
@@ -431,14 +431,196 @@ async def dashboard(_: bool = Depends(verify_session)):
 async def landing_page_root():
     return await landing_page()
 
-@app.get("/download")
-async def download_redirect():
-    """Permanent redirect to latest EXE on Google Drive."""
-    if not DRIVE_FILE_ID:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=404, detail="Download not configured. Set DRIVE_FILE_ID env var.")
-    from fastapi.responses import RedirectResponse
-    return RedirectResponse(url=DOWNLOAD_URL, status_code=302)
+# ══════════════════════════════════════════════════════════════════════════════
+# PRODUCT PAGES
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/download", response_class=HTMLResponse)
+async def download_page():
+    """Public download page — linked from the in-app update banner."""
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute(
+            "SELECT version, release_notes, download_url "
+            "FROM versions WHERE is_current = TRUE "
+            "ORDER BY published_at DESC LIMIT 1")
+        row = cur.fetchone()
+        cur.close(); conn.close()
+        version      = row["version"]      if row else "2.5.0"
+        notes        = row["release_notes"] if row else ""
+        direct_url   = (f"https://drive.google.com/uc?export=download&id={DRIVE_FILE_ID}"
+                        if DRIVE_FILE_ID else "#")
+    except Exception:
+        version, notes, direct_url = "2.5.0", "", "#"
+
+    return f"""<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Download FMSecure v{version}</title>
+<style>
+  *{{box-sizing:border-box;margin:0;padding:0}}
+  body{{background:#0d1117;color:#e6edf3;font-family:system-ui,sans-serif;
+       min-height:100vh;display:flex;flex-direction:column}}
+  nav{{background:#161b22;border-bottom:1px solid #30363d;
+       padding:16px 32px;display:flex;align-items:center;gap:16px}}
+  .logo{{color:#2f81f7;font-size:20px;font-weight:700;text-decoration:none}}
+  nav a{{color:#8b949e;text-decoration:none;font-size:14px}}
+  nav a:hover{{color:#e6edf3}}
+  .hero{{flex:1;display:flex;flex-direction:column;align-items:center;
+         justify-content:center;padding:60px 24px;text-align:center}}
+  .badge{{background:#238636;color:#fff;padding:4px 14px;border-radius:20px;
+          font-size:13px;font-weight:600;display:inline-block;margin-bottom:20px}}
+  h1{{font-size:42px;font-weight:800;margin-bottom:12px;
+      background:linear-gradient(135deg,#2f81f7,#a371f7);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent}}
+  .subtitle{{color:#8b949e;font-size:18px;margin-bottom:36px}}
+  .notes{{background:#161b22;border:1px solid #30363d;border-radius:8px;
+          padding:16px 24px;margin-bottom:36px;font-size:14px;
+          color:#8b949e;max-width:520px}}
+  .notes strong{{color:#e6edf3}}
+  .dl-btn{{background:#238636;color:#fff;padding:16px 48px;border-radius:8px;
+           font-size:17px;font-weight:700;text-decoration:none;
+           border:none;cursor:pointer;
+           transition:background .2s}}
+  .dl-btn:hover{{background:#2ea043}}
+  .dl-btn:active{{background:#1a7f37}}
+  .meta{{margin-top:20px;color:#484f58;font-size:13px}}
+  .features{{display:flex;gap:24px;margin-top:60px;flex-wrap:wrap;
+             justify-content:center;max-width:800px}}
+  .feat{{background:#161b22;border:1px solid #30363d;border-radius:8px;
+         padding:20px 24px;width:220px;text-align:left}}
+  .feat .icon{{font-size:24px;margin-bottom:8px}}
+  .feat h3{{font-size:14px;font-weight:600;margin-bottom:4px}}
+  .feat p{{font-size:12px;color:#8b949e}}
+  footer{{text-align:center;padding:24px;color:#484f58;font-size:13px;
+          border-top:1px solid #21262d}}
+</style>
+</head><body>
+<nav>
+  <a class="logo" href="/">⚡ FMSecure</a>
+  <a href="/">Home</a>
+  <a href="/pricing">Pricing</a>
+  <a href="/changelog">Changelog</a>
+  <a href="/login" style="margin-left:auto;color:#2f81f7">Admin →</a>
+</nav>
+
+<div class="hero">
+  <span class="badge">✅ Latest Release</span>
+  <h1>Download FMSecure</h1>
+  <p class="subtitle">Enterprise File Integrity & EDR Monitor for Windows</p>
+
+  {"<div class='notes'><strong>What's new in v" + version + ":</strong><br>" + notes + "</div>" if notes else ""}
+
+  <a class="dl-btn" href="{direct_url}" id="dlbtn">
+    ⬇&nbsp; Download FMSecure v{version}
+  </a>
+  <p class="meta">Windows 10/11 · 64-bit · Free to try · PRO features require license</p>
+
+  <div class="features">
+    <div class="feat">
+      <div class="icon">🛡️</div>
+      <h3>Active Defense</h3>
+      <p>Auto-restores tampered or deleted files from encrypted vault</p>
+    </div>
+    <div class="feat">
+      <div class="icon">☁️</div>
+      <h3>Cloud Backup</h3>
+      <p>Google Drive disaster recovery with full AppData sync</p>
+    </div>
+    <div class="feat">
+      <div class="icon">🛑</div>
+      <h3>Ransomware Killswitch</h3>
+      <p>OS-level folder lockdown on burst file operations</p>
+    </div>
+    <div class="feat">
+      <div class="icon">🔌</div>
+      <h3>USB Control</h3>
+      <p>Block unauthorized USB write access across the device</p>
+    </div>
+  </div>
+</div>
+
+<footer>FMSecure · Enterprise EDR · © {datetime.now().year}</footer>
+</body></html>"""
+
+
+@app.get("/changelog", response_class=HTMLResponse)
+async def changelog_page():
+    """Public changelog page — linked from the in-app 'What's New' button."""
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute(
+            "SELECT version, release_notes, published_at "
+            "FROM versions ORDER BY published_at DESC LIMIT 20")
+        rows = cur.fetchall()
+        cur.close(); conn.close()
+    except Exception:
+        rows = []
+
+    entries = ""
+    for i, row in enumerate(rows):
+        date  = row["published_at"].strftime("%B %d, %Y") if row["published_at"] else ""
+        badge = ('<span style="background:#238636;color:#fff;padding:2px 10px;'
+                 'border-radius:12px;font-size:12px;font-weight:600">Latest</span>'
+                 if i == 0 else "")
+        entries += f"""
+        <div style="border-left:3px solid {'#2f81f7' if i==0 else '#30363d'};
+                    padding:0 0 32px 24px;margin-bottom:8px">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+            <span style="font-size:20px;font-weight:700;color:#e6edf3">
+              v{row['version']}
+            </span>
+            {badge}
+            <span style="color:#484f58;font-size:13px">{date}</span>
+          </div>
+          <p style="color:#8b949e;font-size:14px;line-height:1.6">
+            {row['release_notes'] or 'No release notes provided.'}
+          </p>
+          <a href="/download"
+             style="display:inline-block;margin-top:12px;background:#238636;
+                    color:#fff;padding:6px 18px;border-radius:6px;
+                    text-decoration:none;font-size:13px;font-weight:600">
+            Download v{row['version']}
+          </a>
+        </div>"""
+
+    if not entries:
+        entries = '<p style="color:#8b949e">No releases published yet.</p>'
+
+    return f"""<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FMSecure Changelog</title>
+<style>
+  *{{box-sizing:border-box;margin:0;padding:0}}
+  body{{background:#0d1117;color:#e6edf3;font-family:system-ui,sans-serif}}
+  nav{{background:#161b22;border-bottom:1px solid #30363d;
+       padding:16px 32px;display:flex;align-items:center;gap:16px}}
+  .logo{{color:#2f81f7;font-size:20px;font-weight:700;text-decoration:none}}
+  nav a{{color:#8b949e;text-decoration:none;font-size:14px}}
+  nav a:hover{{color:#e6edf3}}
+  .container{{max-width:720px;margin:48px auto;padding:0 24px}}
+  h1{{font-size:32px;font-weight:800;margin-bottom:6px}}
+  .sub{{color:#8b949e;font-size:15px;margin-bottom:40px}}
+  footer{{text-align:center;padding:40px 24px;color:#484f58;font-size:13px;
+          border-top:1px solid #21262d;margin-top:40px}}
+</style>
+</head><body>
+<nav>
+  <a class="logo" href="/">⚡ FMSecure</a>
+  <a href="/">Home</a>
+  <a href="/download">Download</a>
+  <a href="/login" style="margin-left:auto;color:#2f81f7">Admin →</a>
+</nav>
+<div class="container">
+  <h1>Changelog</h1>
+  <p class="sub">Every release, every improvement — all in one place.</p>
+  {entries}
+</div>
+<footer>FMSecure · Enterprise EDR · © {datetime.now().year}</footer>
+</body></html>"""
 
 @app.get("/home", response_class=HTMLResponse)
 async def landing_page():
@@ -1795,7 +1977,7 @@ async def publish_version_form(
     _: bool = Depends(verify_session)
 ):
     """Dashboard form handler — same logic as the JSON endpoint but session-auth."""
-    dl = download_url  or f"{APP_BASE_URL}/download"
+    dl = download_url or f"{APP_BASE_URL}/download" 
     cl = changelog_url or f"{APP_BASE_URL}/changelog"
 
     try:
@@ -1819,6 +2001,7 @@ async def version_json():
     The desktop client fetches this on every startup to check for updates.
     Cache-control headers prevent stale CDN caching.
     """
+    dl = download_url or f"{APP_BASE_URL}/download"
     if not DATABASE_URL:
         return JSONResponse({"latest_version": "2.5.0",
                              "release_notes": "",
