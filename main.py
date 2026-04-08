@@ -53,7 +53,7 @@ API_KEY           = os.getenv("API_KEY", "default-dev-key")
 SENDGRID_API_KEY  = os.getenv("SENDGRID_API_KEY", "")
 SENDER_EMAIL      = os.getenv("SENDER_EMAIL", "glimpsefilmy@gmail.com")
 SESSION_TOKEN     = secrets.token_hex(16)
-DRIVE_FILE_ID     = os.getenv("DRIVE_FILE_ID", "14EH6jZM37cSXaZmoessxdVMT3Ec3tQMT")   # Google Drive file ID for download
+DRIVE_FILE_ID     = os.getenv("DRIVE_FILE_ID", "1UgvEKLqzlx_CdpsLUQTDV-f4qmSYvjBg")   # Google Drive file ID for download
 
 # Download URL — auto-derived. Just set DRIVE_FILE_ID env var on Railway.
 DOWNLOAD_URL = (
@@ -66,9 +66,9 @@ rzp_client = razorpay.Client(auth=(RZP_KEY_ID, RZP_KEY_SECRET))
 # ── Plans — amounts in PAISE (Rs 999 = 99900) ─────────────────────────────────
 # To change price: edit "amount". To change label: edit "label" AND the HTML below.
 PLANS = {
-    "pro_monthly": {"label":"PRO Monthly","amount":99900, "currency":"INR",
+    "pro_monthly": {"label":"PRO Monthly","amount":499, "currency":"INR",
                     "description":"FMSecure PRO - Monthly","days":31},
-    "pro_annual":  {"label":"PRO Annual", "amount":999900,"currency":"INR",
+    "pro_annual":  {"label":"PRO Annual", "amount":4999,"currency":"INR",
                     "description":"FMSecure PRO - Annual","days":365},
 }
 
@@ -1180,7 +1180,7 @@ footer{{padding:56px 48px 36px;border-top:1px solid var(--bd)}}
     <div class="pc feat">
       <div class="pbadge">Most popular</div>
       <div class="pplan">PRO Monthly</div>
-      <div class="pprice"><sup>&#x20B9;</sup>999<span>/mo</span></div>
+      <div class="pprice"><sup>&#x20B9;</sup>499<span>/mo</span></div>
       <div class="pdesc">For professionals protecting real systems</div>
       <div class="pdvd"></div>
       <ul class="pfl">
@@ -1201,7 +1201,7 @@ footer{{padding:56px 48px 36px;border-top:1px solid var(--bd)}}
  
     <div class="pc">
       <div class="pplan">PRO Annual</div>
-      <div class="pprice"><sup>&#x20B9;</sup>7999<span>/yr</span></div>
+      <div class="pprice"><sup>&#x20B9;</sup>4999<span>/yr</span></div>
       <div class="pdesc">2 months free &mdash; best value</div>
       <div class="pdvd"></div>
       <ul class="pfl">
@@ -1478,7 +1478,7 @@ async def pricing_page():
       <div class="cards">
         <div class="card">
           <p class="plan">PRO MONTHLY</p>
-          <div class="price">&#x20B9;999<span>/mo</span></div>
+          <div class="price">&#x20B9;499<span>/mo</span></div>
           <p class="period">Billed monthly, cancel anytime</p>
           <div class="email-row">
             <label>EMAIL — KEY WILL BE SENT HERE</label>
@@ -1498,7 +1498,7 @@ async def pricing_page():
         <div class="card featured">
           <div class="badge">BEST VALUE &#x2014; SAVE &#x20B9;1,989</div>
           <p class="plan">PRO ANNUAL</p>
-          <div class="price">&#x20B9;9,999<span>/yr</span></div>
+          <div class="price">&#x20B9;4,999<span>/yr</span></div>
           <p class="period">&#x20B9;833/mo billed annually <span class="savings">&#x2714; 2 months free</span></p>
           <div class="email-row">
             <label>EMAIL — KEY WILL BE SENT HERE</label>
@@ -1513,7 +1513,7 @@ async def pricing_page():
             <li><span class="check">&#10003;</span>2 months free vs monthly</li>
             <li><span class="check">&#10003;</span>Feature request priority</li>
           </ul>
-          <button class="btn btn-green" onclick="startPayment('pro_annual')">Buy Annual &#x2014; &#x20B9;9,999</button>
+          <button class="btn btn-green" onclick="startPayment('pro_annual')">Buy Annual &#x2014; &#x20B9;4,999</button>
         </div>
       </div>
       <p class="note">Payments secured by Razorpay &bull; UPI, Net Banking, Cards, Wallets accepted<br>
