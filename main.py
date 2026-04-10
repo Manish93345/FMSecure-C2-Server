@@ -1736,6 +1736,17 @@ async def tenant_dashboard(request: Request):
         ts   = al["created_at"].strftime("%Y-%m-%d %H:%M") if al["created_at"] else "—"
         acked = al["acknowledged"]
         row_style = "opacity:.5" if acked else ""
+        
+        # 🚨 FIX: Extract the button logic outside the main f-string to prevent the backslash error
+        ack_html = (
+            '<span style="color:#3fb950;font-size:12px">✓ Acked</span>'
+            if acked else
+            f'<button onclick="ackAlert(\'{al["id"]}\')"'
+            f' style="background:#21262d;color:#8b949e;border:1px solid #30363d;'
+            f'border-radius:4px;padding:2px 8px;cursor:pointer;font-size:11px">'
+            f'Acknowledge</button>'
+        )
+
         alert_rows += f"""
         <tr style="{row_style}">
           <td>
@@ -1751,12 +1762,7 @@ async def tenant_dashboard(request: Request):
           </td>
           <td style="font-size:11px;color:#8b949e">{ts}</td>
           <td>
-            {'<span style="color:#3fb950;font-size:12px">✓ Acked</span>'
-             if acked else
-             f'<button onclick="ackAlert(\'{al["id"]}\')"'
-             f' style="background:#21262d;color:#8b949e;border:1px solid #30363d;'
-             f'border-radius:4px;padding:2px 8px;cursor:pointer;font-size:11px">'
-             f'Acknowledge</button>'}
+            {ack_html}
           </td>
         </tr>"""
  
