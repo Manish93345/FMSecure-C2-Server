@@ -593,7 +593,7 @@ async def receive_heartbeat(request: Request, data: Heartbeat):
  
                     if current_count >= max_seats:
                         cur.close(); conn.close()
-                        print(f"[SEAT] Tenant {tenant[\'slug\']} at capacity "
+                        print(f"[SEAT] Tenant {tenant['slug']} at capacity "
                               f"({current_count}/{max_seats}). "
                               f"Rejecting {data.machine_id[:16]}…")
                         # Return 402 so the desktop can show a friendly message
@@ -2136,7 +2136,7 @@ async def tenant_save_config(
           verify_interval, max_vault_mb, allowed_exts.strip()))
     conn.commit(); cur.close(); conn.close()
  
-    print(f"[TENANT CONFIG] Updated for tenant {session[\'tenant_id\'][:8]}…")
+    print(f"[TENANT CONFIG] Updated for tenant {session['tenant_id'][:8]}…")
     return RedirectResponse("/tenant/dashboard", status_code=302)
  
  
