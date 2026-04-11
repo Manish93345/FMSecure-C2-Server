@@ -245,10 +245,49 @@ def init_db():
         cur.close()
         conn.close()
 
+
+def _start_offline_sweeper():
+    """
+    Background thread that marks stale agents as offline.
+ 
+    Industry pattern (CrowdStrike, SentinelOne):
+      Agent heartbeat interval: 10s
+      Grace period before marking offline: 45s (4.5x heartbeat)
+      Sweep frequency: 30s
+ 
+    Without this, agents show "online" forever after their machine
+    disconnects because the sweep only ran on incoming heartbeats.
+    """
+    def _sweep():
+        while True:
+            try:
+                if DATABASE_URL:
+                    conn = get_db(); cur = conn.cursor()
+                    cur.execute(
+                        "UPDATE tenant_agents SET status = \'offline\' "
+                        "WHERE status = \'online\' "
+                        "AND last_seen < NOW() - INTERVAL \'45 seconds\'"
+                    )
+                    affected = cur.rowcount
+                    conn.commit(); cur.close(); conn.close()
+                    if affected > 0:
+                        print(f"[SWEEPER] Marked {affected} agent(s) offline.")
+            except Exception as e:
+                print(f"[SWEEPER] Error (non-critical): {e}")
+            time.sleep(30)
+ 
+    t = threading.Thread(target=_sweep, daemon=True, name="FMSecure-OfflineSweeper")
+    t.start()
+    print("[SWEEPER] Offline sweeper started (30s interval, 45s grace).")
+
+
 @app.on_event("startup")
 async def startup():
-    if DATABASE_URL: init_db()
-    else: print("[DB] WARNING: No DATABASE_URL")
+  if DATABASE_URL:
+    init_db()
+    _start_offline_sweeper()    # ← ADD THIS LINE
+  else:
+    print("[DB] WARNING: No DATABASE_URL")
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 def _is_expired(e):
@@ -528,6 +567,52 @@ async def receive_heartbeat(request: Request, data: Heartbeat):
         tenant = _get_tenant_by_api_key(tenant_key)
         if not tenant:
             raise HTTPException(status_code=401, detail="Invalid tenant key")
+
+        # ── Seat enforcement: reject if tenant is at max capacity ────────────
+        # We check BEFORE upserting so a genuinely new machine is blocked.
+        # A machine that already has a record is always allowed (reconnecting).
+        if DATABASE_URL:
+            try:
+                conn = get_db(); cur = conn.cursor()
+ 
+                # Is this machine already registered with this tenant?
+                cur.execute(
+                    "SELECT id FROM tenant_agents "
+                    "WHERE tenant_id=%s AND machine_id=%s",
+                    (tenant["id"], data.machine_id))
+                already_registered = cur.fetchone() is not None
+ 
+                if not already_registered:
+                    # Count current agents for this tenant
+                    cur.execute(
+                        "SELECT COUNT(*) FROM tenant_agents "
+                        "WHERE tenant_id=%s",
+                        (tenant["id"],))
+                    current_count = cur.fetchone()["count"]
+                    max_seats     = tenant.get("max_agents", 10)
+ 
+                    if current_count >= max_seats:
+                        cur.close(); conn.close()
+                        print(f"[SEAT] Tenant {tenant[\'slug\']} at capacity "
+                              f"({current_count}/{max_seats}). "
+                              f"Rejecting {data.machine_id[:16]}…")
+                        # Return 402 so the desktop can show a friendly message
+                        raise HTTPException(
+                            status_code=402,
+                            detail=(
+                                f"Seat limit reached ({current_count}/{max_seats}). "
+                                f"Contact your administrator to add more seats."
+                            )
+                        )
+ 
+                cur.close(); conn.close()
+ 
+            except HTTPException:
+                raise   # re-raise the 402 we just created
+            except Exception as e:
+                print(f"[SEAT] Check error (non-critical): {e}")
+                # On DB error, allow the heartbeat through — don\'t block agents
+                # for infrastructure reasons
  
         # Upsert agent record in DB
         if DATABASE_URL:
@@ -635,7 +720,67 @@ async def receive_agent_alert(request: Request, data: AgentAlert):
         return {"status": "ok", "stored": False}
 
 
-
+@app.get("/agent/config")
+async def get_agent_config(request: Request):
+    """
+    Returns the tenant\'s policy config for this agent.
+    The desktop app calls this on startup and applies the values,
+    overriding local config.json (Option B — IT admin controls policy).
+ 
+    Auth: x-tenant-key header (same as heartbeat).
+    Returns 200 + config dict, or 401 if key invalid.
+    """
+    tenant_key = request.headers.get("x-tenant-key", "")
+    if not tenant_key:
+        raise HTTPException(status_code=400,
+                            detail="x-tenant-key header required")
+ 
+    tenant = _get_tenant_by_api_key(tenant_key)
+    if not tenant:
+        raise HTTPException(status_code=401, detail="Invalid tenant key")
+ 
+    if not DATABASE_URL:
+        return JSONResponse({"tenant_name": tenant["name"], "config": {}})
+ 
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute(
+            "SELECT * FROM tenant_config WHERE tenant_id = %s",
+            (tenant["id"],))
+        cfg_row = cur.fetchone()
+        cur.close(); conn.close()
+    except Exception as e:
+        print(f"[CONFIG] DB error: {e}")
+        return JSONResponse({"tenant_name": tenant["name"], "config": {}})
+ 
+    # Build the config dict — only include non-empty values
+    # so the agent only overrides settings that the IT admin actually set
+    cfg = {}
+    if cfg_row:
+        if cfg_row.get("webhook_url"):
+            cfg["webhook_url"] = cfg_row["webhook_url"]
+        if cfg_row.get("alert_email"):
+            cfg["admin_email"] = cfg_row["alert_email"]   # matches CONFIG key
+        if cfg_row.get("verify_interval") and cfg_row["verify_interval"] > 0:
+            cfg["verify_interval"] = cfg_row["verify_interval"]
+        if cfg_row.get("max_vault_mb") and cfg_row["max_vault_mb"] > 0:
+            cfg["vault_max_size_mb"] = cfg_row["max_vault_mb"]   # matches CONFIG key
+        if cfg_row.get("allowed_exts"):
+            # Convert comma-separated string to list matching CONFIG format
+            exts = [e.strip() for e in cfg_row["allowed_exts"].split(",")
+                    if e.strip().startswith(".")]
+            if exts:
+                cfg["vault_allowed_exts"] = exts
+ 
+    return JSONResponse(
+        content={
+            "tenant_name": tenant["name"],
+            "tenant_slug": tenant["slug"],
+            "plan":        tenant["plan"],
+            "config":      cfg,
+        },
+        headers={"Cache-Control": "no-store"}
+    )
 
 
 @app.post("/api/trigger_lockdown/{machine_id}")
@@ -1886,23 +2031,43 @@ async def tenant_dashboard(request: Request):
  
   <!-- Config -->
   <div class="card">
-    <h3>Settings</h3>
+    <h3>Policy Settings</h3>
+    <p style="color:#8b949e;font-size:12px;margin-bottom:14px">
+      These settings are pushed to all enrolled agents automatically.
+      They override individual machine settings (IT admin controls policy).
+    </p>
     <form method="POST" action="/tenant/config">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
         <div>
           <label>ALERT EMAIL</label>
           <input name="alert_email" type="email"
-                 value="{email_val}"
+                 value="{ (config.get('alert_email') or '') if config else '' }"
                  placeholder="it-alerts@yourcompany.com">
         </div>
         <div>
           <label>DISCORD / SLACK WEBHOOK URL</label>
           <input name="webhook_url"
-                 value="{webhook_val}"
+                 value="{ (config.get('webhook_url') or '') if config else '' }"
                  placeholder="https://discord.com/api/webhooks/...">
         </div>
+        <div>
+          <label>VERIFY INTERVAL (seconds, min 10)</label>
+          <input name="verify_interval" type="number"
+                 value="{ (config.get('verify_interval') or 60) if config else 60 }" min="10" max="86400">
+        </div>
+        <div>
+          <label>MAX VAULT FILE SIZE (MB)</label>
+          <input name="max_vault_mb" type="number"
+                 value="{ (config.get('max_vault_mb') or 10) if config else 10 }" min="1" max="500">
+        </div>
+        <div style="grid-column:1/-1">
+          <label>ALLOWED VAULT EXTENSIONS (comma-separated)</label>
+          <input name="allowed_exts"
+                 value="{ (config.get('allowed_exts') or '.txt,.json,.py') if config else '.txt,.json,.py' }"
+                 placeholder=".txt,.json,.py,.html,...">
+        </div>
       </div>
-      <button class="save-btn" type="submit">Save Settings →</button>
+      <button class="save-btn" type="submit">Save Policy →</button>
     </form>
   </div>
  
@@ -1937,9 +2102,12 @@ async function sendCommand(machineId, cmd) {{
 # ── Tenant Admin: Save config ─────────────────────────────────────────────────
 @app.post("/tenant/config")
 async def tenant_save_config(
-    request:     Request,
-    alert_email: str = Form(""),
-    webhook_url: str = Form("")
+    request:         Request,
+    alert_email:     str = Form(""),
+    webhook_url:     str = Form(""),
+    verify_interval: int = Form(60),
+    max_vault_mb:    int = Form(10),
+    allowed_exts:    str = Form(".txt,.json,.py,.html,.js,.css"),
 ):
     session = _get_tenant_session(request)
     if not session:
@@ -1947,16 +2115,28 @@ async def tenant_save_config(
     if not DATABASE_URL:
         return RedirectResponse("/tenant/dashboard", status_code=302)
  
+    # Sanitise
+    verify_interval = max(10, min(verify_interval, 86400))  # 10s – 24h
+    max_vault_mb    = max(1,  min(max_vault_mb, 500))       # 1MB – 500MB
+ 
     conn = get_db(); cur = conn.cursor()
     cur.execute("""
-        INSERT INTO tenant_config (tenant_id, alert_email, webhook_url)
-        VALUES (%s,%s,%s)
+        INSERT INTO tenant_config
+            (tenant_id, alert_email, webhook_url,
+             verify_interval, max_vault_mb, allowed_exts)
+        VALUES (%s,%s,%s,%s,%s,%s)
         ON CONFLICT (tenant_id) DO UPDATE SET
-            alert_email = EXCLUDED.alert_email,
-            webhook_url = EXCLUDED.webhook_url
+            alert_email     = EXCLUDED.alert_email,
+            webhook_url     = EXCLUDED.webhook_url,
+            verify_interval = EXCLUDED.verify_interval,
+            max_vault_mb    = EXCLUDED.max_vault_mb,
+            allowed_exts    = EXCLUDED.allowed_exts
     """, (session["tenant_id"],
-          alert_email.strip(), webhook_url.strip()))
+          alert_email.strip(), webhook_url.strip(),
+          verify_interval, max_vault_mb, allowed_exts.strip()))
     conn.commit(); cur.close(); conn.close()
+ 
+    print(f"[TENANT CONFIG] Updated for tenant {session[\'tenant_id\'][:8]}…")
     return RedirectResponse("/tenant/dashboard", status_code=302)
  
  
