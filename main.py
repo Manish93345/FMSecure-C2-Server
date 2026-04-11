@@ -811,6 +811,7 @@ async def dashboard(_: bool = Depends(verify_session)):
     <div>
   <a href="/licenses">Licenses</a>
   <a href="/super/dashboard" style="color:#f0883e">Tenants</a>
+  <a href="/tenant/login" style="color:#8b949e">Client Portal</a>
   <a href="/">Product Page</a>
   <a href="/pricing">Pricing</a>
   <a href="/logout">Logout</a>
@@ -1276,7 +1277,12 @@ async def super_dashboard(request: Request, _: bool = Depends(verify_session)):
 </style>
 </head><body>
 <nav>
-  <span class="brand">⚡ FMSecure — Super Admin</span>
+  <span class="brand">
+  <img src="/static/app_icon.png" width="24" height="24"
+       style="vertical-align:middle;margin-right:8px"
+       onerror="this.style.display='none'">
+  FMSecure — Super Admin
+</span>
   <div>
     <a href="/dashboard">C2 Dashboard</a>
     <a href="/licenses">Licenses</a>
@@ -1591,7 +1597,12 @@ async def super_tenant_detail(
 </style>
 </head><body>
 <nav>
-  <span class="brand">⚡ FMSecure</span>
+  <span class="brand">
+  <img src="/static/app_icon.png" width="24" height="24"
+       style="vertical-align:middle;margin-right:8px"
+       onerror="this.style.display='none'">
+  FMSecure
+</span>
   <div>
     <a href="/super/dashboard">← All Tenants</a>
     <a href="/dashboard">C2</a>
@@ -1697,7 +1708,10 @@ async def tenant_login_page(error: str = ""):
 </style>
 </head><body>
 <div class="card">
-  <h2>⚡ FMSecure</h2>
+  <img src="/static/app_icon.png" width="52" height="52"
+       style="margin-bottom:12px"
+       onerror="this.style.display='none'">
+  <h2 style="color:#2f81f7;margin-bottom:4px">FMSecure</h2>
   <p class="sub">Organisation Security Portal</p>
   {err}
   <form method="POST" action="/tenant/login">
@@ -1961,7 +1975,12 @@ async def tenant_dashboard(request: Request):
 </head><body>
  
 <nav>
-  <span class="brand">⚡ FMSecure</span>
+  <span class="brand">
+  <img src="/static/app_icon.png" width="24" height="24"
+       style="vertical-align:middle;margin-right:8px"
+       onerror="this.style.display='none'">
+  FMSecure
+</span>
   <span class="org">🏢 {tenant['name']}</span>
   <div>
     <span style="color:#8b949e;font-size:12px">
@@ -2265,7 +2284,10 @@ async def download_page():
 </style>
 </head><body>
 <nav>
-  <a class="logo" href="/">⚡ FMSecure</a>
+  <a class="logo" href="/" style="display: flex; align-items: center; gap: 8px;">
+  <img src="/static/app_icon.png" alt="Logo" height="28">
+  FMSecure
+</a>
   <a href="/">Home</a>
   <a href="/pricing">Pricing</a>
   <a href="/changelog">Changelog</a>
@@ -2376,7 +2398,10 @@ async def changelog_page():
 </style>
 </head><body>
 <nav>
-  <a class="logo" href="/">⚡ FMSecure</a>
+  <a class="logo" href="/" style="display: flex; align-items: center; gap: 8px;">
+  <img src="/static/app_icon.png" alt="Logo" height="28">
+  FMSecure
+</a>
   <a href="/">Home</a>
   <a href="/download">Download</a>
   <a href="/login" style="margin-left:auto;color:#2f81f7">Admin →</a>
@@ -2665,6 +2690,7 @@ footer{{padding:56px 48px 36px;border-top:1px solid var(--bd)}}
     <li><a href="#faq">FAQ</a></li>
   </ul>
   <div class="nav-right">
+    <a href="{base}/tenant/login" class="btn-ghost">Client Portal</a>
     <a href="{base}/download" class="btn-ghost">Free download</a>
     <a href="{base}/pricing" class="btn-nav-cta">Get PRO &rarr;</a>
   </div>
@@ -3072,6 +3098,7 @@ footer{{padding:56px 48px 36px;border-top:1px solid var(--bd)}}
         <li><a href="#">Changelog</a></li>
         <li><a href="#">GitHub</a></li>
         <li><a href="{base}/dashboard">C2 Dashboard</a></li>
+        <li><a href="{base}/tenant/login">Client Portal</a></li>
       </ul>
     </div>
     <div class="flg">
