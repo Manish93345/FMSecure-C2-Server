@@ -3403,6 +3403,7 @@ footer{{padding:56px 48px 36px;border-top:1px solid var(--bd)}}
         <li><a href="#">GitHub</a></li>
         <li><a href="{base}/dashboard">C2 Dashboard</a></li>
         <li><a href="{base}/tenant/login">Client Portal</a></li>
+        <li><a href="{base}/enterprise">Enterprise</a></li>
       </ul>
     </div>
     <div class="flg">
