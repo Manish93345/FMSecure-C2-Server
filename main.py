@@ -500,6 +500,123 @@ def _send_license_email(email: str, license_key: str, tier: str, expires_iso: st
         print(f"[EMAIL] SendGrid failed for {email}: {e}")
         print(f"[EMAIL] Key was: {license_key}")
 
+
+# ADD THIS FUNCTION to your main.py (near your other email functions):
+ 
+def send_tenant_welcome_email(org_email: str, org_name: str, api_key: str, max_agents: int, plan: str):
+    """
+    Sends the API key + onboarding instructions to the organization's email.
+    Called automatically when a tenant is created.
+    Never call this without also storing the key in DB first.
+    """
+    import smtplib
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+ 
+    SENDER_EMAIL    = os.environ.get("SMTP_EMAIL", "glimpsefilmy@gmail.com")
+    SENDER_PASSWORD = os.environ.get("SMTP_PASSWORD", "bocwoewklavlnzkt")
+ 
+    plan_label = "PRO" if plan == "pro" else "Free"
+    download_url = f"{APP_BASE_URL}/download"  # your existing constant
+ 
+    html = f"""
+    <html>
+    <body style="font-family: 'Segoe UI', Arial, sans-serif; background:#0d1117; padding:30px; color:#e6edf3;">
+      <div style="max-width:600px; margin:0 auto; background:#161b22; border-radius:12px;
+                  border:1px solid #30363d; overflow:hidden;">
+ 
+        <!-- Header -->
+        <div style="background:#2f81f7; padding:24px 32px;">
+          <h1 style="margin:0; font-size:22px; color:#ffffff;">🛡 Welcome to FMSecure Enterprise</h1>
+          <p style="margin:6px 0 0; color:#cfe2ff; font-size:14px;">
+            Your organization account is ready.
+          </p>
+        </div>
+ 
+        <!-- Body -->
+        <div style="padding:32px;">
+          <p style="font-size:15px; color:#e6edf3;">Hi <strong>{org_name}</strong>,</p>
+          <p style="color:#8b949e; font-size:14px;">
+            Your FMSecure Enterprise account has been activated.
+            Use the API key below to enroll your endpoints.
+          </p>
+ 
+          <!-- Plan badge -->
+          <div style="background:#1c2333; border-radius:8px; padding:16px; margin:20px 0;
+                      border-left:4px solid #{'d29922' if plan == 'pro' else '8b949e'};">
+            <span style="font-size:12px; color:#8b949e; text-transform:uppercase; letter-spacing:1px;">Plan</span>
+            <p style="margin:4px 0 0; font-size:18px; font-weight:bold;
+                      color:#{'d29922' if plan == 'pro' else 'e6edf3'};">
+              {'⭐ ' if plan == 'pro' else ''}{plan_label} — {max_agents} Seats
+            </p>
+          </div>
+ 
+          <!-- API Key box -->
+          <div style="background:#0d1117; border:1px solid #30363d; border-radius:8px;
+                      padding:20px; margin:20px 0; text-align:center;">
+            <p style="margin:0 0 8px; font-size:12px; color:#8b949e; text-transform:uppercase;
+                      letter-spacing:1px;">Your Organization API Key</p>
+            <code style="font-size:15px; color:#2f81f7; font-family:'Courier New', monospace;
+                         letter-spacing:2px; word-break:break-all;">{api_key}</code>
+            <p style="margin:12px 0 0; font-size:12px; color:#f85149;">
+              ⚠ Keep this key private. Do not share it publicly.
+            </p>
+          </div>
+ 
+          <!-- Steps -->
+          <h3 style="color:#e6edf3; font-size:15px; margin-top:28px;">How to enroll your machines:</h3>
+          <ol style="color:#8b949e; font-size:14px; line-height:2;">
+            <li>Download and install FMSecure on each endpoint: <a href="{download_url}" style="color:#2f81f7;">{download_url}</a></li>
+            <li>On first launch, click <strong style="color:#e6edf3;">"Enter Organization Key"</strong></li>
+            <li>Paste your API key above</li>
+            <li>The machine enrolls automatically and appears in your IT dashboard</li>
+          </ol>
+ 
+          <!-- IT Dashboard -->
+          <div style="background:#1c2333; border-radius:8px; padding:16px; margin:24px 0;">
+            <p style="margin:0; font-size:13px; color:#8b949e;">
+              Manage your endpoints at your IT Admin Portal:<br>
+              <a href="{APP_BASE_URL}/tenant/login" style="color:#2f81f7; font-size:14px;">
+                {APP_BASE_URL}/tenant/login
+              </a>
+            </p>
+          </div>
+ 
+          <p style="color:#8b949e; font-size:13px;">
+            If you have questions, reply to this email or contact us at
+            <a href="mailto:support@fmsecure.in" style="color:#2f81f7;">support@fmsecure.in</a>.
+          </p>
+        </div>
+ 
+        <!-- Footer -->
+        <div style="background:#0d1117; padding:16px 32px; text-align:center;">
+          <p style="margin:0; font-size:12px; color:#484f58;">
+            FMSecure Enterprise · Manish Lisa Pvt Limited
+          </p>
+        </div>
+      </div>
+    </body>
+    </html>
+    """
+ 
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = f"FMSecure Enterprise — Your API Key & Setup Instructions"
+        msg["From"]    = f"FMSecure Enterprise <{SENDER_EMAIL}>"
+        msg["To"]      = org_email
+        msg.attach(MIMEText(html, "html"))
+ 
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.starttls()
+        server.login(SENDER_EMAIL, SENDER_PASSWORD)
+        server.send_message(msg)
+        server.quit()
+        print(f"[TENANT] Welcome email sent to {org_email}")
+        return True
+    except Exception as e:
+        print(f"[TENANT] Welcome email failed: {e}")
+        return False
+
 # ══════════════════════════════════════════════════════════════════════════════
 # AUTH PAGES
 # ══════════════════════════════════════════════════════════════════════════════
@@ -655,7 +772,13 @@ async def receive_heartbeat(request: Request, data: Heartbeat):
  
         # Return any queued command for this machine
         cmd = commands.pop(data.machine_id, "NONE")
-        return {"status": "ok", "command": cmd, "tenant": tenant["slug"]}
+        return {
+            "status":  "ok",
+            "command": cmd,
+            "tenant":  tenant["slug"],
+            "tier":    tenant["plan"],          # "pro" / "business" / "enterprise"
+            "is_pro":  tenant["plan"] in ("pro", "business", "enterprise"),
+        }
  
     # Legacy single-user path (unchanged)
     if api_key != API_KEY:
@@ -1416,6 +1539,14 @@ async def super_create_tenant_form(
         print(f"[TENANT] Created via dashboard: {name} — {tenant_key}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+    # Send API key + instructions to the organization
+    import threading
+    threading.Thread(
+        target=send_tenant_welcome_email,
+        args=(body.contact_email, body.name, tenant_key, max_agents, plan),
+        daemon=True
+    ).start()
  
     # Redirect back with the API key in the URL so admin can copy it
     return RedirectResponse(
@@ -1782,6 +1913,179 @@ async def tenant_logout(request: Request):
     resp = RedirectResponse("/tenant/login", status_code=302)
     resp.delete_cookie("fms_tenant_session")
     return resp
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TENANT ADMIN PASSWORD RESET (FORGOT PASSWORD)
+# ══════════════════════════════════════════════════════════════════════════════
+
+_tenant_reset_otps = {}   # {email: {otp, expires, tenant_id}}
+
+def _send_tenant_reset_otp(email: str, otp: str):
+    """Send password reset OTP via SendGrid (non-blocking)."""
+    if not SENDGRID_API_KEY:
+        print(f"[RESET] No SendGrid key. OTP for {email}: {otp}")
+        return
+    html = f"""
+    <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;
+                background:#0d1117;color:#e6edf3;padding:32px;border-radius:12px;">
+      <h2 style="color:#2f81f7;">🔐 FMSecure IT Admin – Password Reset</h2>
+      <p style="color:#8b949e;">Use this code to reset your IT admin password:</p>
+      <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;
+                  padding:24px;text-align:center;margin:20px 0;">
+        <span style="font-size:36px;font-weight:700;color:#2f81f7;
+                     letter-spacing:8px;font-family:Courier,monospace;">{otp}</span>
+      </div>
+      <p style="color:#8b949e;font-size:13px;">
+        This code expires in 5 minutes. If you didn't request this, ignore this email.
+      </p>
+    </div>
+    """
+    try:
+        from sendgrid import SendGridAPIClient
+        from sendgrid.helpers.mail import Mail
+        sg = SendGridAPIClient(api_key=SENDGRID_API_KEY)
+        message = Mail(
+            from_email=SENDER_EMAIL,
+            to_emails=email,
+            subject="FMSecure – IT Admin Password Reset Code",
+            html_content=html
+        )
+        sg.send(message)
+        print(f"[RESET] OTP sent to {email}")
+    except Exception as e:
+        print(f"[RESET] SendGrid failed: {e}")
+
+
+@app.get("/tenant/forgot-password", response_class=HTMLResponse)
+async def tenant_forgot_password_page(error: str = "", success: str = ""):
+    err_div = f'<p class="error">{error}</p>' if error else ""
+    succ_div = f'<p class="success">{success}</p>' if success else ""
+    return f"""
+    <!DOCTYPE html><html><head><title>FMSecure – Forgot Password</title>
+    <style>
+      *{{box-sizing:border-box;margin:0;padding:0}}
+      body{{font-family:'Segoe UI',Arial,sans-serif;background:#0d1117;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}}
+      .card{{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:40px;width:100%;max-width:420px}}
+      h2{{color:#2f81f7;font-size:20px;margin-bottom:8px}}
+      p{{color:#8b949e;font-size:14px;margin-bottom:24px}}
+      label{{display:block;color:#8b949e;font-size:12px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}}
+      input{{width:100%;padding:12px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#e6edf3;font-size:14px;outline:none}}
+      input:focus{{border-color:#2f81f7}}
+      button{{width:100%;padding:12px;background:#2f81f7;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;margin-top:16px}}
+      button:hover{{background:#1f6feb}}
+      .error{{color:#f85149;font-size:13px;margin-top:12px}}
+      .success{{color:#3fb950;font-size:13px;margin-top:12px}}
+      .back{{display:block;text-align:center;margin-top:20px;color:#8b949e;text-decoration:none;font-size:13px}}
+      .back:hover{{color:#2f81f7}}
+    </style></head><body>
+    <div class="card">
+      <h2>Forgot Password?</h2>
+      <p>Enter your registered IT admin email and we'll send a reset code.</p>
+      <form method="POST" action="/tenant/forgot-password">
+        <label>Email Address</label>
+        <input type="email" name="email" placeholder="admin@company.com" required>
+        <button type="submit">Send Reset Code</button>
+        {err_div}{succ_div}
+      </form>
+      <a href="/tenant/login" class="back">← Back to login</a>
+    </div>
+    </body></html>"""
+
+
+@app.post("/tenant/forgot-password")
+async def tenant_forgot_password_submit(email: str = Form(...)):
+    email = email.strip().lower()
+    if not DATABASE_URL:
+        return RedirectResponse("/tenant/forgot-password?error=Server+not+configured", 302)
+
+    # Look up tenant user by email
+    conn = get_db(); cur = conn.cursor()
+    cur.execute("SELECT id, tenant_id FROM tenant_users WHERE email = %s", (email,))
+    row = cur.fetchone()
+    cur.close(); conn.close()
+
+    # Always return same message – no user enumeration
+    if row:
+        import random, time
+        otp = str(random.randint(100000, 999999))
+        _tenant_reset_otps[email] = {
+            "otp":       otp,
+            "expires":   time.time() + 300,
+            "tenant_id": row["tenant_id"],
+        }
+        threading.Thread(target=_send_tenant_reset_otp, args=(email, otp), daemon=True).start()
+
+    return RedirectResponse("/tenant/forgot-password?success=If+that+email+is+registered,+a+reset+code+has+been+sent.", 302)
+
+
+@app.get("/tenant/reset-password", response_class=HTMLResponse)
+async def tenant_reset_password_page(email: str = "", error: str = ""):
+    err_div = f'<p class="error">{error}</p>' if error else ""
+    return f"""
+    <!DOCTYPE html><html><head><title>FMSecure – Reset Password</title>
+    <style>
+      *{{box-sizing:border-box;margin:0;padding:0}}
+      body{{font-family:'Segoe UI',Arial,sans-serif;background:#0d1117;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}}
+      .card{{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:40px;width:100%;max-width:420px}}
+      h2{{color:#2f81f7;font-size:20px;margin-bottom:8px}}
+      p{{color:#8b949e;font-size:14px;margin-bottom:24px}}
+      label{{display:block;color:#8b949e;font-size:12px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;margin-top:16px}}
+      input{{width:100%;padding:12px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#e6edf3;font-size:14px;outline:none}}
+      input:focus{{border-color:#2f81f7}}
+      button{{width:100%;padding:12px;background:#2f81f7;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;margin-top:20px}}
+      button:hover{{background:#1f6feb}}
+      .error{{color:#f85149;font-size:13px;margin-top:12px}}
+    </style></head><body>
+    <div class="card">
+      <h2>Reset Your Password</h2>
+      <p>Enter the 6-digit code from your email and choose a new password.</p>
+      <form method="POST" action="/tenant/reset-password">
+        <input type="hidden" name="email" value="{email}">
+        <label>Reset Code</label>
+        <input type="text" name="otp" placeholder="123456" maxlength="6" inputmode="numeric" required>
+        <label>New Password</label>
+        <input type="password" name="new_password" placeholder="Minimum 8 characters" required>
+        <label>Confirm New Password</label>
+        <input type="password" name="confirm_password" placeholder="Repeat password" required>
+        <button type="submit">Reset Password</button>
+        {err_div}
+      </form>
+    </div>
+    </body></html>"""
+
+
+@app.post("/tenant/reset-password")
+async def tenant_reset_password_submit(
+    email: str = Form(...),
+    otp: str = Form(...),
+    new_password: str = Form(...),
+    confirm_password: str = Form(...)
+):
+    email = email.strip().lower()
+    record = _tenant_reset_otps.get(email)
+
+    if not record:
+        return RedirectResponse(f"/tenant/reset-password?email={email}&error=No+reset+request+found", 302)
+
+    if time.time() > record["expires"]:
+        del _tenant_reset_otps[email]
+        return RedirectResponse(f"/tenant/reset-password?email={email}&error=Code+expired", 302)
+
+    if not secrets.compare_digest(record["otp"], otp):
+        return RedirectResponse(f"/tenant/reset-password?email={email}&error=Incorrect+code", 302)
+
+    if new_password != confirm_password or len(new_password) < 8:
+        return RedirectResponse(f"/tenant/reset-password?email={email}&error=Passwords+must+match+and+be+at+least+8+chars", 302)
+
+    # Update password
+    pw_hash = _hash_password(new_password)
+    conn = get_db(); cur = conn.cursor()
+    cur.execute("UPDATE tenant_users SET password_hash = %s WHERE email = %s", (pw_hash, email))
+    conn.commit(); cur.close(); conn.close()
+
+    del _tenant_reset_otps[email]
+    return RedirectResponse("/tenant/login?error=Password+reset+successfully.+Please+log+in.", 302)
  
  
 # ── Tenant Admin: Main Dashboard ──────────────────────────────────────────────
@@ -3351,6 +3655,157 @@ async def pricing_page():
       }}).open();
     }}
     </script></body></html>"""
+
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ENTERPRISE SALES CONTACT FORM
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _notify_super_admin_of_lead(company: str, name: str, email: str, seats: str, message: str):
+    """Send lead notification to super admin (you)."""
+    if not SENDGRID_API_KEY:
+        print(f"[SALES] Lead: {company} / {name} / {email} / {seats} seats")
+        return
+    admin_email = os.getenv("ADMIN_EMAIL", "kumarmanish85211@gmail.com")
+    html = f"""
+    <div style="font-family:Arial;background:#0d1117;padding:20px;color:#e6edf3;">
+      <div style="max-width:500px;background:#161b22;border:1px solid #30363d;border-radius:10px;padding:28px;">
+        <h2 style="color:#3fb950;">🎯 New Enterprise Lead</h2>
+        <table style="width:100%;">
+          <tr><td style="color:#8b949e;padding:8px 0;">Company</td><td style="color:#e6edf3;font-weight:bold;">{company}</td></tr>
+          <tr><td style="color:#8b949e;padding:8px 0;">Contact</td><td style="color:#e6edf3;">{name}</td></tr>
+          <tr><td style="color:#8b949e;padding:8px 0;">Email</td><td><a href="mailto:{email}" style="color:#2f81f7;">{email}</a></td></tr>
+          <tr><td style="color:#8b949e;padding:8px 0;">Seats</td><td style="color:#d29922;font-weight:bold;">{seats} seats</td></tr>
+        </table>
+        {"<p style='margin-top:16px;color:#8b949e;'>Message:<br><em style='color:#e6edf3;'>" + message + "</em></p>" if message else ""}
+        <hr style="border-color:#30363d;margin:20px 0;">
+        <p style="color:#8b949e;font-size:13px;">
+          Action: Create tenant at <a href="{APP_BASE_URL}/super/dashboard" style="color:#2f81f7;">{APP_BASE_URL}/super/dashboard</a>
+        </p>
+      </div>
+    </div>
+    """
+    try:
+        from sendgrid import SendGridAPIClient
+        from sendgrid.helpers.mail import Mail
+        sg = SendGridAPIClient(api_key=SENDGRID_API_KEY)
+        msg = Mail(from_email=SENDER_EMAIL, to_emails=admin_email,
+                   subject=f"🎯 New FMSecure Enterprise Lead – {company} ({seats} seats)",
+                   html_content=html)
+        sg.send(msg)
+    except Exception as e:
+        print(f"[SALES] Lead notification failed: {e}")
+
+
+def _send_sales_acknowledgment(email: str, name: str, company: str):
+    """Send acknowledgment to the prospect."""
+    if not SENDGRID_API_KEY:
+        return
+    html = f"""
+    <div style="font-family:'Segoe UI',Arial;background:#0d1117;padding:30px;">
+      <div style="max-width:520px;margin:auto;background:#161b22;border-radius:12px;border:1px solid #30363d;overflow:hidden;">
+        <div style="background:#2f81f7;padding:20px 28px;">
+          <h1 style="margin:0;color:#fff;font-size:20px;">🛡 FMSecure Enterprise</h1>
+          <p style="margin:4px 0 0;color:#cfe2ff;font-size:13px;">We received your request</p>
+        </div>
+        <div style="padding:28px;">
+          <p style="color:#e6edf3;">Hi <strong>{name}</strong>,</p>
+          <p style="color:#8b949e;">Thank you for your interest in FMSecure Enterprise for <strong style="color:#e6edf3;">{company}</strong>.</p>
+          <p style="color:#8b949e;">Our team will review your request and send your organization's API key and onboarding instructions within <strong>24 hours</strong>.</p>
+          <div style="background:#1c2333;border-radius:8px;padding:16px;margin:20px 0;border-left:4px solid #2f81f7;">
+            <p style="margin:0;color:#8b949e;font-size:13px;">
+              In the meantime, explore FMSecure free: <a href="{APP_BASE_URL}/download" style="color:#2f81f7;">{APP_BASE_URL}/download</a>
+            </p>
+          </div>
+          <p style="color:#8b949e;font-size:13px;">Questions? Reply to this email.</p>
+        </div>
+        <div style="background:#0d1117;padding:14px 28px;text-align:center;">
+          <p style="margin:0;font-size:12px;color:#484f58;">FMSecure · Manish Lisa Pvt Limited</p>
+        </div>
+      </div>
+    </div>
+    """
+    try:
+        from sendgrid import SendGridAPIClient
+        from sendgrid.helpers.mail import Mail
+        sg = SendGridAPIClient(api_key=SENDGRID_API_KEY)
+        msg = Mail(from_email=SENDER_EMAIL, to_emails=email,
+                   subject="FMSecure Enterprise – We received your request",
+                   html_content=html)
+        sg.send(msg)
+    except Exception as e:
+        print(f"[SALES] Acknowledgment failed: {e}")
+
+
+@app.get("/enterprise", response_class=HTMLResponse)
+async def enterprise_sales_page(error: str = "", success: bool = False):
+    if success:
+        return """
+        <!DOCTYPE html><html><head><title>Request Received – FMSecure</title>
+        <style>body{background:#0d1117;color:#e6edf3;font-family:system-ui;display:flex;align-items:center;justify-content:center;min-height:100vh}
+        .card{background:#161b22;border:1px solid #30363d;border-radius:16px;padding:48px;max-width:500px;text-align:center}
+        h2{color:#3fb950;margin-bottom:8px}p{color:#8b949e}</style></head><body>
+        <div class="card"><h2>✅ Request Received!</h2><p>We'll send your API key and setup instructions within 24 hours.</p><p>Check your email (including spam).</p></div></body></html>"""
+    err_div = f'<p style="color:#f85149;font-size:13px;margin-top:12px">{error}</p>' if error else ""
+    return f"""
+    <!DOCTYPE html><html><head><title>FMSecure Enterprise</title>
+    <style>
+      *{{box-sizing:border-box;margin:0;padding:0}}
+      body{{font-family:'Segoe UI',Arial;background:#0d1117;display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:40px 20px;color:#e6edf3}}
+      .hero{{text-align:center;margin-bottom:40px}}
+      .hero h1{{font-size:32px}} .hero p{{color:#8b949e}}
+      .plans{{display:flex;gap:20px;margin-bottom:40px;flex-wrap:wrap;justify-content:center}}
+      .plan{{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:28px;width:220px;text-align:center}}
+      .plan.featured{{border-color:#2f81f7}}
+      .plan h3{{font-size:18px}} .plan .price{{font-size:28px;font-weight:bold;color:#2f81f7;margin:12px 0}}
+      .plan .price span{{font-size:14px;color:#8b949e;font-weight:normal}}
+      .plan ul{{list-style:none;text-align:left;font-size:13px;color:#8b949e}}
+      .plan ul li::before{{content:"✓ ";color:#3fb950}}
+      .badge{{background:#2f81f7;color:#fff;font-size:11px;padding:2px 8px;border-radius:4px;display:inline-block;margin-bottom:8px}}
+      form{{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:36px;width:100%;max-width:480px}}
+      form h2{{font-size:20px;margin-bottom:6px}} form p{{color:#8b949e;font-size:13px;margin-bottom:24px}}
+      label{{display:block;color:#8b949e;font-size:12px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;margin-top:16px}}
+      input,select,textarea{{width:100%;padding:12px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#e6edf3;font-size:14px;outline:none}}
+      input:focus,select:focus,textarea:focus{{border-color:#2f81f7}}
+      textarea{{resize:vertical;min-height:80px}}
+      button{{width:100%;padding:13px;background:#2f81f7;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;margin-top:20px}}
+      button:hover{{background:#1f6feb}}
+    </style></head><body>
+    <div class="hero"><h1>🛡 FMSecure Enterprise</h1><p>EDR & File Integrity Monitoring for your organization</p></div>
+    <div class="plans">
+      <div class="plan"><h3>Starter</h3><div class="price">₹2,999 <span>/mo</span></div><ul><li>Up to 10 endpoints</li><li>IT Admin portal</li><li>All PRO features</li></ul></div>
+      <div class="plan featured"><span class="badge">Most Popular</span><h3>Business</h3><div class="price">₹7,999 <span>/mo</span></div><ul><li>Up to 50 endpoints</li><li>Priority support</li><li>Threat intel engine</li></ul></div>
+      <div class="plan"><h3>Enterprise</h3><div class="price">Custom</div><ul><li>Unlimited endpoints</li><li>Dedicated support</li><li>SLA guarantee</li></ul></div>
+    </div>
+    <form method="POST" action="/enterprise">
+      <h2>Get Started</h2><p>Fill this form – we'll set up your account and email the API key within 24 hours.</p>
+      <label>Company Name *</label><input type="text" name="company" placeholder="Acme Corp" required>
+      <label>Your Name *</label><input type="text" name="name" placeholder="Rahul Sharma" required>
+      <label>Business Email *</label><input type="email" name="email" placeholder="it@company.com" required>
+      <label>Number of Endpoints</label>
+      <select name="seats"><option value="5">Up to 5</option><option value="10" selected>Up to 10</option><option value="25">Up to 25</option><option value="50">Up to 50</option><option value="100">100+</option></select>
+      <label>Anything else? (optional)</label><textarea name="message" placeholder="e.g. We need deployment by..."></textarea>
+      <button type="submit">Request Enterprise Access →</button>
+      {err_div}
+    </form>
+    </body></html>"""
+
+
+@app.post("/enterprise")
+async def enterprise_sales_submit(
+    company: str = Form(...),
+    name: str = Form(...),
+    email: str = Form(...),
+    seats: str = Form("10"),
+    message: str = Form("")
+):
+    # Send lead notification and acknowledgment in background
+    threading.Thread(target=_notify_super_admin_of_lead,
+                     args=(company, name, email, seats, message), daemon=True).start()
+    threading.Thread(target=_send_sales_acknowledgment,
+                     args=(email, name, company), daemon=True).start()
+    return RedirectResponse("/enterprise?success=1", 302)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PAYMENT ENDPOINTS
