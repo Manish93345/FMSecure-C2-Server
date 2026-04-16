@@ -21,7 +21,7 @@ ADMIN_PASS        = os.getenv("ADMIN_PASSWORD", "password")
 API_KEY           = os.getenv("API_KEY", "default-dev-key")
 SENDGRID_API_KEY  = os.getenv("SENDGRID_API_KEY", "")
 SENDER_EMAIL      = os.getenv("SENDER_EMAIL", "glimpsefilmy@gmail.com")
-DRIVE_FILE_ID     = os.getenv("DRIVE_FILE_ID", "1Wo_GwR8YR_3sZUykTcwEzdAtbKZOtmpJ")
+DRIVE_FILE_ID     = os.getenv("DRIVE_FILE_ID", "1e-EnPaxiMP0ZFpkL6QpBopJ41QeQMjMM")
 
 # ── Derived constants ──────────────────────────────────────────────────────────
 DOWNLOAD_URL = (
