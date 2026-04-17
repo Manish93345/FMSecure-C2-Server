@@ -504,118 +504,80 @@ def _send_license_email(email: str, license_key: str, tier: str, expires_iso: st
 # ADD THIS FUNCTION to your main.py (near your other email functions):
  
 def send_tenant_welcome_email(org_email: str, org_name: str, api_key: str, max_agents: int, plan: str):
-    """
-    Sends the API key + onboarding instructions to the organization's email.
-    Called automatically when a tenant is created.
-    Never call this without also storing the key in DB first.
-    """
-    import smtplib
-    from email.mime.multipart import MIMEMultipart
-    from email.mime.text import MIMEText
- 
-    SENDER_EMAIL    = os.environ.get("SMTP_EMAIL", "glimpsefilmy@gmail.com")
-    SENDER_PASSWORD = os.environ.get("SMTP_PASSWORD", "bocwoewklavlnzkt")
- 
-    plan_label = "PRO" if plan == "pro" else "Free"
-    download_url = f"{APP_BASE_URL}/download"  # your existing constant
- 
+    """Send API key + onboarding instructions via SendGrid HTTP API."""
+    if not SENDGRID_API_KEY:
+        print(f"[TENANT] No SENDGRID_API_KEY. API key for {org_email}: {api_key}")
+        return
+
+    plan_label = {"business": "Business", "enterprise": "Enterprise", "trial": "Trial"}.get(plan, "Business")
+    download_url = f"{APP_BASE_URL}/download"
+
     html = f"""
-    <html>
-    <body style="font-family: 'Segoe UI', Arial, sans-serif; background:#0d1117; padding:30px; color:#e6edf3;">
-      <div style="max-width:600px; margin:0 auto; background:#161b22; border-radius:12px;
-                  border:1px solid #30363d; overflow:hidden;">
- 
-        <!-- Header -->
-        <div style="background:#2f81f7; padding:24px 32px;">
-          <h1 style="margin:0; font-size:22px; color:#ffffff;">🛡 Welcome to FMSecure Enterprise</h1>
-          <p style="margin:6px 0 0; color:#cfe2ff; font-size:14px;">
-            Your organization account is ready.
-          </p>
+    <div style="font-family:'Segoe UI',Arial,sans-serif;background:#0d1117;padding:30px;">
+      <div style="max-width:600px;margin:0 auto;background:#161b22;border-radius:12px;
+                  border:1px solid #30363d;overflow:hidden;">
+        <div style="background:#2f81f7;padding:24px 32px;">
+          <h1 style="margin:0;font-size:22px;color:#fff;">🛡 Welcome to FMSecure Enterprise</h1>
+          <p style="margin:6px 0 0;color:#cfe2ff;font-size:14px;">Your organisation account is ready.</p>
         </div>
- 
-        <!-- Body -->
         <div style="padding:32px;">
-          <p style="font-size:15px; color:#e6edf3;">Hi <strong>{org_name}</strong>,</p>
-          <p style="color:#8b949e; font-size:14px;">
-            Your FMSecure Enterprise account has been activated.
-            Use the API key below to enroll your endpoints.
+          <p style="font-size:15px;color:#e6edf3;">Hi <strong>{org_name}</strong>,</p>
+          <p style="color:#8b949e;font-size:14px;">
+            Your FMSecure Enterprise account has been activated on the
+            <strong style="color:#e6edf3">{plan_label} plan</strong> with
+            <strong style="color:#e6edf3">{max_agents} seats</strong>.
           </p>
- 
-          <!-- Plan badge -->
-          <div style="background:#1c2333; border-radius:8px; padding:16px; margin:20px 0;
-                      border-left:4px solid #{'d29922' if plan == 'pro' else '8b949e'};">
-            <span style="font-size:12px; color:#8b949e; text-transform:uppercase; letter-spacing:1px;">Plan</span>
-            <p style="margin:4px 0 0; font-size:18px; font-weight:bold;
-                      color:#{'d29922' if plan == 'pro' else 'e6edf3'};">
-              {'⭐ ' if plan == 'pro' else ''}{plan_label} — {max_agents} Seats
-            </p>
-          </div>
- 
-          <!-- API Key box -->
-          <div style="background:#0d1117; border:1px solid #30363d; border-radius:8px;
-                      padding:20px; margin:20px 0; text-align:center;">
-            <p style="margin:0 0 8px; font-size:12px; color:#8b949e; text-transform:uppercase;
-                      letter-spacing:1px;">Your Organization API Key</p>
-            <code style="font-size:15px; color:#2f81f7; font-family:'Courier New', monospace;
-                         letter-spacing:2px; word-break:break-all;">{api_key}</code>
-            <p style="margin:12px 0 0; font-size:12px; color:#f85149;">
+          <div style="background:#0d1117;border:1px solid #30363d;border-radius:8px;
+                      padding:20px;margin:20px 0;text-align:center;">
+            <p style="margin:0 0 8px;font-size:12px;color:#8b949e;text-transform:uppercase;
+                      letter-spacing:1px;">Your Organisation API Key</p>
+            <code style="font-size:15px;color:#2f81f7;font-family:'Courier New',monospace;
+                         letter-spacing:2px;word-break:break-all;">{api_key}</code>
+            <p style="margin:12px 0 0;font-size:12px;color:#f85149;">
               ⚠ Keep this key private. Do not share it publicly.
             </p>
           </div>
- 
-          <!-- Steps -->
-          <h3 style="color:#e6edf3; font-size:15px; margin-top:28px;">How to enroll your machines:</h3>
-          <ol style="color:#8b949e; font-size:14px; line-height:2;">
-            <li>Download and install FMSecure on each endpoint: <a href="{download_url}" style="color:#2f81f7;">{download_url}</a></li>
-            <li>On first launch, click <strong style="color:#e6edf3;">"Enter Organization Key"</strong></li>
+          <h3 style="color:#e6edf3;font-size:15px;margin-top:28px;">How to enroll your machines:</h3>
+          <ol style="color:#8b949e;font-size:14px;line-height:2;">
+            <li>Download FMSecure: <a href="{download_url}" style="color:#2f81f7;">{download_url}</a></li>
+            <li>On first launch, select <strong style="color:#e6edf3;">"Organisation Managed"</strong></li>
             <li>Paste your API key above</li>
-            <li>The machine enrolls automatically and appears in your IT dashboard</li>
+            <li>The machine enrolls automatically — all PRO features activate instantly</li>
           </ol>
- 
-          <!-- IT Dashboard -->
-          <div style="background:#1c2333; border-radius:8px; padding:16px; margin:24px 0;">
-            <p style="margin:0; font-size:13px; color:#8b949e;">
-              Manage your endpoints at your IT Admin Portal:<br>
-              <a href="{APP_BASE_URL}/tenant/login" style="color:#2f81f7; font-size:14px;">
+          <div style="background:#1c2333;border-radius:8px;padding:16px;margin:24px 0;">
+            <p style="margin:0;font-size:13px;color:#8b949e;">
+              IT Admin Portal:<br>
+              <a href="{APP_BASE_URL}/tenant/login" style="color:#2f81f7;font-size:14px;">
                 {APP_BASE_URL}/tenant/login
               </a>
             </p>
           </div>
- 
-          <p style="color:#8b949e; font-size:13px;">
-            If you have questions, reply to this email or contact us at
-            <a href="mailto:support@fmsecure.in" style="color:#2f81f7;">support@fmsecure.in</a>.
+          <p style="color:#8b949e;font-size:13px;">
+            Lost this key? Reply to this email and we'll resend it.<br>
+            Questions? <a href="mailto:support@fmsecure.in" style="color:#2f81f7;">support@fmsecure.in</a>
           </p>
         </div>
- 
-        <!-- Footer -->
-        <div style="background:#0d1117; padding:16px 32px; text-align:center;">
-          <p style="margin:0; font-size:12px; color:#484f58;">
-            FMSecure Enterprise · Manish Lisa Pvt Limited
-          </p>
+        <div style="background:#0d1117;padding:16px 32px;text-align:center;">
+          <p style="margin:0;font-size:12px;color:#484f58;">FMSecure Enterprise · Manish Lisa Pvt Limited</p>
         </div>
       </div>
-    </body>
-    </html>
-    """
- 
+    </div>"""
+
     try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = f"FMSecure Enterprise — Your API Key & Setup Instructions"
-        msg["From"]    = f"FMSecure Enterprise <{SENDER_EMAIL}>"
-        msg["To"]      = org_email
-        msg.attach(MIMEText(html, "html"))
- 
-        server = smtplib.SMTP("smtp.gmail.com", 587)
-        server.starttls()
-        server.login(SENDER_EMAIL, SENDER_PASSWORD)
-        server.send_message(msg)
-        server.quit()
-        print(f"[TENANT] Welcome email sent to {org_email}")
-        return True
+        import sendgrid
+        from sendgrid.helpers.mail import Mail
+        sg = sendgrid.SendGridAPIClient(api_key=SENDGRID_API_KEY)
+        message = Mail(
+            from_email=SENDER_EMAIL,
+            to_emails=org_email,
+            subject=f"FMSecure Enterprise — Your API Key & Setup Instructions",
+            html_content=html
+        )
+        resp = sg.send(message)
+        print(f"[TENANT] Welcome email sent to {org_email} — status {resp.status_code}")
     except Exception as e:
         print(f"[TENANT] Welcome email failed: {e}")
-        return False
+        print(f"[TENANT] API key was: {api_key}")
 
 # ══════════════════════════════════════════════════════════════════════════════
 # AUTH PAGES
@@ -1223,6 +1185,31 @@ async def super_reset_tenant_key(tenant_id: str, api_key: str = ""):
     if not row:
         raise HTTPException(status_code=404, detail="Tenant not found")
     return {"ok": True, "new_api_key": new_key, "tenant": row["name"]}
+
+
+@app.post("/super/tenants/{tenant_id}/resend-welcome-email")
+async def super_resend_welcome_email(tenant_id: str, _: bool = Depends(verify_session)):
+    """Resend the welcome email with the existing API key — for orgs that lost it."""
+    if not DATABASE_URL:
+        raise HTTPException(status_code=500, detail="No database")
+    conn = get_db(); cur = conn.cursor()
+    cur.execute(
+        "SELECT name, contact_email, api_key, max_agents, plan FROM tenants WHERE id=%s",
+        (tenant_id,))
+    row = cur.fetchone()
+    cur.close(); conn.close()
+    if not row:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    
+    threading.Thread(
+        target=send_tenant_welcome_email,
+        args=(row["contact_email"], row["name"], row["api_key"],
+              row["max_agents"], row["plan"]),
+        daemon=True
+    ).start()
+    return RedirectResponse(
+        f"/super/tenant-detail?id={tenant_id}&msg=email_sent",
+        status_code=303)
  
  
 # ── Super Admin: Suspend / unsuspend tenant ───────────────────────────────────
@@ -1541,10 +1528,10 @@ async def super_create_tenant_form(
         raise HTTPException(status_code=500, detail=str(e))
 
     # Send API key + instructions to the organization
-    import threading
+    # ✅ FIXED — use the form variables directly
     threading.Thread(
         target=send_tenant_welcome_email,
-        args=(body.contact_email, body.name, tenant_key, max_agents, plan),
+        args=(contact_email.strip(), name.strip(), tenant_key, max_agents, plan),
         daemon=True
     ).start()
  
@@ -1696,6 +1683,27 @@ async def super_tenant_detail(
  
     created = (tenant["created_at"].strftime("%Y-%m-%d %H:%M")
                if tenant["created_at"] else "—")
+
+    # =========================================================
+    # NEW CODE: Defining the resend_banner right before returning
+    # =========================================================
+    resend_banner = f"""
+    <div style="background:#0d1117;border:1px solid #30363d;border-radius:8px;
+                padding:16px 24px;margin-bottom:20px;display:flex;
+                justify-content:space-between;align-items:center;">
+      <div>
+        <div style="font-weight:600;color:#e6edf3;margin-bottom:4px;">Organisation API Key</div>
+        <code style="font-family:monospace;font-size:13px;color:#2f81f7;
+                     word-break:break-all">{tenant['api_key']}</code>
+      </div>
+      <form method="POST" action="/super/tenants/{id}/resend-welcome-email" style="margin-left:16px;flex-shrink:0">
+        <button type="submit"
+                style="background:#238636;color:#fff;border:none;border-radius:6px;
+                       padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer">
+          📧 Resend to {tenant['contact_email']}
+        </button>
+      </form>
+    </div>"""
  
     return f"""<!DOCTYPE html>
 <html lang="en"><head>
@@ -1852,8 +1860,15 @@ async def tenant_login_page(error: str = ""):
     <input name="password" type="password" required placeholder="••••••••">
     <button type="submit">Sign In →</button>
   </form>
-  <p style="color:#484f58;font-size:12px;text-align:center;margin-top:20px">
-    Contact your FMSecure account manager if you need access.
+  <div style="text-align:center;margin-top:16px">
+    <a href="/tenant/forgot-password"
+       style="color:#2f81f7;font-size:13px;text-decoration:none">
+      Forgot your password?
+    </a>
+  </div>
+  <p style="color:#484f58;font-size:12px;text-align:center;margin-top:12px">
+    Lost your API key? Contact <a href="mailto:support@fmsecure.in"
+    style="color:#2f81f7">support@fmsecure.in</a>
   </p>
 </div>
 </body></html>"""
