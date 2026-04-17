@@ -66,7 +66,7 @@ _tenant_sessions: dict = {}   # token → {"tenant_id": str, "email": str, "role
 _TENANT_SESSION_TTL = 86400   # 24 hours
 rzp_client = razorpay.Client(auth=(RZP_KEY_ID, RZP_KEY_SECRET))
 
-# ── Plans — amounts in PAISE (Rs 999 = 99900) ─────────────────────────────────
+# ── Plans — amounts in PAISE (Rs 499 = 49900) ─────────────────────────────────
 # To change price: edit "amount". To change label: edit "label" AND the HTML below.
 PLANS = {
     "pro_monthly": {"label":"PRO Monthly","amount":499, "currency":"INR",
@@ -74,6 +74,36 @@ PLANS = {
     "pro_annual":  {"label":"PRO Annual", "amount":4999,"currency":"INR",
                     "description":"FMSecure PRO - Annual","days":365},
 }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CENTRAL CONFIGURATION – CHANGE ONCE, UPDATE EVERYWHERE
+# ══════════════════════════════════════════════════════════════════════════════
+BRAND = {
+    "name": "FMSecure",
+    "tagline": "Enterprise EDR for Windows",
+    "logo_ico": "/static/app_icon.ico",          # Browser tab icon
+    "logo_png": "/static/app_icon.png",          # Navbar logo (fallback to text)
+    "support_email": "support@fmsecure.in",
+    "company": "Manish Lisa Pvt Limited",
+    "copyright_year": datetime.now().year,
+}
+
+# Pricing displayed on the pricing page – keep in sync with PLANS dict
+PRICING_DISPLAY = {
+    "pro_monthly": {"label": "PRO Monthly", "price": "499", "period": "/mo"},
+    "pro_annual":  {"label": "PRO Annual",  "price": "4,999", "period": "/yr"},
+}
+
+def standard_head(title: str = None) -> str:
+    """Return a standard HTML <head> with favicon and meta tags."""
+    page_title = f"{title} | {BRAND['name']}" if title else BRAND['name']
+    return f"""
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{page_title}</title>
+    <link rel="icon" type="image/x-icon" href="{BRAND['logo_ico']}">
+    <link rel="shortcut icon" href="{BRAND['logo_ico']}">
+    """
 
 # ── App setup ──────────────────────────────────────────────────────────────────
 limiter = Limiter(key_func=get_remote_address)
@@ -86,10 +116,6 @@ except Exception:
     pass
 
 agents = {}; commands = {}
-
-# In-memory OTP store for license transfer flow
-# key: license_key → {"otp": str, "email": str, "expires": float}
-# Railway runs a single process so in-memory is safe here.
 _pending_transfers: dict = {}
 _TRANSFER_OTP_TTL = 300   # 5 minutes
 
@@ -102,7 +128,6 @@ def init_db():
     cur = conn.cursor()
     
     try:
-        # 1. Execute standard SQL for creating tables and migrations
         cur.execute("""
             CREATE TABLE IF NOT EXISTS licenses (
                 license_key TEXT PRIMARY KEY,
@@ -197,15 +222,12 @@ def init_db():
                 allowed_exts    TEXT NOT NULL DEFAULT '.txt,.json,.py,.html,.js,.css'
             );
         
-            -- Index for fast agent lookups by tenant
             CREATE INDEX IF NOT EXISTS idx_tenant_agents_tenant
                 ON tenant_agents(tenant_id);
         
-            -- Index for fast alert lookups by tenant + severity
             CREATE INDEX IF NOT EXISTS idx_tenant_alerts_tenant_sev
                 ON tenant_alerts(tenant_id, severity, created_at DESC);
 
-            -- Run the migration for machine_id
             DO $$ BEGIN
               IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
                              WHERE table_name='licenses' AND column_name='machine_id') 
@@ -213,12 +235,8 @@ def init_db():
             END $$;
         """)
 
-        # 2. Back in Python land: Check count and seed the starter row
         cur.execute("SELECT COUNT(*) FROM versions")
         row = cur.fetchone()
-        
-        # NOTE: If you are using a standard cursor, row is a tuple, so we use row[0].
-        # If you are explicitly using a DictCursor (like RealDictCursor in psycopg2), use row["count"].
         row_count = row["count"] if isinstance(row, dict) else row[0]
 
         if row_count == 0:
@@ -236,37 +254,25 @@ def init_db():
         print("[DB] Tables ready.")
 
     except Exception as e:
-        conn.rollback() # Roll back if something goes wrong so the DB doesn't lock
+        conn.rollback()
         print(f"[DB] Error initializing database: {e}")
         raise e
         
     finally:
-        # Always close cursors and connections inside a finally block to prevent connection leaks!
         cur.close()
         conn.close()
 
 
 def _start_offline_sweeper():
-    """
-    Background thread that marks stale agents as offline.
- 
-    Industry pattern (CrowdStrike, SentinelOne):
-      Agent heartbeat interval: 10s
-      Grace period before marking offline: 45s (4.5x heartbeat)
-      Sweep frequency: 30s
- 
-    Without this, agents show "online" forever after their machine
-    disconnects because the sweep only ran on incoming heartbeats.
-    """
     def _sweep():
         while True:
             try:
                 if DATABASE_URL:
                     conn = get_db(); cur = conn.cursor()
                     cur.execute(
-                        "UPDATE tenant_agents SET status = \'offline\' "
-                        "WHERE status = \'online\' "
-                        "AND last_seen < NOW() - INTERVAL \'45 seconds\'"
+                        "UPDATE tenant_agents SET status = 'offline' "
+                        "WHERE status = 'online' "
+                        "AND last_seen < NOW() - INTERVAL '45 seconds'"
                     )
                     affected = cur.rowcount
                     conn.commit(); cur.close(); conn.close()
@@ -285,7 +291,7 @@ def _start_offline_sweeper():
 async def startup():
   if DATABASE_URL:
     init_db()
-    _start_offline_sweeper()    # ← ADD THIS LINE
+    _start_offline_sweeper()
   else:
     print("[DB] WARNING: No DATABASE_URL")
 
@@ -317,21 +323,15 @@ def _check_admin(api_key):
         raise HTTPException(status_code=403, detail="Forbidden")
 
 def _gen_tenant_api_key() -> str:
-    """Generate a secure, prefixed tenant API key."""
     return "fms-tenant-" + secrets.token_urlsafe(24)
  
- 
 def _hash_password(password: str) -> str:
-    """SHA-256 password hash with a fixed salt prefix (simple, works offline)."""
     return hashlib.sha256(("fmsecure_salt_v1:" + password).encode()).hexdigest()
- 
  
 def _verify_password(password: str, hashed: str) -> bool:
     return secrets.compare_digest(_hash_password(password), hashed)
  
- 
 def _get_tenant_by_api_key(api_key: str) -> dict | None:
-    """Look up a tenant by their API key. Returns None if not found or inactive."""
     if not api_key or not DATABASE_URL:
         return None
     try:
@@ -346,9 +346,7 @@ def _get_tenant_by_api_key(api_key: str) -> dict | None:
         print(f"[TENANT] API key lookup error: {e}")
         return None
  
- 
 def _create_tenant_session(tenant_id: str, email: str, role: str) -> str:
-    """Create a session token for a tenant admin login. Returns the token."""
     token = secrets.token_urlsafe(32)
     _tenant_sessions[token] = {
         "tenant_id": tenant_id,
@@ -358,30 +356,19 @@ def _create_tenant_session(tenant_id: str, email: str, role: str) -> str:
     }
     return token
  
- 
 def _get_tenant_session(request: "Request") -> dict | None:
-    """
-    Read tenant session from cookie. Returns session dict or None.
-    Also cleans up expired sessions.
-    """
     token = request.cookies.get("fms_tenant_session")
     if not token:
         return None
     session = _tenant_sessions.get(token)
     if not session:
         return None
-    # Check TTL
     if time.time() - session["created_at"] > _TENANT_SESSION_TTL:
         del _tenant_sessions[token]
         return None
     return session
  
- 
 def _require_tenant_session(request: "Request") -> dict:
-    """
-    Dependency-style helper — raises 302 redirect if no valid tenant session.
-    Use: session = _require_tenant_session(request)
-    """
     session = _get_tenant_session(request)
     if not session:
         raise HTTPException(
@@ -389,9 +376,7 @@ def _require_tenant_session(request: "Request") -> dict:
             headers={"Location": "/tenant/login"})
     return session
  
- 
 def _get_tenant_stats(tenant_id: str) -> dict:
-    """Return agent count, online count, and unacked alert count for a tenant."""
     try:
         conn = get_db(); cur = conn.cursor()
         cur.execute(
@@ -435,23 +420,17 @@ async def verify_session(fmsecure_session: str = Cookie(None)):
     return True
 
 def _send_license_email(email: str, license_key: str, tier: str, expires_iso: str):
-    """
-    Send license key via SendGrid HTTP API.
-    HTTP-based — works on Railway free tier (SMTP is blocked, HTTP is not).
-    Falls back to printing the key if no SendGrid key is configured.
-    """
     tier_label  = PLANS.get(tier, {}).get("label", "PRO")
     expires_str = expires_iso[:10]
 
     if not SENDGRID_API_KEY:
-        # No SendGrid key — key is still on the success page, just log it
         print(f"[EMAIL] No SENDGRID_API_KEY. Key for {email}: {license_key}")
         return
 
     html = f"""
     <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;
                 background:#0d1117;color:#e6edf3;padding:32px;border-radius:10px;">
-      <h2 style="color:#2f81f7;margin-top:0">&#128737; FMSecure PRO Activated</h2>
+      <h2 style="color:#2f81f7;margin-top:0">&#128737; {BRAND['name']} PRO Activated</h2>
       <p style="color:#a0a8b8;font-size:15px">
         Your <strong style="color:#e6edf3">{tier_label}</strong>
         is active until <strong style="color:#e6edf3">{expires_str}</strong>.
@@ -470,7 +449,7 @@ def _send_license_email(email: str, license_key: str, tier: str, expires_iso: st
                   border-radius:4px;padding:16px;margin-bottom:20px">
         <p style="margin:0;color:#a0a8b8;font-size:14px;line-height:1.8">
           <strong style="color:#e6edf3">How to activate:</strong><br>
-          1. Open <strong>FMSecure</strong> on your PC<br>
+          1. Open <strong>{BRAND['name']}</strong> on your PC<br>
           2. Click your <strong>username</strong> (top-right corner)<br>
           3. Click <strong>Activate License</strong><br>
           4. Paste this key and click <strong>Activate</strong><br>
@@ -480,7 +459,7 @@ def _send_license_email(email: str, license_key: str, tier: str, expires_iso: st
       <p style="color:#484f58;font-size:12px;border-top:1px solid #21262d;
                 padding-top:16px;margin:0">
         This key activates on one device. To transfer to a new device, reply to this email.<br>
-        FMSecure v2.0 &bull; Enterprise EDR for Windows &bull; Made in India
+        {BRAND['name']} v2.0 &bull; {BRAND['tagline']} &bull; Made in India
       </p>
     </div>"""
 
@@ -491,7 +470,7 @@ def _send_license_email(email: str, license_key: str, tier: str, expires_iso: st
         message = Mail(
             from_email=SENDER_EMAIL,
             to_emails=email,
-            subject="Your FMSecure PRO License Key",
+            subject=f"Your {BRAND['name']} PRO License Key",
             html_content=html
         )
         resp = sg.send(message)
@@ -501,10 +480,7 @@ def _send_license_email(email: str, license_key: str, tier: str, expires_iso: st
         print(f"[EMAIL] Key was: {license_key}")
 
 
-# ADD THIS FUNCTION to your main.py (near your other email functions):
- 
 def send_tenant_welcome_email(org_email: str, org_name: str, api_key: str, max_agents: int, plan: str):
-    """Send API key + onboarding instructions via SendGrid HTTP API."""
     if not SENDGRID_API_KEY:
         print(f"[TENANT] No SENDGRID_API_KEY. API key for {org_email}: {api_key}")
         return
@@ -517,13 +493,13 @@ def send_tenant_welcome_email(org_email: str, org_name: str, api_key: str, max_a
       <div style="max-width:600px;margin:0 auto;background:#161b22;border-radius:12px;
                   border:1px solid #30363d;overflow:hidden;">
         <div style="background:#2f81f7;padding:24px 32px;">
-          <h1 style="margin:0;font-size:22px;color:#fff;">🛡 Welcome to FMSecure Enterprise</h1>
+          <h1 style="margin:0;font-size:22px;color:#fff;">🛡 Welcome to {BRAND['name']} Enterprise</h1>
           <p style="margin:6px 0 0;color:#cfe2ff;font-size:14px;">Your organisation account is ready.</p>
         </div>
         <div style="padding:32px;">
           <p style="font-size:15px;color:#e6edf3;">Hi <strong>{org_name}</strong>,</p>
           <p style="color:#8b949e;font-size:14px;">
-            Your FMSecure Enterprise account has been activated on the
+            Your {BRAND['name']} Enterprise account has been activated on the
             <strong style="color:#e6edf3">{plan_label} plan</strong> with
             <strong style="color:#e6edf3">{max_agents} seats</strong>.
           </p>
@@ -539,7 +515,7 @@ def send_tenant_welcome_email(org_email: str, org_name: str, api_key: str, max_a
           </div>
           <h3 style="color:#e6edf3;font-size:15px;margin-top:28px;">How to enroll your machines:</h3>
           <ol style="color:#8b949e;font-size:14px;line-height:2;">
-            <li>Download FMSecure: <a href="{download_url}" style="color:#2f81f7;">{download_url}</a></li>
+            <li>Download {BRAND['name']}: <a href="{download_url}" style="color:#2f81f7;">{download_url}</a></li>
             <li>On first launch, select <strong style="color:#e6edf3;">"Organisation Managed"</strong></li>
             <li>Paste your API key above</li>
             <li>The machine enrolls automatically — all PRO features activate instantly</li>
@@ -554,11 +530,11 @@ def send_tenant_welcome_email(org_email: str, org_name: str, api_key: str, max_a
           </div>
           <p style="color:#8b949e;font-size:13px;">
             Lost this key? Reply to this email and we'll resend it.<br>
-            Questions? <a href="mailto:support@fmsecure.in" style="color:#2f81f7;">support@fmsecure.in</a>
+            Questions? <a href="mailto:{BRAND['support_email']}" style="color:#2f81f7;">{BRAND['support_email']}</a>
           </p>
         </div>
         <div style="background:#0d1117;padding:16px 32px;text-align:center;">
-          <p style="margin:0;font-size:12px;color:#484f58;">FMSecure Enterprise · Manish Lisa Pvt Limited</p>
+          <p style="margin:0;font-size:12px;color:#484f58;">{BRAND['name']} Enterprise · {BRAND['company']}</p>
         </div>
       </div>
     </div>"""
@@ -570,7 +546,7 @@ def send_tenant_welcome_email(org_email: str, org_name: str, api_key: str, max_a
         message = Mail(
             from_email=SENDER_EMAIL,
             to_emails=org_email,
-            subject=f"FMSecure Enterprise — Your API Key & Setup Instructions",
+            subject=f"{BRAND['name']} Enterprise — Your API Key & Setup Instructions",
             html_content=html
         )
         resp = sg.send(message)
@@ -585,7 +561,8 @@ def send_tenant_welcome_email(org_email: str, org_name: str, api_key: str, max_a
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(error: str = ""):
     err = f'<p style="color:#f85149;background:#2d1c1c;padding:10px;border-radius:6px;margin-bottom:16px;font-size:14px">{error}</p>' if error else ""
-    return f"""<!DOCTYPE html><html><head><title>FMSecure | Login</title>
+    return f"""<!DOCTYPE html><html>
+    <head>{standard_head("Login")}
     <style>*{{box-sizing:border-box;margin:0;padding:0}}
     body{{background:#0a0a0a;color:#e6edf3;display:flex;align-items:center;
           justify-content:center;min-height:100vh;font-family:system-ui,sans-serif}}
@@ -598,7 +575,7 @@ async def login_page(error: str = ""):
     input:focus{{border-color:#2f81f7}}
     button{{width:100%;background:#238636;border:none;border-radius:6px;color:#fff;
              padding:12px;font-size:14px;font-weight:600;cursor:pointer}}</style></head><body>
-    <div class="card"><h3>FMSecure C2</h3><p class="sub">Enterprise Authentication</p>
+    <div class="card"><h3>{BRAND['name']} C2</h3><p class="sub">Enterprise Authentication</p>
       {err}
       <form method="post" action="/login">
         <label>USERNAME</label><input name="username" type="text" required autofocus>
@@ -630,31 +607,23 @@ class Heartbeat(BaseModel):
     username:   str
     tier:       str
     is_armed:   bool
-    # New optional fields — old agents send without them, that's fine
     agent_version: str = "2.5.0"
     os_info:       str = ""
 
 @app.post("/api/heartbeat")
 @limiter.limit("200/minute")
 async def receive_heartbeat(request: Request, data: Heartbeat):
-    # ── Legacy single-user auth (unchanged) ──────────────────────────────────
     tenant_key = request.headers.get("x-tenant-key", "")
     api_key    = request.headers.get("x-api-key",    "")
  
-    # Multi-tenant path
     if tenant_key:
         tenant = _get_tenant_by_api_key(tenant_key)
         if not tenant:
             raise HTTPException(status_code=401, detail="Invalid tenant key")
 
-        # ── Seat enforcement: reject if tenant is at max capacity ────────────
-        # We check BEFORE upserting so a genuinely new machine is blocked.
-        # A machine that already has a record is always allowed (reconnecting).
         if DATABASE_URL:
             try:
                 conn = get_db(); cur = conn.cursor()
- 
-                # Is this machine already registered with this tenant?
                 cur.execute(
                     "SELECT id FROM tenant_agents "
                     "WHERE tenant_id=%s AND machine_id=%s",
@@ -662,7 +631,6 @@ async def receive_heartbeat(request: Request, data: Heartbeat):
                 already_registered = cur.fetchone() is not None
  
                 if not already_registered:
-                    # Count current agents for this tenant
                     cur.execute(
                         "SELECT COUNT(*) FROM tenant_agents "
                         "WHERE tenant_id=%s",
@@ -675,7 +643,6 @@ async def receive_heartbeat(request: Request, data: Heartbeat):
                         print(f"[SEAT] Tenant {tenant['slug']} at capacity "
                               f"({current_count}/{max_seats}). "
                               f"Rejecting {data.machine_id[:16]}…")
-                        # Return 402 so the desktop can show a friendly message
                         raise HTTPException(
                             status_code=402,
                             detail=(
@@ -687,24 +654,18 @@ async def receive_heartbeat(request: Request, data: Heartbeat):
                 cur.close(); conn.close()
  
             except HTTPException:
-                raise   # re-raise the 402 we just created
+                raise
             except Exception as e:
                 print(f"[SEAT] Check error (non-critical): {e}")
-                # On DB error, allow the heartbeat through — don\'t block agents
-                # for infrastructure reasons
  
-        # Upsert agent record in DB
         if DATABASE_URL:
             try:
                 conn = get_db(); cur = conn.cursor()
- 
-                # Mark all this tenant's agents offline if last_seen > 35s
                 cur.execute(
                     "UPDATE tenant_agents SET status='offline' "
                     "WHERE tenant_id=%s AND last_seen < NOW() - INTERVAL '35 seconds'",
                     (tenant["id"],))
  
-                # Upsert this agent
                 cur.execute("""
                     INSERT INTO tenant_agents
                         (tenant_id, machine_id, hostname, ip_address, username,
@@ -732,17 +693,15 @@ async def receive_heartbeat(request: Request, data: Heartbeat):
             except Exception as e:
                 print(f"[TENANT HB] DB error: {e}")
  
-        # Return any queued command for this machine
         cmd = commands.pop(data.machine_id, "NONE")
         return {
             "status":  "ok",
             "command": cmd,
             "tenant":  tenant["slug"],
-            "tier":    tenant["plan"],          # "pro" / "business" / "enterprise"
+            "tier":    tenant["plan"],
             "is_pro":  tenant["plan"] in ("pro", "business", "enterprise"),
         }
  
-    # Legacy single-user path (unchanged)
     if api_key != API_KEY:
         raise HTTPException(status_code=401, detail="Unauthorized")
     agents[data.machine_id] = {
@@ -777,8 +736,6 @@ async def receive_agent_alert(request: Request, data: AgentAlert):
  
     try:
         conn = get_db(); cur = conn.cursor()
- 
-        # Look up agent ID
         cur.execute(
             "SELECT id FROM tenant_agents "
             "WHERE tenant_id=%s AND machine_id=%s",
@@ -786,7 +743,6 @@ async def receive_agent_alert(request: Request, data: AgentAlert):
         agent_row = cur.fetchone()
         agent_id  = agent_row["id"] if agent_row else None
  
-        # Insert alert
         cur.execute("""
             INSERT INTO tenant_alerts
                 (tenant_id, agent_id, machine_id, hostname,
@@ -807,14 +763,6 @@ async def receive_agent_alert(request: Request, data: AgentAlert):
 
 @app.get("/agent/config")
 async def get_agent_config(request: Request):
-    """
-    Returns the tenant\'s policy config for this agent.
-    The desktop app calls this on startup and applies the values,
-    overriding local config.json (Option B — IT admin controls policy).
- 
-    Auth: x-tenant-key header (same as heartbeat).
-    Returns 200 + config dict, or 401 if key invalid.
-    """
     tenant_key = request.headers.get("x-tenant-key", "")
     if not tenant_key:
         raise HTTPException(status_code=400,
@@ -838,20 +786,17 @@ async def get_agent_config(request: Request):
         print(f"[CONFIG] DB error: {e}")
         return JSONResponse({"tenant_name": tenant["name"], "config": {}})
  
-    # Build the config dict — only include non-empty values
-    # so the agent only overrides settings that the IT admin actually set
     cfg = {}
     if cfg_row:
         if cfg_row.get("webhook_url"):
             cfg["webhook_url"] = cfg_row["webhook_url"]
         if cfg_row.get("alert_email"):
-            cfg["admin_email"] = cfg_row["alert_email"]   # matches CONFIG key
+            cfg["admin_email"] = cfg_row["alert_email"]
         if cfg_row.get("verify_interval") and cfg_row["verify_interval"] > 0:
             cfg["verify_interval"] = cfg_row["verify_interval"]
         if cfg_row.get("max_vault_mb") and cfg_row["max_vault_mb"] > 0:
-            cfg["vault_max_size_mb"] = cfg_row["max_vault_mb"]   # matches CONFIG key
+            cfg["vault_max_size_mb"] = cfg_row["max_vault_mb"]
         if cfg_row.get("allowed_exts"):
-            # Convert comma-separated string to list matching CONFIG format
             exts = [e.strip() for e in cfg_row["allowed_exts"].split(",")
                     if e.strip().startswith(".")]
             if exts:
@@ -885,14 +830,15 @@ async def dashboard(_: bool = Depends(verify_session)):
     if not rows: 
         rows = "<tr><td colspan='7' style='text-align:center;color:#484f58;padding:32px'>No endpoints connected</td></tr>"
     
-    return f"""<!DOCTYPE html><html><head><title>FMSecure C2</title>
+    return f"""<!DOCTYPE html><html>
+    <head>{standard_head("C2 Dashboard")}
     <style>*{{box-sizing:border-box;margin:0;padding:0}}body{{background:#0a0a0a;color:#e6edf3;font-family:system-ui,sans-serif}}
     nav{{background:#161b22;border-bottom:1px solid #30363d;padding:16px 24px;display:flex;justify-content:space-between;align-items:center}}
     .brand{{color:#2f81f7;font-weight:700;font-size:18px}}a{{color:#8b949e;text-decoration:none;font-size:13px;margin-left:16px}}a:hover{{color:#e6edf3}}
     .container{{padding:24px}}table{{width:100%;border-collapse:collapse;background:#161b22;border-radius:8px;overflow:hidden}}
     th{{background:#0d1117;color:#8b949e;padding:12px 16px;text-align:left;font-size:12px;font-weight:600;letter-spacing:.5px}}
     td{{padding:12px 16px;border-top:1px solid #21262d;font-size:14px}}</style></head><body>
-    <nav><span class="brand">FMSecure Global C2</span>
+    <nav><span class="brand">{BRAND['name']} Global C2</span>
     <div>
   <a href="/licenses">Licenses</a>
   <a href="/super/dashboard" style="color:#f0883e">Tenants</a>
@@ -907,7 +853,7 @@ async def dashboard(_: bool = Depends(verify_session)):
                     padding:24px;margin-bottom:24px">
           <h3 style="color:#e6edf3;margin:0 0 6px">🚀 Publish New Version</h3>
           <p style="color:#8b949e;font-size:13px;margin:0 0 18px">
-            When you ship a new EXE, fill this in. Every running copy of FMSecure
+            When you ship a new EXE, fill this in. Every running copy of {BRAND['name']}
             will show an update banner within seconds.
           </p>
           <form method="POST" action="/api/version/publish-form"
@@ -950,7 +896,6 @@ async def dashboard(_: bool = Depends(verify_session)):
     </div>
     
     <script>
-        // SMART HEARTBEAT: Refreshes every 5s, BUT pauses if the admin is typing!
         setInterval(() => {{
             const isTyping = document.querySelector('input:focus, textarea:focus');
             if (!isTyping) {{
@@ -971,11 +916,6 @@ async def dashboard(_: bool = Depends(verify_session)):
 # ── Super Admin: DB migration helper ─────────────────────────────────────────
 @app.get("/super/db-migrate")
 async def super_db_migrate(api_key: str = ""):
-    """
-    Idempotent migration endpoint — safe to run multiple times.
-    Creates all tenant tables if they don't exist yet.
-    Call this once after first deploy, or after any schema update.
-    """
     _check_admin(api_key)
     try:
         conn = get_db(); cur = conn.cursor()
@@ -1048,7 +988,6 @@ async def super_db_migrate(api_key: str = ""):
     except Exception as e:
         return {"ok": False, "error": str(e)}
  
- 
 # ── Super Admin: List all tenants ─────────────────────────────────────────────
 @app.get("/super/tenants")
 async def super_list_tenants(api_key: str = ""):
@@ -1063,25 +1002,23 @@ async def super_list_tenants(api_key: str = ""):
         "FROM tenants t ORDER BY t.created_at DESC")
     rows = [dict(r) for r in cur.fetchall()]
     cur.close(); conn.close()
-    # Convert datetime to ISO string for JSON
     for r in rows:
         if r.get("created_at"):
             r["created_at"] = r["created_at"].isoformat()
     return {"count": len(rows), "tenants": rows}
  
- 
 # ── Super Admin: Create tenant ────────────────────────────────────────────────
 class CreateTenantBody(BaseModel):
     name:          str
-    slug:          str                 # url-safe identifier e.g. "acme-corp"
+    slug:          str
     contact_email: str
     plan:          str  = "business"
     max_agents:    int  = 10
     notes:         str  = ""
-    admin_email:   str  = ""           # creates first tenant admin user if set
+    admin_email:   str  = ""
     admin_password:str  = ""
     api_key:       str  = ""
- 
+
 @app.post("/super/tenants")
 async def super_create_tenant(body: CreateTenantBody):
     _check_admin(body.api_key)
@@ -1094,8 +1031,6 @@ async def super_create_tenant(body: CreateTenantBody):
  
     try:
         conn = get_db(); cur = conn.cursor()
- 
-        # Insert tenant
         cur.execute("""
             INSERT INTO tenants
                 (id, name, slug, api_key, plan, max_agents, contact_email, notes)
@@ -1103,13 +1038,9 @@ async def super_create_tenant(body: CreateTenantBody):
         """, (tenant_id, body.name.strip(), slug, tenant_key,
               body.plan, body.max_agents,
               body.contact_email.strip(), body.notes.strip()))
- 
-        # Create default config row
         cur.execute(
             "INSERT INTO tenant_config (tenant_id) VALUES (%s)",
             (tenant_id,))
- 
-        # Optionally create first admin user
         if body.admin_email and body.admin_password:
             cur.execute("""
                 INSERT INTO tenant_users
@@ -1118,7 +1049,6 @@ async def super_create_tenant(body: CreateTenantBody):
             """, (tenant_id,
                   body.admin_email.strip().lower(),
                   _hash_password(body.admin_password)))
- 
         conn.commit(); cur.close(); conn.close()
         print(f"[TENANT] Created: {body.name} ({slug}) — key: {tenant_key}")
  
@@ -1132,7 +1062,6 @@ async def super_create_tenant(body: CreateTenantBody):
  
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
- 
  
 # ── Super Admin: Get single tenant detail ─────────────────────────────────────
 @app.get("/super/tenants/{tenant_id}")
@@ -1170,7 +1099,6 @@ async def super_get_tenant(tenant_id: str, api_key: str = ""):
         "stats":   _get_tenant_stats(tenant_id),
     }
  
- 
 # ── Super Admin: Reset tenant API key ────────────────────────────────────────
 @app.post("/super/tenants/{tenant_id}/reset-key")
 async def super_reset_tenant_key(tenant_id: str, api_key: str = ""):
@@ -1189,7 +1117,6 @@ async def super_reset_tenant_key(tenant_id: str, api_key: str = ""):
 
 @app.post("/super/tenants/{tenant_id}/resend-welcome-email")
 async def super_resend_welcome_email(tenant_id: str, _: bool = Depends(verify_session)):
-    """Resend the welcome email with the existing API key — for orgs that lost it."""
     if not DATABASE_URL:
         raise HTTPException(status_code=500, detail="No database")
     conn = get_db(); cur = conn.cursor()
@@ -1210,7 +1137,6 @@ async def super_resend_welcome_email(tenant_id: str, _: bool = Depends(verify_se
     return RedirectResponse(
         f"/super/tenant-detail?id={tenant_id}&msg=email_sent",
         status_code=303)
- 
  
 # ── Super Admin: Suspend / unsuspend tenant ───────────────────────────────────
 @app.post("/super/tenants/{tenant_id}/suspend")
@@ -1243,31 +1169,8 @@ async def super_all_alerts(api_key: str = "", limit: int = 100):
     rows = [dict(r) for r in cur.fetchall()]
     cur.close(); conn.close()
     for r in rows:
-        if r.get("created_at"):
-            r["created_at"] = r["created_at"].isoformat()
-    return {"count": len(rows), "alerts": rows}
- 
- 
-# ── Super Admin: Global alert view ───────────────────────────────────────────
-@app.get("/super/alerts")
-async def super_all_alerts(api_key: str = "", limit: int = 100):
-    _check_admin(api_key)
-    if not DATABASE_URL:
-        return {"alerts": []}
-    conn = get_db(); cur = conn.cursor()
-    cur.execute("""
-        SELECT a.*, t.name as tenant_name, t.slug as tenant_slug
-        FROM tenant_alerts a
-        JOIN tenants t ON t.id = a.tenant_id
-        ORDER BY a.created_at DESC
-        LIMIT %s
-    """, (min(limit, 500),))
-    rows = [dict(r) for r in cur.fetchall()]
-    cur.close(); conn.close()
-    for r in rows:
         if r.get("created_at"): r["created_at"] = r["created_at"].isoformat()
     return {"count": len(rows), "alerts": rows}
- 
  
 # ── Super Admin: Visual Dashboard ────────────────────────────────────────────
 @app.get("/super/dashboard", response_class=HTMLResponse)
@@ -1276,8 +1179,6 @@ async def super_dashboard(request: Request, _: bool = Depends(verify_session)):
         return HTMLResponse("<h1>No database configured</h1>")
  
     conn = get_db(); cur = conn.cursor()
- 
-    # Fetch all tenants with stats
     cur.execute("""
         SELECT t.*,
           (SELECT COUNT(*) FROM tenant_agents a WHERE a.tenant_id=t.id)   AS agent_count,
@@ -1288,8 +1189,6 @@ async def super_dashboard(request: Request, _: bool = Depends(verify_session)):
         FROM tenants t ORDER BY t.created_at DESC
     """)
     tenants = cur.fetchall()
- 
-    # Global counts
     cur.execute("SELECT COUNT(*) FROM tenants WHERE active=TRUE")
     total_tenants = cur.fetchone()["count"]
     cur.execute("SELECT COUNT(*) FROM tenant_agents WHERE status='online'")
@@ -1300,7 +1199,6 @@ async def super_dashboard(request: Request, _: bool = Depends(verify_session)):
     total_critical = cur.fetchone()["count"]
     cur.close(); conn.close()
  
-    # Build tenant rows HTML
     tenant_rows = ""
     for t in tenants:
         status_badge = (
@@ -1348,9 +1246,8 @@ async def super_dashboard(request: Request, _: bool = Depends(verify_session)):
             "padding:32px'>No tenants yet — create your first one below</td></tr>")
  
     return f"""<!DOCTYPE html>
-<html lang="en"><head>
+<html lang="en"><head>{standard_head("Super Admin")}
 <meta charset="UTF-8">
-<title>FMSecure Super Admin</title>
 <style>
   *{{box-sizing:border-box;margin:0;padding:0}}
   body{{background:#0a0a0a;color:#e6edf3;font-family:system-ui,sans-serif}}
@@ -1388,10 +1285,10 @@ async def super_dashboard(request: Request, _: bool = Depends(verify_session)):
 </head><body>
 <nav>
   <span class="brand">
-  <img src="/static/app_icon.png" width="24" height="24"
+  <img src="{BRAND['logo_png']}" width="24" height="24"
        style="vertical-align:middle;margin-right:8px"
        onerror="this.style.display='none'">
-  FMSecure — Super Admin
+  {BRAND['name']} — Super Admin
 </span>
   <div>
     <a href="/dashboard">C2 Dashboard</a>
@@ -1403,7 +1300,6 @@ async def super_dashboard(request: Request, _: bool = Depends(verify_session)):
  
 <div class="container">
  
-  <!-- Stat row -->
   <div class="stat-row">
     <div class="stat">
       <div class="num" style="color:#2f81f7">{total_tenants}</div>
@@ -1419,7 +1315,6 @@ async def super_dashboard(request: Request, _: bool = Depends(verify_session)):
     </div>
   </div>
  
-  <!-- Tenant table -->
   <div class="card">
     <h3>All Tenants</h3>
     <table>
@@ -1432,7 +1327,6 @@ async def super_dashboard(request: Request, _: bool = Depends(verify_session)):
     </table>
   </div>
  
-  <!-- Create Tenant Form -->
   <div class="card">
     <h3>➕ Create New Tenant</h3>
     <form method="POST" action="/super/tenants-form">
@@ -1487,7 +1381,6 @@ async def super_dashboard(request: Request, _: bool = Depends(verify_session)):
 </div>
 </body></html>"""
  
- 
 # ── Form handler for tenant creation from dashboard ───────────────────────────
 @app.post("/super/tenants-form")
 async def super_create_tenant_form(
@@ -1527,19 +1420,15 @@ async def super_create_tenant_form(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-    # Send API key + instructions to the organization
-    # ✅ FIXED — use the form variables directly
     threading.Thread(
         target=send_tenant_welcome_email,
         args=(contact_email.strip(), name.strip(), tenant_key, max_agents, plan),
         daemon=True
     ).start()
  
-    # Redirect back with the API key in the URL so admin can copy it
     return RedirectResponse(
         f"/super/tenant-detail?id={tenant_id}&new_key={tenant_key}",
         status_code=303)
- 
  
 # ── Tenant detail page (super admin view) ─────────────────────────────────────
 @app.get("/super/tenant-detail", response_class=HTMLResponse)
@@ -1579,7 +1468,6 @@ async def super_tenant_detail(
     user_list = cur.fetchall()
     cur.close(); conn.close()
  
-    # Build agent rows
     agent_rows = ""
     for a in agents_list:
         online = a["status"] == "online"
@@ -1613,7 +1501,6 @@ async def super_tenant_detail(
             "<tr><td colspan='8' style='text-align:center;color:#484f58;"
             "padding:24px'>No agents registered yet</td></tr>")
  
-    # Build alert rows
     alert_rows = ""
     sev_colors = {
         "CRITICAL": "#f85149", "HIGH": "#f0883e",
@@ -1642,7 +1529,6 @@ async def super_tenant_detail(
             "<tr><td colspan='6' style='text-align:center;color:#484f58;"
             "padding:24px'>No alerts recorded</td></tr>")
  
-    # New API key banner
     new_key_banner = ""
     if new_key:
         new_key_banner = f"""
@@ -1666,7 +1552,6 @@ async def super_tenant_detail(
           </div>
         </div>"""
  
-    # User list rows
     user_rows = ""
     for u in user_list:
         ts = u["created_at"].strftime("%Y-%m-%d") if u["created_at"] else "—"
@@ -1684,9 +1569,6 @@ async def super_tenant_detail(
     created = (tenant["created_at"].strftime("%Y-%m-%d %H:%M")
                if tenant["created_at"] else "—")
 
-    # =========================================================
-    # NEW CODE: Defining the resend_banner right before returning
-    # =========================================================
     resend_banner = f"""
     <div style="background:#0d1117;border:1px solid #30363d;border-radius:8px;
                 padding:16px 24px;margin-bottom:20px;display:flex;
@@ -1706,9 +1588,8 @@ async def super_tenant_detail(
     </div>"""
  
     return f"""<!DOCTYPE html>
-<html lang="en"><head>
+<html lang="en"><head>{standard_head(tenant['name'])}
 <meta charset="UTF-8">
-<title>FMSecure | {tenant['name']}</title>
 <style>
   *{{box-sizing:border-box;margin:0;padding:0}}
   body{{background:#0a0a0a;color:#e6edf3;font-family:system-ui,sans-serif}}
@@ -1737,10 +1618,10 @@ async def super_tenant_detail(
 </head><body>
 <nav>
   <span class="brand">
-  <img src="/static/app_icon.png" width="24" height="24"
+  <img src="{BRAND['logo_png']}" width="24" height="24"
        style="vertical-align:middle;margin-right:8px"
        onerror="this.style.display='none'">
-  FMSecure
+  {BRAND['name']}
 </span>
   <div>
     <a href="/super/dashboard">← All Tenants</a>
@@ -1824,9 +1705,8 @@ async def tenant_login_page(error: str = ""):
            f'border-radius:6px;margin-bottom:16px;font-size:14px">{error}</p>'
            if error else "")
     return f"""<!DOCTYPE html>
-<html><head>
+<html><head>{standard_head("Organisation Login")}
 <meta charset="UTF-8">
-<title>FMSecure | Organisation Login</title>
 <style>
   *{{box-sizing:border-box;margin:0;padding:0}}
   body{{background:#0a0a0a;color:#e6edf3;display:flex;align-items:center;
@@ -1847,10 +1727,10 @@ async def tenant_login_page(error: str = ""):
 </style>
 </head><body>
 <div class="card">
-  <img src="/static/app_icon.png" width="52" height="52"
+  <img src="{BRAND['logo_png']}" width="52" height="52"
        style="margin-bottom:12px"
        onerror="this.style.display='none'">
-  <h2 style="color:#2f81f7;margin-bottom:4px">FMSecure</h2>
+  <h2 style="color:#2f81f7;margin-bottom:4px">{BRAND['name']}</h2>
   <p class="sub">Organisation Security Portal</p>
   {err}
   <form method="POST" action="/tenant/login">
@@ -1867,12 +1747,11 @@ async def tenant_login_page(error: str = ""):
     </a>
   </div>
   <p style="color:#484f58;font-size:12px;text-align:center;margin-top:12px">
-    Lost your API key? Contact <a href="mailto:support@fmsecure.in"
-    style="color:#2f81f7">support@fmsecure.in</a>
+    Lost your API key? Contact <a href="mailto:{BRAND['support_email']}"
+    style="color:#2f81f7">{BRAND['support_email']}</a>
   </p>
 </div>
 </body></html>"""
- 
  
 # ── Tenant Admin: Process login ───────────────────────────────────────────────
 @app.post("/tenant/login")
@@ -1919,7 +1798,6 @@ async def tenant_login_post(
         httponly=True, max_age=_TENANT_SESSION_TTL)
     return resp
  
- 
 # ── Tenant Admin: Logout ──────────────────────────────────────────────────────
 @app.get("/tenant/logout")
 async def tenant_logout(request: Request):
@@ -1937,14 +1815,13 @@ async def tenant_logout(request: Request):
 _tenant_reset_otps = {}   # {email: {otp, expires, tenant_id}}
 
 def _send_tenant_reset_otp(email: str, otp: str):
-    """Send password reset OTP via SendGrid (non-blocking)."""
     if not SENDGRID_API_KEY:
         print(f"[RESET] No SendGrid key. OTP for {email}: {otp}")
         return
     html = f"""
     <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;
                 background:#0d1117;color:#e6edf3;padding:32px;border-radius:12px;">
-      <h2 style="color:#2f81f7;">🔐 FMSecure IT Admin – Password Reset</h2>
+      <h2 style="color:#2f81f7;">🔐 {BRAND['name']} IT Admin – Password Reset</h2>
       <p style="color:#8b949e;">Use this code to reset your IT admin password:</p>
       <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;
                   padding:24px;text-align:center;margin:20px 0;">
@@ -1963,7 +1840,7 @@ def _send_tenant_reset_otp(email: str, otp: str):
         message = Mail(
             from_email=SENDER_EMAIL,
             to_emails=email,
-            subject="FMSecure – IT Admin Password Reset Code",
+            subject=f"{BRAND['name']} – IT Admin Password Reset Code",
             html_content=html
         )
         sg.send(message)
@@ -1977,7 +1854,7 @@ async def tenant_forgot_password_page(error: str = "", success: str = ""):
     err_div = f'<p class="error">{error}</p>' if error else ""
     succ_div = f'<p class="success">{success}</p>' if success else ""
     return f"""
-    <!DOCTYPE html><html><head><title>FMSecure – Forgot Password</title>
+    <!DOCTYPE html><html><head>{standard_head("Forgot Password")}
     <style>
       *{{box-sizing:border-box;margin:0;padding:0}}
       body{{font-family:'Segoe UI',Arial,sans-serif;background:#0d1117;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}}
@@ -2014,13 +1891,11 @@ async def tenant_forgot_password_submit(email: str = Form(...)):
     if not DATABASE_URL:
         return RedirectResponse("/tenant/forgot-password?error=Server+not+configured", 302)
 
-    # Look up tenant user by email
     conn = get_db(); cur = conn.cursor()
     cur.execute("SELECT id, tenant_id FROM tenant_users WHERE email = %s", (email,))
     row = cur.fetchone()
     cur.close(); conn.close()
 
-    # Always return same message – no user enumeration
     if row:
         import random, time
         otp = str(random.randint(100000, 999999))
@@ -2038,7 +1913,7 @@ async def tenant_forgot_password_submit(email: str = Form(...)):
 async def tenant_reset_password_page(email: str = "", error: str = ""):
     err_div = f'<p class="error">{error}</p>' if error else ""
     return f"""
-    <!DOCTYPE html><html><head><title>FMSecure – Reset Password</title>
+    <!DOCTYPE html><html><head>{standard_head("Reset Password")}
     <style>
       *{{box-sizing:border-box;margin:0;padding:0}}
       body{{font-family:'Segoe UI',Arial,sans-serif;background:#0d1117;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}}
@@ -2093,7 +1968,6 @@ async def tenant_reset_password_submit(
     if new_password != confirm_password or len(new_password) < 8:
         return RedirectResponse(f"/tenant/reset-password?email={email}&error=Passwords+must+match+and+be+at+least+8+chars", 302)
 
-    # Update password
     pw_hash = _hash_password(new_password)
     conn = get_db(); cur = conn.cursor()
     cur.execute("UPDATE tenant_users SET password_hash = %s WHERE email = %s", (pw_hash, email))
@@ -2101,7 +1975,6 @@ async def tenant_reset_password_submit(
 
     del _tenant_reset_otps[email]
     return RedirectResponse("/tenant/login?error=Password+reset+successfully.+Please+log+in.", 302)
- 
  
 # ── Tenant Admin: Main Dashboard ──────────────────────────────────────────────
 @app.get("/tenant/dashboard", response_class=HTMLResponse)
@@ -2117,21 +1990,18 @@ async def tenant_dashboard(request: Request):
  
     conn = get_db(); cur = conn.cursor()
  
-    # Tenant info
     cur.execute("SELECT * FROM tenants WHERE id=%s", (tenant_id,))
     tenant = cur.fetchone()
     if not tenant:
         cur.close(); conn.close()
         return RedirectResponse("/tenant/login", status_code=302)
  
-    # Mark stale agents offline (>35s)
     cur.execute(
         "UPDATE tenant_agents SET status='offline' "
         "WHERE tenant_id=%s AND last_seen < NOW() - INTERVAL '35 seconds'",
         (tenant_id,))
     conn.commit()
  
-    # Agents
     cur.execute("""
         SELECT machine_id,hostname,ip_address,username,tier,
                is_armed,status,last_seen,agent_version
@@ -2140,7 +2010,6 @@ async def tenant_dashboard(request: Request):
     """, (tenant_id,))
     agents_list = cur.fetchall()
  
-    # Recent alerts (last 50, unacked first)
     cur.execute("""
         SELECT severity,event_type,message,hostname,file_path,
                created_at,acknowledged,id
@@ -2150,7 +2019,6 @@ async def tenant_dashboard(request: Request):
     """, (tenant_id,))
     alert_list = cur.fetchall()
  
-    # Config
     cur.execute(
         "SELECT * FROM tenant_config WHERE tenant_id=%s", (tenant_id,))
     config = cur.fetchone() or {}
@@ -2160,7 +2028,6 @@ async def tenant_dashboard(request: Request):
     online  = sum(1 for a in agents_list if a["status"] == "online")
     armed   = sum(1 for a in agents_list if a["is_armed"])
  
-    # Build agent rows
     agent_rows = ""
     for a in agents_list:
         is_online = a["status"] == "online"
@@ -2200,10 +2067,9 @@ async def tenant_dashboard(request: Request):
         agent_rows = (
             "<tr><td colspan='8' style='text-align:center;color:#484f58;"
             "padding:32px'>"
-            "No agents connected yet. Install FMSecure on endpoints and "
+            "No agents connected yet. Install {BRAND['name']} on endpoints and "
             "configure the tenant API key.</td></tr>")
  
-    # Build alert rows
     alert_rows = ""
     sev_colors = {
         "CRITICAL": "#f85149", "HIGH": "#f0883e",
@@ -2215,7 +2081,6 @@ async def tenant_dashboard(request: Request):
         acked = al["acknowledged"]
         row_style = "opacity:.5" if acked else ""
         
-        # 🚨 FIX: Extract the button logic outside the main f-string to prevent the backslash error
         ack_html = (
             '<span style="color:#3fb950;font-size:12px">✓ Acked</span>'
             if acked else
@@ -2253,9 +2118,8 @@ async def tenant_dashboard(request: Request):
     email_val   = (config.get("alert_email")  or "") if config else ""
  
     return f"""<!DOCTYPE html>
-<html lang="en"><head>
+<html lang="en"><head>{standard_head(tenant['name'] + " Dashboard")}
 <meta charset="UTF-8">
-<title>FMSecure | {tenant['name']} Dashboard</title>
 <style>
   *{{box-sizing:border-box;margin:0;padding:0}}
   body{{background:#0a0a0a;color:#e6edf3;font-family:system-ui,sans-serif}}
@@ -2295,10 +2159,10 @@ async def tenant_dashboard(request: Request):
  
 <nav>
   <span class="brand">
-  <img src="/static/app_icon.png" width="24" height="24"
+  <img src="{BRAND['logo_png']}" width="24" height="24"
        style="vertical-align:middle;margin-right:8px"
        onerror="this.style.display='none'">
-  FMSecure
+  {BRAND['name']}
 </span>
   <span class="org">🏢 {tenant['name']}</span>
   <div>
@@ -2311,10 +2175,8 @@ async def tenant_dashboard(request: Request):
  
 <div class="container">
  
-  <!-- Alert banner for critical unacked events -->
   {'<div style="background:#2d0d0d;border:1px solid #f85149;border-radius:8px;padding:14px 20px;margin-bottom:20px;color:#f85149;font-weight:600">⚠ ' + str(stats["critical_alerts"]) + ' unacknowledged CRITICAL alert(s) require your attention</div>' if stats['critical_alerts'] else ''}
  
-  <!-- Stats -->
   <div class="stat-row">
     <div class="stat">
       <div class="num">{stats['total_agents']}</div>
@@ -2336,13 +2198,11 @@ async def tenant_dashboard(request: Request):
     </div>
   </div>
  
-  <!-- Seat usage -->
   <div style="color:#8b949e;font-size:12px;margin-bottom:16px">
     Seat usage: {stats['total_agents']} / {tenant['max_agents']} agents
     · Plan: <strong style="color:#e6edf3">{tenant['plan'].upper()}</strong>
   </div>
  
-  <!-- Agent table -->
   <div class="card">
     <h3>Endpoints</h3>
     <table>
@@ -2355,7 +2215,6 @@ async def tenant_dashboard(request: Request):
     </table>
   </div>
  
-  <!-- Alert table -->
   <div class="card">
     <h3>Security Alerts</h3>
     <table>
@@ -2367,7 +2226,6 @@ async def tenant_dashboard(request: Request):
     </table>
   </div>
  
-  <!-- Config -->
   <div class="card">
     <h3>Policy Settings</h3>
     <p style="color:#8b949e;font-size:12px;margin-bottom:14px">
@@ -2412,7 +2270,6 @@ async def tenant_dashboard(request: Request):
 </div>
  
 <script>
-// Auto-refresh every 15s (pauses if user is typing)
 setInterval(() => {{
   if (!document.querySelector('input:focus')) location.reload();
 }}, 15000);
@@ -2436,7 +2293,6 @@ async function sendCommand(machineId, cmd) {{
 </script>
 </body></html>"""
  
- 
 # ── Tenant Admin: Save config ─────────────────────────────────────────────────
 @app.post("/tenant/config")
 async def tenant_save_config(
@@ -2453,9 +2309,8 @@ async def tenant_save_config(
     if not DATABASE_URL:
         return RedirectResponse("/tenant/dashboard", status_code=302)
  
-    # Sanitise
-    verify_interval = max(10, min(verify_interval, 86400))  # 10s – 24h
-    max_vault_mb    = max(1,  min(max_vault_mb, 500))       # 1MB – 500MB
+    verify_interval = max(10, min(verify_interval, 86400))
+    max_vault_mb    = max(1,  min(max_vault_mb, 500))
  
     conn = get_db(); cur = conn.cursor()
     cur.execute("""
@@ -2477,7 +2332,6 @@ async def tenant_save_config(
     print(f"[TENANT CONFIG] Updated for tenant {session['tenant_id'][:8]}…")
     return RedirectResponse("/tenant/dashboard", status_code=302)
  
- 
 # ── Tenant Admin: Acknowledge alert ───────────────────────────────────────────
 @app.post("/tenant/alerts/{alert_id}/ack")
 async def tenant_ack_alert(alert_id: str, request: Request):
@@ -2494,7 +2348,6 @@ async def tenant_ack_alert(alert_id: str, request: Request):
     conn.commit(); cur.close(); conn.close()
     return {"ok": True}
  
- 
 # ── Tenant Admin: Send command to agent ───────────────────────────────────────
 @app.post("/tenant/command/{machine_id}")
 async def tenant_send_command(
@@ -2510,7 +2363,6 @@ async def tenant_send_command(
     if cmd not in allowed_cmds:
         raise HTTPException(status_code=400, detail="Unknown command")
  
-    # Verify this machine belongs to this tenant before queuing
     if DATABASE_URL:
         conn = get_db(); cur = conn.cursor()
         cur.execute(
@@ -2542,7 +2394,6 @@ async def landing_page_root():
 
 @app.get("/download", response_class=HTMLResponse)
 async def download_page():
-    """Public download page — linked from the in-app update banner."""
     try:
         conn = get_db(); cur = conn.cursor()
         cur.execute(
@@ -2559,10 +2410,9 @@ async def download_page():
         version, notes, direct_url = "2.5.0", "", "#"
 
     return f"""<!DOCTYPE html>
-<html lang="en"><head>
+<html lang="en"><head>{standard_head(f"Download v{version}")}
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Download FMSecure v{version}</title>
 <style>
   *{{box-sizing:border-box;margin:0;padding:0}}
   body{{background:#0d1117;color:#e6edf3;font-family:system-ui,sans-serif;
@@ -2604,8 +2454,8 @@ async def download_page():
 </head><body>
 <nav>
   <a class="logo" href="/" style="display: flex; align-items: center; gap: 8px;">
-  <img src="/static/app_icon.png" alt="Logo" height="28">
-  FMSecure
+  <img src="{BRAND['logo_png']}" alt="Logo" height="28">
+  {BRAND['name']}
 </a>
   <a href="/">Home</a>
   <a href="/pricing">Pricing</a>
@@ -2615,13 +2465,13 @@ async def download_page():
 
 <div class="hero">
   <span class="badge">✅ Latest Release</span>
-  <h1>Download FMSecure</h1>
-  <p class="subtitle">Enterprise File Integrity & EDR Monitor for Windows</p>
+  <h1>Download {BRAND['name']}</h1>
+  <p class="subtitle">{BRAND['tagline']}</p>
 
   {"<div class='notes'><strong>What's new in v" + version + ":</strong><br>" + notes + "</div>" if notes else ""}
 
   <a class="dl-btn" href="{direct_url}" id="dlbtn">
-    ⬇&nbsp; Download FMSecure v{version}
+    ⬇&nbsp; Download {BRAND['name']} v{version}
   </a>
   <p class="meta">Windows 10/11 · 64-bit · Free to try · PRO features require license</p>
 
@@ -2649,13 +2499,12 @@ async def download_page():
   </div>
 </div>
 
-<footer>FMSecure · Enterprise EDR · © {datetime.now().year}</footer>
+<footer>{BRAND['name']} · {BRAND['tagline']} · © {BRAND['copyright_year']}</footer>
 </body></html>"""
 
 
 @app.get("/changelog", response_class=HTMLResponse)
 async def changelog_page():
-    """Public changelog page — linked from the in-app 'What's New' button."""
     try:
         conn = get_db(); cur = conn.cursor()
         cur.execute(
@@ -2697,10 +2546,9 @@ async def changelog_page():
         entries = '<p style="color:#8b949e">No releases published yet.</p>'
 
     return f"""<!DOCTYPE html>
-<html lang="en"><head>
+<html lang="en"><head>{standard_head("Changelog")}
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>FMSecure Changelog</title>
 <style>
   *{{box-sizing:border-box;margin:0;padding:0}}
   body{{background:#0d1117;color:#e6edf3;font-family:system-ui,sans-serif}}
@@ -2718,8 +2566,8 @@ async def changelog_page():
 </head><body>
 <nav>
   <a class="logo" href="/" style="display: flex; align-items: center; gap: 8px;">
-  <img src="/static/app_icon.png" alt="Logo" height="28">
-  FMSecure
+  <img src="{BRAND['logo_png']}" alt="Logo" height="28">
+  {BRAND['name']}
 </a>
   <a href="/">Home</a>
   <a href="/download">Download</a>
@@ -2730,20 +2578,17 @@ async def changelog_page():
   <p class="sub">Every release, every improvement — all in one place.</p>
   {entries}
 </div>
-<footer>FMSecure · Enterprise EDR · © {datetime.now().year}</footer>
+<footer>{BRAND['name']} · {BRAND['tagline']} · © {BRAND['copyright_year']}</footer>
 </body></html>"""
 
 @app.get("/home", response_class=HTMLResponse)
 async def landing_page():
     base = APP_BASE_URL
+    # The landing page is massive; we'll replace brand references and use standard_head.
     return f"""<!DOCTYPE html>
 <html lang="en">
-<head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>FMSecure — Enterprise EDR for Windows</title>
+<head>{standard_head("Home")}
 <meta name="description" content="Real-time file integrity monitoring, ransomware killswitch, auto-healing vault, and cloud disaster recovery for Windows endpoints."/>
-<link rel="icon" href="/static/app_icon.png" type="image/png"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
@@ -2766,11 +2611,9 @@ body{{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:va
 ::-webkit-scrollbar-track{{background:var(--bg)}}
 ::-webkit-scrollbar-thumb{{background:var(--bdh);border-radius:3px}}
  
-/* Canvas */
 #bgc{{position:fixed;inset:0;z-index:0;pointer-events:none}}
 .z1{{position:relative;z-index:1}}
  
-/* Nav */
 nav{{
   position:fixed;top:0;left:0;right:0;z-index:200;
   height:66px;padding:0 48px;
@@ -2791,7 +2634,6 @@ nav{{
 .btn-nav-cta{{padding:8px 20px;border-radius:8px;background:var(--blue);border:none;color:#fff;font-size:13px;font-weight:600;cursor:pointer;text-decoration:none;transition:all .2s}}
 .btn-nav-cta:hover{{background:#4f96ff;transform:translateY(-1px);box-shadow:0 4px 16px rgba(47,129,247,.35)}}
  
-/* Hero */
 .hero{{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:110px 48px 80px;text-align:center}}
 .hero-inner{{max-width:860px}}
 .badge{{
@@ -2816,7 +2658,6 @@ h1{{font-size:clamp(38px,6vw,70px);font-weight:800;letter-spacing:-2px;line-heig
 .hstat-n em{{font-style:normal;color:var(--blue)}}
 .hstat-l{{font-size:12px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-top:2px;font-weight:600}}
  
-/* Terminal */
 .term-wrap{{padding:0 48px 100px;display:flex;justify-content:center}}
 .term{{width:100%;max-width:780px;background:#080b14;border:1px solid var(--bd);border-radius:var(--rl);overflow:hidden;box-shadow:0 32px 72px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,.025)}}
 .term-bar{{display:flex;align-items:center;gap:7px;padding:13px 20px;background:#0b0f1c;border-bottom:1px solid var(--bd)}}
@@ -2827,10 +2668,8 @@ h1{{font-size:clamp(38px,6vw,70px);font-weight:800;letter-spacing:-2px;line-heig
 .tcu{{display:inline-block;width:7px;height:13px;background:var(--green);vertical-align:middle;animation:blink 1.1s step-end infinite}}
 @keyframes blink{{0%,100%{{opacity:1}}50%{{opacity:0}}}}
  
-/* Divider */
 .dvd{{height:1px;background:linear-gradient(90deg,transparent,var(--bd),transparent);margin:0 48px}}
  
-/* Section */
 section{{padding:100px 48px}}
 .slbl{{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--blue);margin-bottom:14px}}
 .stit{{font-size:clamp(26px,4vw,44px);font-weight:800;letter-spacing:-1px;line-height:1.1;margin-bottom:14px}}
@@ -2838,7 +2677,6 @@ section{{padding:100px 48px}}
 .scen{{text-align:center}}
 .scen .ssub{{margin:0 auto}}
  
-/* Feature grid */
 .fg{{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:18px;margin-top:56px;max-width:1200px;margin-left:auto;margin-right:auto}}
 .fc{{
   background:var(--bgc);border:1px solid var(--bd);border-radius:var(--rl);
@@ -2853,7 +2691,6 @@ section{{padding:100px 48px}}
 .tfree{{background:rgba(34,197,94,.08);color:var(--green);border:1px solid rgba(34,197,94,.2)}}
 .tall{{background:rgba(167,139,250,.08);color:var(--purple);border:1px solid rgba(167,139,250,.2)}}
  
-/* Comparison table */
 .cmp-wrap{{max-width:900px;margin:64px auto 0}}
 .cmp-tbl{{width:100%;border-collapse:collapse;background:var(--bgc);border:1px solid var(--bd);border-radius:var(--rl);overflow:hidden}}
 .cmp-tbl th{{padding:18px 24px;font-size:13px;font-weight:700;text-align:center;border-bottom:1px solid var(--bd)}}
@@ -2868,7 +2705,6 @@ section{{padding:100px 48px}}
 .crs{{color:var(--t3);font-size:16px}}
 .cnum{{color:var(--amber);font-weight:700}}
  
-/* How it works */
 .hw{{display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin-top:72px;max-width:960px;margin-left:auto;margin-right:auto;position:relative}}
 .hw::before{{content:'';position:absolute;top:31px;left:calc(16.7% + 28px);right:calc(16.7% + 28px);height:1px;background:var(--bd);z-index:0}}
 .hws{{text-align:center;padding:0 28px;position:relative;z-index:1}}
@@ -2877,7 +2713,6 @@ section{{padding:100px 48px}}
 .hws h3{{font-size:16px;font-weight:700;margin-bottom:10px}}
 .hws p{{font-size:13.5px;color:var(--t2);line-height:1.65}}
  
-/* Architecture */
 .arch{{display:flex;gap:72px;align-items:center;max-width:1160px;margin:0 auto;padding:100px 48px}}
 .arch-t{{flex:1}}
 .arch-t h2{{font-size:clamp(24px,3.5vw,38px);font-weight:800;letter-spacing:-1px;margin-bottom:14px}}
@@ -2903,7 +2738,6 @@ section{{padding:100px 48px}}
 .st-local{{background:rgba(34,211,238,.08);color:var(--cyan)}}
 .st-kern{{background:rgba(167,139,250,.08);color:var(--purple)}}
  
-/* Pricing */
 .pg{{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:60px;max-width:1000px;margin-left:auto;margin-right:auto}}
 .pc{{
   background:var(--bgc);border:1px solid var(--bd);border-radius:var(--rl);
@@ -2936,7 +2770,6 @@ section{{padding:100px 48px}}
 .pbp{{background:var(--blue);color:#fff}}
 .pbp:hover{{background:#4f96ff;box-shadow:0 6px 22px rgba(47,129,247,.42);transform:translateY(-1px)}}
  
-/* FAQ */
 .faq-list{{max-width:760px;margin:60px auto 0;display:flex;flex-direction:column;gap:10px}}
 .fi{{background:var(--bgc);border:1px solid var(--bd);border-radius:var(--r);overflow:hidden;transition:border-color .2s}}
 .fi:hover{{border-color:var(--bdh)}}
@@ -2947,7 +2780,6 @@ section{{padding:100px 48px}}
 .fa p{{padding:0 22px 18px;font-size:13.5px;color:var(--t2);line-height:1.7}}
 .fi.open .fa{{max-height:280px}}
  
-/* CTA */
 .cta-sec{{padding:100px 48px;text-align:center}}
 .cta-box{{
   max-width:740px;margin:0 auto;padding:72px 60px;
@@ -2960,7 +2792,6 @@ section{{padding:100px 48px}}
 .cta-box p{{font-size:16px;color:var(--t2);margin-bottom:38px;line-height:1.6}}
 .cta-acts{{display:flex;justify-content:center;gap:16px;flex-wrap:wrap}}
  
-/* Footer */
 footer{{padding:56px 48px 36px;border-top:1px solid var(--bd)}}
 .ft{{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:44px;flex-wrap:wrap;gap:36px}}
 .fb p{{font-size:13.5px;color:var(--t3);line-height:1.6;max-width:270px;margin-top:10px}}
@@ -2971,7 +2802,6 @@ footer{{padding:56px 48px 36px;border-top:1px solid var(--bd)}}
 .fb2{{display:flex;justify-content:space-between;align-items:center;padding-top:22px;border-top:1px solid var(--bd);flex-wrap:wrap;gap:10px}}
 .fb2 p{{font-size:12px;color:var(--t3)}}
  
-/* Mobile */
 @media(max-width:900px){{
   nav{{padding:0 20px}}
   .nav-links{{display:none}}
@@ -2995,10 +2825,9 @@ footer{{padding:56px 48px 36px;border-top:1px solid var(--bd)}}
  
 <div class="z1">
  
-<!-- NAV -->
 <nav id="mnav">
   <a href="{base}/home" class="nav-brand">
-    <img src="/static/app_icon.png" alt="FMSecure" onerror="this.style.display='none'"/>
+    <img src="{BRAND['logo_png']}" alt="{BRAND['name']}" onerror="this.style.display='none'"/>
     <span class="nav-brand-txt">FM<em>Secure</em></span>
   </a>
   <ul class="nav-links">
@@ -3015,13 +2844,12 @@ footer{{padding:56px 48px 36px;border-top:1px solid var(--bd)}}
   </div>
 </nav>
  
-<!-- HERO -->
 <section class="hero">
   <div class="hero-inner">
     <div class="badge">Windows EDR — v2.0 production release</div>
     <h1>Stop ransomware.<br/><span class="gt">Before damage is done.</span></h1>
     <p class="hero-sub">
-      FMSecure is a production-grade Endpoint Detection &amp; Response agent for Windows.
+      {BRAND['name']} is a production-grade Endpoint Detection &amp; Response agent for Windows.
       Real-time file integrity monitoring, behavioral ransomware detection, auto-healing vault,
       and live C2 telemetry — all in a single executable.
     </p>
@@ -3054,14 +2882,13 @@ footer{{padding:56px 48px 36px;border-top:1px solid var(--bd)}}
   </div>
 </section>
  
-<!-- TERMINAL -->
 <div class="term-wrap">
   <div class="term">
     <div class="term-bar">
       <div class="tdot" style="background:#ff5f57"></div>
       <div class="tdot" style="background:#febc2e"></div>
       <div class="tdot" style="background:#28c840"></div>
-      <span class="tlabel">FMSecure v2.0 &mdash; Live Agent Log &mdash; WORKSTATION-01</span>
+      <span class="tlabel">{BRAND['name']} v2.0 &mdash; Live Agent Log &mdash; WORKSTATION-01</span>
     </div>
     <div class="term-body">
       <div><span class="tok">[22:14:03]</span> <span class="tout">[INFO ] Monitor started &mdash; 2 folders indexed, 15,842 files baseline captured</span></div>
@@ -3073,7 +2900,7 @@ footer{{padding:56px 48px 36px;border-top:1px solid var(--bd)}}
       <div><span class="tcr">[22:17:02]</span> <span class="tout">[SNAP ] Forensic snapshot BF9A2C1D &rarr; forensics\forensic_2026-03-29_22-17-02.dat</span></div>
       <div><span class="tok">[22:17:03]</span> <span class="tout">[MAIL ] Critical alert dispatched &rarr; admin@corp.com (SMTP, attachment: .dat)</span></div>
       <div><span class="tin">[22:17:03]</span> <span class="tout">[C2  ] Heartbeat pushed &rarr; fmsecure-c2-server.railway.app (LOCKDOWN queued)</span></div>
-      <div><span class="tok">[22:17:04]</span> <span class="tout">[KEY  ] Cloud key backup complete &rarr; Google Drive / FMSecure_FM-A3C9 / keys/</span></div>
+      <div><span class="tok">[22:17:04]</span> <span class="tout">[KEY  ] Cloud key backup complete &rarr; Google Drive / {BRAND['name']}_FM-A3C9 / keys/</span></div>
       <div style="margin-top:8px"><span class="tok">root@WORKSTATION-01</span><span class="tout"> ~/fmsecure $ </span><span class="tcu"></span></div>
     </div>
   </div>
@@ -3081,7 +2908,6 @@ footer{{padding:56px 48px 36px;border-top:1px solid var(--bd)}}
  
 <div class="dvd"></div>
  
-<!-- FEATURES -->
 <section id="features">
   <div class="scen">
     <div class="slbl">Platform capabilities</div>
@@ -3121,7 +2947,7 @@ footer{{padding:56px 48px 36px;border-top:1px solid var(--bd)}}
     <div class="fc">
       <div class="fci" style="background:rgba(245,158,11,.09)">&#x1F52C;</div>
       <h3>AES-Encrypted Forensic Vault</h3>
-      <p>Every CRITICAL event generates an AES-256 snapshot capturing disk state, process memory, critical file hashes, and the last 15 decrypted log lines. Viewable only inside the FMSecure agent &mdash; never in plaintext.</p>
+      <p>Every CRITICAL event generates an AES-256 snapshot capturing disk state, process memory, critical file hashes, and the last 15 decrypted log lines. Viewable only inside the {BRAND['name']} agent &mdash; never in plaintext.</p>
       <span class="ftag tpro">PRO only</span>
     </div>
  
@@ -3158,7 +2984,6 @@ footer{{padding:56px 48px 36px;border-top:1px solid var(--bd)}}
  
 <div class="dvd"></div>
  
-<!-- FREE VS PRO COMPARE -->
 <section id="compare">
   <div class="scen">
     <div class="slbl">Plan comparison</div>
@@ -3203,7 +3028,6 @@ footer{{padding:56px 48px 36px;border-top:1px solid var(--bd)}}
  
 <div class="dvd"></div>
  
-<!-- HOW IT WORKS -->
 <section id="howitworks">
   <div class="scen">
     <div class="slbl">Deployment</div>
@@ -3231,12 +3055,11 @@ footer{{padding:56px 48px 36px;border-top:1px solid var(--bd)}}
  
 <div class="dvd"></div>
  
-<!-- ARCHITECTURE -->
 <div class="arch" id="architecture">
   <div class="arch-t">
     <div class="slbl">Technical architecture</div>
     <h2>Multi-layer defense.<br/>Single binary.</h2>
-    <p>FMSecure is not a script wrapper. It is a layered security architecture where each tier is independently functional &mdash; a failure in one layer never compromises the others.</p>
+    <p>{BRAND['name']} is not a script wrapper. It is a layered security architecture where each tier is independently functional &mdash; a failure in one layer never compromises the others.</p>
     <ul class="arch-li">
       <li>HMAC SHA-256 signed on every log line &mdash; tamper detection at write time</li>
       <li>Hardware KEK ensures stolen key files are permanently unreadable elsewhere</li>
@@ -3260,7 +3083,6 @@ footer{{padding:56px 48px 36px;border-top:1px solid var(--bd)}}
  
 <div class="dvd"></div>
  
-<!-- PRICING -->
 <section id="pricing">
   <div class="scen">
     <div class="slbl">Pricing</div>
@@ -3291,8 +3113,8 @@ footer{{padding:56px 48px 36px;border-top:1px solid var(--bd)}}
  
     <div class="pc feat">
       <div class="pbadge">Most popular</div>
-      <div class="pplan">PRO Monthly</div>
-      <div class="pprice"><sup>&#x20B9;</sup>499<span>/mo</span></div>
+      <div class="pplan">{PRICING_DISPLAY['pro_monthly']['label']}</div>
+      <div class="pprice"><sup>&#x20B9;</sup>{PRICING_DISPLAY['pro_monthly']['price']}<span>{PRICING_DISPLAY['pro_monthly']['period']}</span></div>
       <div class="pdesc">For professionals protecting real systems</div>
       <div class="pdvd"></div>
       <ul class="pfl">
@@ -3307,13 +3129,12 @@ footer{{padding:56px 48px 36px;border-top:1px solid var(--bd)}}
         <li><span class="c">&#10003;</span> Live C2 fleet telemetry</li>
         <li><span class="c">&#10003;</span> Remote host isolation</li>
       </ul>
-      <!-- Replace href with your Razorpay / Stripe payment link -->
       <a href="{base}/pricing" class="pbtn pbp">Activate PRO &rarr;</a>
     </div>
  
     <div class="pc">
-      <div class="pplan">PRO Annual</div>
-      <div class="pprice"><sup>&#x20B9;</sup>4999<span>/yr</span></div>
+      <div class="pplan">{PRICING_DISPLAY['pro_annual']['label']}</div>
+      <div class="pprice"><sup>&#x20B9;</sup>{PRICING_DISPLAY['pro_annual']['price']}<span>{PRICING_DISPLAY['pro_annual']['period']}</span></div>
       <div class="pdesc">2 months free &mdash; best value</div>
       <div class="pdvd"></div>
       <ul class="pfl">
@@ -3333,7 +3154,6 @@ footer{{padding:56px 48px 36px;border-top:1px solid var(--bd)}}
  
 <div class="dvd"></div>
  
-<!-- FAQ -->
 <section id="faq">
   <div class="scen">
     <div class="slbl">FAQ</div>
@@ -3343,32 +3163,32 @@ footer{{padding:56px 48px 36px;border-top:1px solid var(--bd)}}
  
     <div class="fi">
       <button class="fq" onclick="tfaq(this)">How does license activation work?<i class="chv">&#x203A;</i></button>
-      <div class="fa"><p>After payment, Razorpay fires a webhook to our Railway server which generates a unique license key and emails it within 60 seconds. Paste it into FMSecure&apos;s "Activate PRO" dialog &mdash; the agent validates it against our server and unlocks all PRO features instantly. Keys are device-bound by hardware machine ID, not email.</p></div>
+      <div class="fa"><p>After payment, Razorpay fires a webhook to our Railway server which generates a unique license key and emails it within 60 seconds. Paste it into {BRAND['name']}&apos;s "Activate PRO" dialog &mdash; the agent validates it against our server and unlocks all PRO features instantly. Keys are device-bound by hardware machine ID, not email.</p></div>
     </div>
  
     <div class="fi">
       <button class="fq" onclick="tfaq(this)">What happens if my encryption key is deleted?<i class="chv">&#x203A;</i></button>
-      <div class="fa"><p>PRO users get three-tier key protection: (1) primary local key, (2) shadow backup copy, (3) cloud escrow on Google Drive identified by hardware machine ID. On startup, FMSecure automatically attempts all three in order. Full disaster recovery &mdash; including logs, forensics, user accounts, and vault files &mdash; runs from the dashboard in under 3 minutes.</p></div>
+      <div class="fa"><p>PRO users get three-tier key protection: (1) primary local key, (2) shadow backup copy, (3) cloud escrow on Google Drive identified by hardware machine ID. On startup, {BRAND['name']} automatically attempts all three in order. Full disaster recovery &mdash; including logs, forensics, user accounts, and vault files &mdash; runs from the dashboard in under 3 minutes.</p></div>
     </div>
  
     <div class="fi">
-      <button class="fq" onclick="tfaq(this)">Does FMSecure require a kernel driver or code signing?<i class="chv">&#x203A;</i></button>
-      <div class="fa"><p>No. FMSecure runs as a standard Windows application with UAC Administrator elevation. The Ransomware Killswitch uses the built-in Windows <code style="font-family:'JetBrains Mono',monospace;font-size:12px">icacls</code> command to revoke NTFS permissions at the OS level &mdash; no kernel driver, no Authenticode signing required for that path.</p></div>
+      <button class="fq" onclick="tfaq(this)">Does {BRAND['name']} require a kernel driver or code signing?<i class="chv">&#x203A;</i></button>
+      <div class="fa"><p>No. {BRAND['name']} runs as a standard Windows application with UAC Administrator elevation. The Ransomware Killswitch uses the built-in Windows <code style="font-family:'JetBrains Mono',monospace;font-size:12px">icacls</code> command to revoke NTFS permissions at the OS level &mdash; no kernel driver, no Authenticode signing required for that path.</p></div>
     </div>
  
     <div class="fi">
-      <button class="fq" onclick="tfaq(this)">What if I kill the FMSecure process in Task Manager?<i class="chv">&#x203A;</i></button>
+      <button class="fq" onclick="tfaq(this)">What if I kill the {BRAND['name']} process in Task Manager?<i class="chv">&#x203A;</i></button>
       <div class="fa"><p>The Watchdog process (masquerading as <code style="font-family:'JetBrains Mono',monospace;font-size:12px">WinSysHost.exe</code>) detects the termination within seconds and relaunches the agent in Recovery Mode &mdash; bypassing the login screen, auto-logging in the last admin, and resuming monitoring of all previously configured folders without any user interaction.</p></div>
     </div>
  
     <div class="fi">
       <button class="fq" onclick="tfaq(this)">Does it monitor network shares and USB drives?<i class="chv">&#x203A;</i></button>
-      <div class="fa"><p>FMSecure monitors any path accessible from the Windows filesystem including local NTFS drives, mapped network shares, and USB drives. The watchdog library hooks into native Windows file system events at the OS level, so it receives change notifications regardless of the underlying storage type.</p></div>
+      <div class="fa"><p>{BRAND['name']} monitors any path accessible from the Windows filesystem including local NTFS drives, mapped network shares, and USB drives. The watchdog library hooks into native Windows file system events at the OS level, so it receives change notifications regardless of the underlying storage type.</p></div>
     </div>
  
     <div class="fi">
       <button class="fq" onclick="tfaq(this)">Do you ever have access to my Google Drive or my files?<i class="chv">&#x203A;</i></button>
-      <div class="fa"><p>No. FMSecure uses your own Google OAuth credentials to write to your personal Google Drive. All backups land in a <code style="font-family:'JetBrains Mono',monospace;font-size:12px">FMSecure_{{MACHINE_ID}}</code> folder that only your account controls. Files are AES-256 encrypted before upload &mdash; we never see plaintext content, and your Google credentials are never sent to our servers.</p></div>
+      <div class="fa"><p>No. {BRAND['name']} uses your own Google OAuth credentials to write to your personal Google Drive. All backups land in a <code style="font-family:'JetBrains Mono',monospace;font-size:12px">{BRAND['name']}_{{MACHINE_ID}}</code> folder that only your account controls. Files are AES-256 encrypted before upload &mdash; we never see plaintext content, and your Google credentials are never sent to our servers.</p></div>
     </div>
  
     <div class="fi">
@@ -3379,27 +3199,25 @@ footer{{padding:56px 48px 36px;border-top:1px solid var(--bd)}}
   </div>
 </section>
  
-<!-- CTA -->
 <section class="cta-sec">
   <div class="cta-box">
     <h2>Start protecting your endpoints today.</h2>
     <p>Free tier available with no credit card. PRO features activate within 60 seconds of payment.</p>
     <div class="cta-acts">
-      <a href="{base}/download" class="btn-hp">Download FMSecure free</a>
+      <a href="{base}/download" class="btn-hp">Download {BRAND['name']} free</a>
       <a href="{base}/pricing" class="btn-hg">See PRO pricing &rarr;</a>
     </div>
   </div>
 </section>
  
-<!-- FOOTER -->
 <footer>
   <div class="ft">
     <div class="fb">
       <a href="{base}/home" class="nav-brand">
-        <img src="/static/app_icon.png" alt="FMSecure" width="26" height="26" onerror="this.style.display='none'"/>
+        <img src="{BRAND['logo_png']}" alt="{BRAND['name']}" width="26" height="26" onerror="this.style.display='none'"/>
         <span class="nav-brand-txt" style="font-size:16px">FM<em>Secure</em></span>
       </a>
-      <p>Enterprise-grade endpoint detection and response for Windows. Built by a security engineer, for security engineers.</p>
+      <p>{BRAND['tagline']}. Built by a security engineer, for security engineers.</p>
     </div>
     <div class="flg">
       <h4>Product</h4>
@@ -3431,15 +3249,14 @@ footer{{padding:56px 48px 36px;border-top:1px solid var(--bd)}}
     </div>
   </div>
   <div class="fb2">
-    <p>&copy; 2026 FMSecure &bull; All rights reserved &bull; Made in India</p>
+    <p>&copy; {BRAND['copyright_year']} {BRAND['name']} &bull; All rights reserved &bull; Made in India</p>
     <p>FastAPI &bull; Python &bull; Google Drive API &bull; Razorpay</p>
   </div>
 </footer>
  
-</div><!-- end z1 -->
+</div>
  
 <script>
-/* ── THREE.JS NETWORK ── */
 (function(){{
   const cv = document.getElementById('bgc');
   const scene = new THREE.Scene();
@@ -3503,7 +3320,6 @@ footer{{padding:56px 48px 36px;border-top:1px solid var(--bd)}}
   }});
 }})();
  
-/* ── GSAP SCROLL ── */
 gsap.registerPlugin(ScrollTrigger);
  
 gsap.utils.toArray('.fc').forEach((el,i)=>{{
@@ -3524,13 +3340,11 @@ gsap.utils.toArray('.pc').forEach((el,i)=>{{
   }});
 }});
  
-/* Nav opacity on scroll */
 const mnav = document.getElementById('mnav');
 window.addEventListener('scroll',()=>{{
   mnav.style.background = scrollY>20 ? 'rgba(5,8,16,.97)' : 'rgba(5,8,16,.7)';
 }});
  
-/* FAQ */
 function tfaq(btn){{
   const it=btn.closest('.fi');
   const op=it.classList.contains('open');
@@ -3538,7 +3352,6 @@ function tfaq(btn){{
   if(!op) it.classList.add('open');
 }}
  
-/* Smooth anchor */
 document.querySelectorAll('a[href^="#"]').forEach(a=>{{
   a.addEventListener('click',e=>{{
     const t=document.querySelector(a.getAttribute('href'));
@@ -3555,7 +3368,7 @@ document.querySelectorAll('a[href^="#"]').forEach(a=>{{
 @app.get("/pricing", response_class=HTMLResponse)
 async def pricing_page():
     base = APP_BASE_URL; rzpkey = RZP_KEY_ID
-    return f"""<!DOCTYPE html><html><head><title>FMSecure PRO — Pricing</title>
+    return f"""<!DOCTYPE html><html><head>{standard_head("Pricing")}
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
     <style>
       *{{box-sizing:border-box;margin:0;padding:0}}body{{background:#0d1117;color:#e6edf3;font-family:system-ui,sans-serif;min-height:100vh}}
@@ -3585,14 +3398,14 @@ async def pricing_page():
       .note{{text-align:center;color:#484f58;font-size:13px;margin-top:36px;line-height:1.7}}
       footer{{text-align:center;color:#484f58;font-size:13px;padding:48px 24px}}
     </style></head><body>
-    <nav><a class="brand" href="/home">FMSecure</a><a class="back" href="/home">&#x2190; Back to home</a></nav>
+    <nav><a class="brand" href="/home">{BRAND['name']}</a><a class="back" href="/home">&#x2190; Back to home</a></nav>
     <main>
       <h1>Simple, transparent pricing</h1>
       <p class="sub">No hidden fees. Cancel anytime. License key emailed instantly after payment.</p>
       <div class="cards">
         <div class="card">
-          <p class="plan">PRO MONTHLY</p>
-          <div class="price">&#x20B9;499<span>/mo</span></div>
+          <p class="plan">{PRICING_DISPLAY['pro_monthly']['label']}</p>
+          <div class="price">&#x20B9;{PRICING_DISPLAY['pro_monthly']['price']}<span>{PRICING_DISPLAY['pro_monthly']['period']}</span></div>
           <p class="period">Billed monthly, cancel anytime</p>
           <div class="email-row">
             <label>EMAIL — KEY WILL BE SENT HERE</label>
@@ -3607,12 +3420,12 @@ async def pricing_page():
             <li><span class="check">&#10003;</span><strong>Forensic vault</strong> + snapshots</li>
             <li><span class="check">&#10003;</span>Email security alerts</li>
           </ul>
-          <button class="btn btn-blue" onclick="startPayment('pro_monthly')">Buy Monthly &#x2014; &#x20B9;999</button>
+          <button class="btn btn-blue" onclick="startPayment('pro_monthly')">Buy Monthly &#x2014; &#x20B9;{PRICING_DISPLAY['pro_monthly']['price']}</button>
         </div>
         <div class="card featured">
           <div class="badge">BEST VALUE &#x2014; SAVE &#x20B9;1,989</div>
-          <p class="plan">PRO ANNUAL</p>
-          <div class="price">&#x20B9;4,999<span>/yr</span></div>
+          <p class="plan">{PRICING_DISPLAY['pro_annual']['label']}</p>
+          <div class="price">&#x20B9;{PRICING_DISPLAY['pro_annual']['price']}<span>{PRICING_DISPLAY['pro_annual']['period']}</span></div>
           <p class="period">&#x20B9;833/mo billed annually <span class="savings">&#x2714; 2 months free</span></p>
           <div class="email-row">
             <label>EMAIL — KEY WILL BE SENT HERE</label>
@@ -3627,13 +3440,13 @@ async def pricing_page():
             <li><span class="check">&#10003;</span>2 months free vs monthly</li>
             <li><span class="check">&#10003;</span>Feature request priority</li>
           </ul>
-          <button class="btn btn-green" onclick="startPayment('pro_annual')">Buy Annual &#x2014; &#x20B9;4,999</button>
+          <button class="btn btn-green" onclick="startPayment('pro_annual')">Buy Annual &#x2014; &#x20B9;{PRICING_DISPLAY['pro_annual']['price']}</button>
         </div>
       </div>
       <p class="note">Payments secured by Razorpay &bull; UPI, Net Banking, Cards, Wallets accepted<br>
          One license per device &bull; Transfer to new device on request</p>
     </main>
-    <footer>FMSecure v2.0 &bull; Enterprise Endpoint Detection &amp; Response &bull; Made in India</footer>
+    <footer>{BRAND['name']} v2.0 &bull; {BRAND['tagline']} &bull; Made in India</footer>
     <script>
     async function startPayment(tier) {{
       const eid=tier==='pro_monthly'?'email-monthly':'email-annual';
@@ -3649,7 +3462,7 @@ async def pricing_page():
       }}catch(e){{alert('Could not reach payment server. Please try again.');return;}}
       if(od.error){{alert('Error: '+od.error);return;}}
       new Razorpay({{
-        key:'{rzpkey}',amount:od.amount,currency:od.currency,name:'FMSecure',
+        key:'{rzpkey}',amount:od.amount,currency:od.currency,name:'{BRAND['name']}',
         description:od.description,order_id:od.order_id,prefill:{{email}},
         theme:{{color:'#2f81f7'}},
         handler:async function(res){{
@@ -3673,13 +3486,11 @@ async def pricing_page():
     </script></body></html>"""
 
 
-
 # ══════════════════════════════════════════════════════════════════════════════
 # ENTERPRISE SALES CONTACT FORM
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _notify_super_admin_of_lead(company: str, name: str, email: str, seats: str, message: str):
-    """Send lead notification to super admin (you)."""
     if not SENDGRID_API_KEY:
         print(f"[SALES] Lead: {company} / {name} / {email} / {seats} seats")
         return
@@ -3707,7 +3518,7 @@ def _notify_super_admin_of_lead(company: str, name: str, email: str, seats: str,
         from sendgrid.helpers.mail import Mail
         sg = SendGridAPIClient(api_key=SENDGRID_API_KEY)
         msg = Mail(from_email=SENDER_EMAIL, to_emails=admin_email,
-                   subject=f"🎯 New FMSecure Enterprise Lead – {company} ({seats} seats)",
+                   subject=f"🎯 New {BRAND['name']} Enterprise Lead – {company} ({seats} seats)",
                    html_content=html)
         sg.send(msg)
     except Exception as e:
@@ -3715,29 +3526,28 @@ def _notify_super_admin_of_lead(company: str, name: str, email: str, seats: str,
 
 
 def _send_sales_acknowledgment(email: str, name: str, company: str):
-    """Send acknowledgment to the prospect."""
     if not SENDGRID_API_KEY:
         return
     html = f"""
     <div style="font-family:'Segoe UI',Arial;background:#0d1117;padding:30px;">
       <div style="max-width:520px;margin:auto;background:#161b22;border-radius:12px;border:1px solid #30363d;overflow:hidden;">
         <div style="background:#2f81f7;padding:20px 28px;">
-          <h1 style="margin:0;color:#fff;font-size:20px;">🛡 FMSecure Enterprise</h1>
+          <h1 style="margin:0;color:#fff;font-size:20px;">🛡 {BRAND['name']} Enterprise</h1>
           <p style="margin:4px 0 0;color:#cfe2ff;font-size:13px;">We received your request</p>
         </div>
         <div style="padding:28px;">
           <p style="color:#e6edf3;">Hi <strong>{name}</strong>,</p>
-          <p style="color:#8b949e;">Thank you for your interest in FMSecure Enterprise for <strong style="color:#e6edf3;">{company}</strong>.</p>
+          <p style="color:#8b949e;">Thank you for your interest in {BRAND['name']} Enterprise for <strong style="color:#e6edf3;">{company}</strong>.</p>
           <p style="color:#8b949e;">Our team will review your request and send your organization's API key and onboarding instructions within <strong>24 hours</strong>.</p>
           <div style="background:#1c2333;border-radius:8px;padding:16px;margin:20px 0;border-left:4px solid #2f81f7;">
             <p style="margin:0;color:#8b949e;font-size:13px;">
-              In the meantime, explore FMSecure free: <a href="{APP_BASE_URL}/download" style="color:#2f81f7;">{APP_BASE_URL}/download</a>
+              In the meantime, explore {BRAND['name']} free: <a href="{APP_BASE_URL}/download" style="color:#2f81f7;">{APP_BASE_URL}/download</a>
             </p>
           </div>
           <p style="color:#8b949e;font-size:13px;">Questions? Reply to this email.</p>
         </div>
         <div style="background:#0d1117;padding:14px 28px;text-align:center;">
-          <p style="margin:0;font-size:12px;color:#484f58;">FMSecure · Manish Lisa Pvt Limited</p>
+          <p style="margin:0;font-size:12px;color:#484f58;">{BRAND['name']} · {BRAND['company']}</p>
         </div>
       </div>
     </div>
@@ -3747,7 +3557,7 @@ def _send_sales_acknowledgment(email: str, name: str, company: str):
         from sendgrid.helpers.mail import Mail
         sg = SendGridAPIClient(api_key=SENDGRID_API_KEY)
         msg = Mail(from_email=SENDER_EMAIL, to_emails=email,
-                   subject="FMSecure Enterprise – We received your request",
+                   subject=f"{BRAND['name']} Enterprise – We received your request",
                    html_content=html)
         sg.send(msg)
     except Exception as e:
@@ -3757,15 +3567,15 @@ def _send_sales_acknowledgment(email: str, name: str, company: str):
 @app.get("/enterprise", response_class=HTMLResponse)
 async def enterprise_sales_page(error: str = "", success: bool = False):
     if success:
-        return """
-        <!DOCTYPE html><html><head><title>Request Received – FMSecure</title>
-        <style>body{background:#0d1117;color:#e6edf3;font-family:system-ui;display:flex;align-items:center;justify-content:center;min-height:100vh}
-        .card{background:#161b22;border:1px solid #30363d;border-radius:16px;padding:48px;max-width:500px;text-align:center}
-        h2{color:#3fb950;margin-bottom:8px}p{color:#8b949e}</style></head><body>
+        return f"""
+        <!DOCTYPE html><html><head>{standard_head("Request Received")}
+        <style>body{{background:#0d1117;color:#e6edf3;font-family:system-ui;display:flex;align-items:center;justify-content:center;min-height:100vh}}
+        .card{{background:#161b22;border:1px solid #30363d;border-radius:16px;padding:48px;max-width:500px;text-align:center}}
+        h2{{color:#3fb950;margin-bottom:8px}}p{{color:#8b949e}}</style></head><body>
         <div class="card"><h2>✅ Request Received!</h2><p>We'll send your API key and setup instructions within 24 hours.</p><p>Check your email (including spam).</p></div></body></html>"""
     err_div = f'<p style="color:#f85149;font-size:13px;margin-top:12px">{error}</p>' if error else ""
     return f"""
-    <!DOCTYPE html><html><head><title>FMSecure Enterprise</title>
+    <!DOCTYPE html><html><head>{standard_head("Enterprise")}
     <style>
       *{{box-sizing:border-box;margin:0;padding:0}}
       body{{font-family:'Segoe UI',Arial;background:#0d1117;display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:40px 20px;color:#e6edf3}}
@@ -3788,7 +3598,7 @@ async def enterprise_sales_page(error: str = "", success: bool = False):
       button{{width:100%;padding:13px;background:#2f81f7;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;margin-top:20px}}
       button:hover{{background:#1f6feb}}
     </style></head><body>
-    <div class="hero"><h1>🛡 FMSecure Enterprise</h1><p>EDR & File Integrity Monitoring for your organization</p></div>
+    <div class="hero"><h1>🛡 {BRAND['name']} Enterprise</h1><p>EDR & File Integrity Monitoring for your organization</p></div>
     <div class="plans">
       <div class="plan"><h3>Starter</h3><div class="price">₹2,999 <span>/mo</span></div><ul><li>Up to 10 endpoints</li><li>IT Admin portal</li><li>All PRO features</li></ul></div>
       <div class="plan featured"><span class="badge">Most Popular</span><h3>Business</h3><div class="price">₹7,999 <span>/mo</span></div><ul><li>Up to 50 endpoints</li><li>Priority support</li><li>Threat intel engine</li></ul></div>
@@ -3816,7 +3626,6 @@ async def enterprise_sales_submit(
     seats: str = Form("10"),
     message: str = Form("")
 ):
-    # Send lead notification and acknowledgment in background
     threading.Thread(target=_notify_super_admin_of_lead,
                      args=(company, name, email, seats, message), daemon=True).start()
     threading.Thread(target=_send_sales_acknowledgment,
@@ -3856,7 +3665,6 @@ async def create_order(request: Request, body: CreateOrderRequest):
 @app.post("/payment/verify")
 @limiter.limit("20/minute")
 async def verify_payment(request: Request, body: VerifyPaymentRequest):
-    # 1. Verify Razorpay signature
     expected=_hmac.new(RZP_KEY_SECRET.encode(),
         f"{body.razorpay_order_id}|{body.razorpay_payment_id}".encode(),
         hashlib.sha256).hexdigest()
@@ -3864,7 +3672,6 @@ async def verify_payment(request: Request, body: VerifyPaymentRequest):
         print(f"[RZP] Sig mismatch {body.razorpay_order_id}")
         return JSONResponse({"success":False,"error":"Signature failed"},status_code=400)
 
-    # 2. Generate license and save to DB
     tier=body.tier.strip().lower(); email=body.email.strip().lower()
     payment_id=body.razorpay_payment_id; order_id=body.razorpay_order_id
     expires_iso=(datetime.now(timezone.utc)+timedelta(days=PLANS.get(tier,{}).get("days",31))).isoformat()
@@ -3875,14 +3682,12 @@ async def verify_payment(request: Request, body: VerifyPaymentRequest):
         print(f"[DB] Save error: {e}")
         return JSONResponse({"success":False,"error":"Database error"},status_code=500)
 
-    # 3. Clean up pending order
     try:
         conn=get_db();cur=conn.cursor()
         cur.execute("DELETE FROM pending_orders WHERE order_id=%s",(order_id,))
         conn.commit();cur.close();conn.close()
     except: pass
 
-    # 4. Send email in background thread — does NOT block the payment response
     threading.Thread(
         target=_send_license_email,
         args=(email, license_key, tier, expires_iso),
@@ -3890,14 +3695,12 @@ async def verify_payment(request: Request, body: VerifyPaymentRequest):
     ).start()
 
     print(f"[PAYMENT] Generated key {license_key} for {email}")
-
-    # 5. Return immediately — browser redirects to success page without waiting for email
     return {"success":True,"license_key":license_key,"tier":tier,"expires_at":expires_iso}
 
 @app.get("/payment/success", response_class=HTMLResponse)
 async def payment_success(key: str = "", email: str = "", tier: str = ""):
     tier_label=PLANS.get(tier,{}).get("label","PRO")
-    return f"""<!DOCTYPE html><html><head><title>Payment Successful | FMSecure</title>
+    return f"""<!DOCTYPE html><html><head>{standard_head("Payment Successful")}
     <style>*{{box-sizing:border-box;margin:0;padding:0}}
     body{{background:#0d1117;color:#e6edf3;font-family:system-ui,sans-serif;
          display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px}}
@@ -3921,8 +3724,8 @@ async def payment_success(key: str = "", email: str = "", tier: str = ""):
         <button class="copy-btn" onclick="navigator.clipboard.writeText('{key}');this.textContent='&#10003; Copied!'">Copy key</button>
       </div>
       <div class="steps">
-        <strong>How to activate in FMSecure:</strong><br>
-        1. Open <strong>FMSecure</strong> on your PC<br>
+        <strong>How to activate in {BRAND['name']}:</strong><br>
+        1. Open <strong>{BRAND['name']}</strong> on your PC<br>
         2. Click your <strong>username</strong> (top-right)<br>
         3. Click <strong>Activate License</strong><br>
         4. Paste this key — no email needed<br>
@@ -3972,12 +3775,12 @@ async def activate_license(req: LicenseValidateRequest):
     return await validate_license(req)
 
 # ══════════════════════════════════════════════════════════════════════════════
-# LICENSE TRANSFER  — lets a user re-bind a key to a new device after reinstall
+# LICENSE TRANSFER
 # ══════════════════════════════════════════════════════════════════════════════
 
 class TransferRequestBody(BaseModel):
     license_key: str
-    email:       str   # must match the purchase email on record
+    email:       str
 
 class TransferConfirmBody(BaseModel):
     license_key:    str
@@ -3986,10 +3789,6 @@ class TransferConfirmBody(BaseModel):
 
 @app.post("/api/license/request_transfer")
 async def request_transfer(req: TransferRequestBody):
-    """
-    Step 1 — user proves ownership by providing their purchase email.
-    If it matches the DB record, a 6-digit OTP is sent via SendGrid.
-    """
     key   = req.license_key.strip()
     email = req.email.strip().lower()
 
@@ -4010,7 +3809,6 @@ async def request_transfer(req: TransferRequestBody):
     if not row:
         return {"ok": False, "reason": "key_not_found"}
 
-    # Constant-time comparison — don't reveal whether key exists
     stored_email = (row["email"] or "").strip().lower()
     if not secrets.compare_digest(stored_email, email):
         return {"ok": False,
@@ -4019,7 +3817,6 @@ async def request_transfer(req: TransferRequestBody):
     if not row["active"]:
         return {"ok": False, "reason": "subscription_expired"}
 
-    # Generate OTP and stash it
     otp = str(random.randint(100000, 999999))
     _pending_transfers[key] = {
         "otp":     otp,
@@ -4027,7 +3824,6 @@ async def request_transfer(req: TransferRequestBody):
         "expires": time.time() + _TRANSFER_OTP_TTL,
     }
 
-    # Send via SendGrid (same helper pattern as _send_license_email)
     def _send_transfer_otp():
         if not SENDGRID_API_KEY:
             print(f"[TRANSFER] No SENDGRID_API_KEY. OTP for {email}: {otp}")
@@ -4035,7 +3831,7 @@ async def request_transfer(req: TransferRequestBody):
         html = f"""
         <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;
                     background:#0d1117;color:#e6edf3;padding:32px;border-radius:10px;">
-          <h2 style="color:#2f81f7;margin-top:0">&#128273; FMSecure License Transfer</h2>
+          <h2 style="color:#2f81f7;margin-top:0">&#128273; {BRAND['name']} License Transfer</h2>
           <p style="color:#a0a8b8;font-size:15px">
             A request was made to transfer your license key to a new device.
             Use the verification code below to confirm. It expires in 5 minutes.
@@ -4050,7 +3846,7 @@ async def request_transfer(req: TransferRequestBody):
           <p style="color:#484f58;font-size:12px;border-top:1px solid #21262d;
                     padding-top:16px;margin:0">
             If you did not request this, your license is safe — ignore this email.<br>
-            FMSecure v2.0 &bull; Enterprise EDR for Windows
+            {BRAND['name']} v2.0 &bull; {BRAND['tagline']}
           </p>
         </div>"""
         try:
@@ -4058,7 +3854,7 @@ async def request_transfer(req: TransferRequestBody):
             from sendgrid.helpers.mail import Mail
             sg = sg_mod.SendGridAPIClient(api_key=SENDGRID_API_KEY)
             msg = Mail(from_email=SENDER_EMAIL, to_emails=email,
-                       subject="FMSecure — License Transfer Verification Code",
+                       subject=f"{BRAND['name']} — License Transfer Verification Code",
                        html_content=html)
             resp = sg.send(msg)
             print(f"[TRANSFER] OTP sent to {email} — status {resp.status_code}")
@@ -4072,10 +3868,6 @@ async def request_transfer(req: TransferRequestBody):
 
 @app.post("/api/license/confirm_transfer")
 async def confirm_transfer(req: TransferConfirmBody):
-    """
-    Step 2 — user submits the OTP + their new machine_id.
-    On success the DB machine_id column is updated and the key works immediately.
-    """
     key = req.license_key.strip()
     otp = req.otp.strip()
     mid = req.new_machine_id.strip()
@@ -4098,7 +3890,6 @@ async def confirm_transfer(req: TransferConfirmBody):
     if not secrets.compare_digest(pending["otp"], otp):
         return {"ok": False, "reason": "Incorrect verification code."}
 
-    # OTP is valid — re-bind the key to the new device
     try:
         conn = get_db(); cur = conn.cursor()
         cur.execute(
@@ -4114,7 +3905,6 @@ async def confirm_transfer(req: TransferConfirmBody):
     if not row:
         return {"ok": False, "reason": "key_not_found"}
 
-    # Clean up the pending entry
     del _pending_transfers[key]
 
     tier = row["tier"] or "pro_monthly"
@@ -4131,15 +3921,8 @@ class KeyRecoveryBody(BaseModel):
 
 @app.post("/api/license/recover_key")
 async def recover_key(req: KeyRecoveryBody):
-    """
-    User forgot their license key or deleted the email.
-    Looks up all active, non-expired keys for that email and re-sends them.
-    Rate-limited to prevent enumeration — always returns {ok: true} so
-    attackers can't determine whether an email is registered.
-    """
     email = req.email.strip().lower()
     if not email or not DATABASE_URL:
-        # Return ok=True even on bad input to avoid enumeration
         return {"ok": True}
 
     try:
@@ -4153,9 +3936,8 @@ async def recover_key(req: KeyRecoveryBody):
         cur.close(); conn.close()
     except Exception as e:
         print(f"[RECOVER] DB error: {e}")
-        return {"ok": True}   # still return ok — don't leak DB status
+        return {"ok": True}
 
-    # Only send keys that haven't expired
     sent = 0
     for row in rows:
         if not _is_expired(row["expires_at"]):
@@ -4168,7 +3950,6 @@ async def recover_key(req: KeyRecoveryBody):
             sent += 1
 
     print(f"[RECOVER] Sent {sent} key(s) to {email}")
-    # Always return ok=True — user sees "check your inbox" regardless
     return {"ok": True}
 
 
@@ -4213,7 +3994,7 @@ async def licenses_page(_: bool = Depends(verify_session)):
         exp=r["expires_at"].strftime("%Y-%m-%d") if r["expires_at"] else "—"
         mid=(r["machine_id"] or "—")
         trs+=f"<tr><td style='font-family:monospace;font-size:12px'>{r['license_key']}</td><td>{r['email']}</td><td>{r['tier']}</td><td>{sb}</td><td>{exp}</td><td style='font-family:monospace;font-size:11px;color:#8b949e'>{mid[:22] if mid!='—' else mid}</td></tr>"
-    return f"""<!DOCTYPE html><html><head><title>FMSecure | Licenses</title>
+    return f"""<!DOCTYPE html><html><head>{standard_head("Licenses")}
     <style>*{{box-sizing:border-box;margin:0;padding:0}}body{{background:#0a0a0a;color:#e6edf3;font-family:system-ui,sans-serif}}
     nav{{background:#161b22;border-bottom:1px solid #30363d;padding:16px 24px;display:flex;justify-content:space-between;align-items:center}}
     .brand{{color:#2f81f7;font-weight:700}}a{{color:#8b949e;text-decoration:none;font-size:13px;margin-left:16px}}a:hover{{color:#e6edf3}}
@@ -4227,9 +4008,8 @@ async def licenses_page(_: bool = Depends(verify_session)):
     </tr></thead><tbody>{trs}</tbody></table></div></body></html>"""
 
 
-
 # ══════════════════════════════════════════════════════════════════════════════
-# PUBLIC VERSION ENDPOINT — checked by FMSecure desktop app on startup
+# PUBLIC VERSION ENDPOINT
 # ══════════════════════════════════════════════════════════════════════════════
 
 @app.post("/api/version/publish-form")
@@ -4241,7 +4021,6 @@ async def publish_version_form(
     changelog_url: str = Form(""),
     _: bool = Depends(verify_session)
 ):
-    """Dashboard form handler — same logic as the JSON endpoint but session-auth."""
     dl = download_url or f"{APP_BASE_URL}/download" 
     cl = changelog_url or f"{APP_BASE_URL}/changelog"
 
@@ -4261,11 +4040,6 @@ async def publish_version_form(
 
 @app.get("/version.json")
 async def version_json():
-    """
-    Returns the current latest version metadata.
-    The desktop client fetches this on every startup to check for updates.
-    Cache-control headers prevent stale CDN caching.
-    """
     if not DATABASE_URL:
         return JSONResponse({"latest_version": "2.5.0",
                              "release_notes": "",
@@ -4307,7 +4081,6 @@ async def version_json():
                              "changelog_url": f"{APP_BASE_URL}/changelog"})
 
 
-# ── Admin: push a new version ──────────────────────────────────────────────
 class VersionBody(BaseModel):
     version:       str
     release_notes: str  = ""
@@ -4317,10 +4090,6 @@ class VersionBody(BaseModel):
 
 @app.post("/api/version/publish")
 async def publish_version(body: VersionBody):
-    """
-    Call this from your admin dashboard to publish a new version.
-    All existing rows are marked is_current=FALSE, new row inserted as TRUE.
-    """
     _check_admin(body.api_key)
 
     dl  = body.download_url  or f"{APP_BASE_URL}/download"
@@ -4339,21 +4108,18 @@ async def publish_version(body: VersionBody):
 
     print(f"[VERSION] Published v{body.version}")
     return {"ok": True, "version": body.version}
+
 # ══════════════════════════════════════════════════════════════════════════════
 # TEMPORARY DB PATCH ENDPOINT
 # ══════════════════════════════════════════════════════════════════════════════
 
 @app.get("/api/db-fix")
 async def fix_db():
-    """Temporary endpoint to forcefully patch the database schema"""
     try:
         conn = get_db()
         cur  = conn.cursor()
-        
-        # Forcefully inject the missing columns into the existing table
         cur.execute("ALTER TABLE licenses ADD COLUMN IF NOT EXISTS payment_id TEXT;")
         cur.execute("ALTER TABLE licenses ADD COLUMN IF NOT EXISTS order_id TEXT;")
-        
         conn.commit()
         cur.close()
         conn.close()
