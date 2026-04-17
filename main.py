@@ -54,7 +54,7 @@ API_KEY           = os.getenv("API_KEY", "default-dev-key")
 SENDGRID_API_KEY  = os.getenv("SENDGRID_API_KEY", "")
 SENDER_EMAIL      = os.getenv("SENDER_EMAIL", "glimpsefilmy@gmail.com")
 SESSION_TOKEN     = secrets.token_hex(16)
-DRIVE_FILE_ID     = os.getenv("DRIVE_FILE_ID", "1tAadU5gjgkH26Hs-WM_VDKQUo0-TT8-e")   # Google Drive file ID for download
+DRIVE_FILE_ID     = os.getenv("DRIVE_FILE_ID", "1e-EnPaxiMP0ZFpkL6QpBopJ41QeQMjMM")   # Google Drive file ID for download
 
 # Download URL — auto-derived. Just set DRIVE_FILE_ID env var on Railway.
 DOWNLOAD_URL = (
