@@ -1,0 +1,81 @@
+{% extends 'layout.html' %}
+{% block body %}
+<div class="portal-topbar">
+  <div class="portal-topbar-inner">
+    <div>
+      <div class="brand-lockup">
+        <span class="brand-mark"><img src="{{ brand.logo_png }}" alt="{{ brand.name }}" width="22"></span>
+        <span class="brand-copy"><strong>{{ brand.name }}</strong><span>{{ page_heading }}</span></span>
+      </div>
+      <div class="portal-meta">{{ page_subheading }}</div>
+    </div>
+    <div class="portal-nav">
+      {% for item in portal_nav %}<a href="{{ item.href }}" class="{% if request.url.path == item.href %}active{% endif %}">{{ item.label }}</a>{% endfor %}
+      <a href="/tenant/logout">Logout</a>
+    </div>
+  </div>
+</div>
+<div class="portal-page shell">
+  {% if db_missing %}<div class="flash error">Database is not configured yet, so tenant telemetry and settings are unavailable.</div>{% endif %}
+  <div class="stats-grid">
+    <div class="stat-card"><div class="pill info">Endpoints</div><div class="value">{{ stats.total_agents or 0 }}</div><div class="label">Registered for this tenant</div></div>
+    <div class="stat-card"><div class="pill success">Online</div><div class="value">{{ stats.online_now or 0 }}</div><div class="label">Currently reporting</div></div>
+    <div class="stat-card"><div class="pill warning">Armed</div><div class="value">{{ stats.armed_agents or 0 }}</div><div class="label">Protection active</div></div>
+    <div class="stat-card"><div class="pill danger">Open alerts</div><div class="value">{{ stats.unacked_alerts or 0 }}</div><div class="label">Need acknowledgment</div></div>
+  </div>
+
+  <div class="panel-grid section">
+    <section class="panel">
+      <div class="section-head"><div class="kicker">Organisation</div><h2>{{ tenant.name if tenant else 'Tenant dashboard' }}</h2><p>Use this workspace to monitor endpoints, review incidents, and tune tenant-level config without affecting backend behavior.</p></div>
+      <ul class="list-clean">
+        <li><strong>Plan</strong><div class="subtle">{{ tenant.plan|upper if tenant else '—' }}</div></li>
+        <li><strong>Contact</strong><div class="subtle">{{ tenant.contact_email if tenant else '—' }}</div></li>
+        <li><strong>Seat limit</strong><div class="subtle">{{ tenant.max_agents if tenant else '—' }}</div></li>
+      </ul>
+    </section>
+    <section class="panel">
+      <div class="section-head"><div class="kicker">Tenant configuration</div><h2>Policy defaults</h2></div>
+      <form method="post" action="/tenant/config" class="form-grid">
+        <div class="field"><label>Alert email</label><input name="alert_email" value="{{ config.alert_email or '' }}"></div>
+        <div class="field"><label>Webhook URL</label><input name="webhook_url" value="{{ config.webhook_url or '' }}"></div>
+        <div class="field"><label>Verify interval (seconds)</label><input type="number" name="verify_interval" value="{{ config.verify_interval or 60 }}"></div>
+        <div class="field"><label>Max vault size (MB)</label><input type="number" name="max_vault_mb" value="{{ config.max_vault_mb or 10 }}"></div>
+        <div class="field"><label>Allowed extensions</label><input name="allowed_exts" value="{{ config.allowed_exts or '.txt,.json,.py,.html,.js,.css' }}"></div>
+        <button class="btn btn-primary" type="submit">Save tenant config</button>
+      </form>
+    </section>
+  </div>
+
+  <section class="table-card section">
+    <div class="toolbar"><div><div class="kicker">Endpoints</div><h2>Connected agents</h2></div></div>
+    {% if agent_records %}
+    <div class="table-wrap"><table class="table"><thead><tr><th>Machine</th><th>Hostname</th><th>User</th><th>IP</th><th>Tier</th><th>Status</th><th>Protection</th><th>Version</th><th>Action</th></tr></thead><tbody>
+      {% for row in agent_records %}
+      <tr>
+        <td class="mono">{{ row.machine_id[:18] }}…</td><td>{{ row.hostname }}</td><td>{{ row.username }}</td><td class="subtle">{{ row.ip_address }}</td><td>{{ row.tier|upper }}</td>
+        <td>{% if row.status == 'online' %}<span class="pill success">Online</span>{% else %}<span class="pill">Offline</span>{% endif %}</td>
+        <td>{% if row.is_armed %}<span class="pill info">Armed</span>{% else %}<span class="pill warning">Unarmed</span>{% endif %}</td>
+        <td>{{ row.agent_version }}</td>
+        <td><div class="inline-actions"><button class="btn btn-secondary btn-sm" type="button" onclick="fmPostCommand('{{ row.machine_id }}','VERIFY')">Verify</button><button class="btn btn-danger btn-sm" type="button" onclick="fmPostCommand('{{ row.machine_id }}','LOCKDOWN')">Lockdown</button></div></td>
+      </tr>
+      {% endfor %}
+    </tbody></table></div>
+    {% else %}<div class="empty">No agents have checked in for this tenant yet.</div>{% endif %}
+  </section>
+
+  <section class="table-card">
+    <div class="toolbar"><div><div class="kicker">Incidents</div><h2>Recent alerts</h2></div></div>
+    {% if alert_records %}
+    <div class="table-wrap"><table class="table"><thead><tr><th>Severity</th><th>Event</th><th>Host</th><th>Message</th><th>Path</th><th>Time</th><th>Acknowledge</th></tr></thead><tbody>
+      {% for row in alert_records %}
+      <tr>
+        <td>{% if row.severity == 'CRITICAL' %}<span class="pill danger">{{ row.severity }}</span>{% elif row.severity == 'HIGH' %}<span class="pill warning">{{ row.severity }}</span>{% else %}<span class="pill info">{{ row.severity }}</span>{% endif %}</td>
+        <td>{{ row.event_type }}</td><td>{{ row.hostname }}</td><td>{{ row.message }}</td><td class="subtle">{{ row.file_path or '—' }}</td><td>{{ row.created_at|dt('%Y-%m-%d %H:%M') }}</td>
+        <td>{% if row.acknowledged %}<span class="pill success">Acked</span>{% else %}<button class="btn btn-secondary btn-sm" type="button" onclick="fmAckAlert('{{ row.id }}')">Acknowledge</button>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody></table></div>
+    {% else %}<div class="empty">No alerts are currently stored for this tenant.</div>{% endif %}
+  </section>
+</div>
+{% endblock %}

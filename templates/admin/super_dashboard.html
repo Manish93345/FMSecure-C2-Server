@@ -1,0 +1,93 @@
+{% extends 'layout.html' %}
+{% block body %}
+<div class="portal-topbar">
+  <div class="portal-topbar-inner">
+    <div>
+      <div class="brand-lockup">
+        <span class="brand-mark"><img src="{{ brand.logo_png }}" alt="{{ brand.name }}" width="22"></span>
+        <span class="brand-copy"><strong>{{ brand.name }}</strong><span>{{ page_heading }}</span></span>
+      </div>
+      <div class="portal-meta">{{ page_subheading }}</div>
+    </div>
+    <div class="portal-nav">
+      {% for item in portal_nav %}<a href="{{ item.href }}" class="{% if request.url.path == item.href %}active{% endif %}">{{ item.label }}</a>{% endfor %}
+      <a href="/logout">Logout</a>
+    </div>
+  </div>
+</div>
+<div class="portal-page shell">
+  {% if db_missing %}<div class="flash error">Database is not configured yet. Tenant operations need PostgreSQL.</div>{% endif %}
+  <div class="stats-grid">
+    <div class="stat-card"><div class="pill info">Tenants</div><div class="value">{{ stats.total_tenants or 0 }}</div><div class="label">Active organisations</div></div>
+    <div class="stat-card"><div class="pill success">Endpoints</div><div class="value">{{ stats.total_online or 0 }}</div><div class="label">Agents online now</div></div>
+    <div class="stat-card"><div class="pill danger">Critical</div><div class="value">{{ stats.total_critical or 0 }}</div><div class="label">Unacked critical alerts</div></div>
+    <div class="stat-card"><div class="pill warning">Inbox</div><div class="value">{{ stats.new_inquiries or 0 }}</div><div class="label">New website inquiries</div></div>
+  </div>
+
+  <div class="panel-grid section">
+    <section class="table-card">
+      <div class="toolbar"><div><div class="kicker">Customers</div><h2>Tenant roster</h2></div><a class="btn btn-secondary" href="/super/inquiries">View inquiries</a></div>
+      {% if tenants %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Tenant</th><th>Plan</th><th>Usage</th><th>Alerts</th><th>Status</th><th>Created</th><th></th></tr></thead>
+          <tbody>
+          {% for tenant in tenants %}
+            <tr>
+              <td><strong>{{ tenant.name }}</strong><div class="subtle mono">{{ tenant.slug }}</div></td>
+              <td>{{ tenant.plan|upper }}</td>
+              <td>
+                <div>{{ tenant.online_count }}/{{ tenant.agent_count }}/{{ tenant.max_agents }}</div>
+                <div class="progress"><span style="width: {{ tenant.usage_percent }}%"></span></div>
+              </td>
+              <td>{% if tenant.unacked_alerts %}<span class="pill danger">{{ tenant.unacked_alerts }} open</span>{% else %}<span class="pill success">Clear</span>{% endif %}</td>
+              <td>{% if tenant.active %}<span class="pill success">Active</span>{% else %}<span class="pill">Suspended</span>{% endif %}</td>
+              <td>{{ tenant.created_at|dt('%Y-%m-%d') }}</td>
+              <td><a class="btn btn-secondary btn-sm" href="/super/tenant-detail?id={{ tenant.id }}">Open</a></td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}<div class="empty">No tenants created yet.</div>{% endif %}
+    </section>
+
+    <section class="panel">
+      <div class="section-head"><div class="kicker">Provision</div><h2>Create a tenant</h2><p>Issue a tenant API key, set seat limits, and optionally create the first admin in one flow.</p></div>
+      <form method="post" action="/super/tenants-form" class="form-grid">
+        <div class="field"><label>Company name</label><input name="name" required placeholder="Acme Security"></div>
+        <div class="field"><label>Slug</label><input name="slug" required pattern="[a-z0-9-]+" placeholder="acme-security"></div>
+        <div class="field"><label>Contact email</label><input type="email" name="contact_email" required placeholder="security@acme.com"></div>
+        <div class="field"><label>Plan</label><select name="plan"><option value="business">Business</option><option value="enterprise">Enterprise</option><option value="trial">Trial</option></select></div>
+        <div class="field"><label>Max agents</label><input type="number" name="max_agents" min="1" value="10"></div>
+        <div class="field"><label>Internal notes</label><input name="notes" placeholder="Commercial notes"></div>
+        <div class="field"><label>First admin email</label><input type="email" name="admin_email" placeholder="admin@acme.com"></div>
+        <div class="field"><label>First admin password</label><input type="password" name="admin_password" placeholder="Minimum 8 characters"></div>
+        <button class="btn btn-primary" type="submit">Create tenant</button>
+      </form>
+    </section>
+  </div>
+
+  <section class="table-card">
+    <div class="toolbar"><div><div class="kicker">Website demand</div><h2>Recent inquiries</h2></div></div>
+    {% if recent_inquiries %}
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>Type</th><th>Contact</th><th>Company</th><th>Subject</th><th>Received</th></tr></thead>
+        <tbody>
+        {% for item in recent_inquiries %}
+          <tr>
+            <td><span class="pill info">{{ item.kind|upper }}</span></td>
+            <td>{{ item.contact_name }}<div class="subtle">{{ item.email }}</div></td>
+            <td>{{ item.company or '—' }}</td>
+            <td>{{ item.subject or item.message[:72] }}</td>
+            <td>{{ item.created_at|dt('%Y-%m-%d %H:%M') }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}<div class="empty">No inbound inquiries stored yet.</div>{% endif %}
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,23 @@
+{% extends 'layout.html' %}
+{% block body %}
+<div class="auth-shell">
+  <div class="auth-card">
+    <a class="brand-lockup" href="/">
+      <span class="brand-mark"><img src="{{ brand.logo_png }}" alt="{{ brand.name }}" width="22"></span>
+      <span class="brand-copy"><strong>{{ brand.name }}</strong><span>{{ brand.tagline }}</span></span>
+    </a>
+    <h1>Super-admin sign in</h1>
+    <p>Access the global C2, version management, licensing, and tenant operations workspace.</p>
+    {% if error %}<div class="flash error">{{ error }}</div>{% endif %}
+    <form method="post" action="/login" class="form-grid">
+      <div class="field"><label>Username</label><input name="username" required autofocus placeholder="Admin username"></div>
+      <div class="field"><label>Password</label><input type="password" name="password" required placeholder="Admin password"></div>
+      <button class="btn btn-primary" type="submit">Sign in to admin workspace</button>
+    </form>
+    <div class="stack-actions" style="margin-top:16px">
+      <a class="btn btn-secondary" href="/tenant/login">Tenant portal</a>
+      <a class="btn btn-ghost" href="/docs">Deployment docs</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

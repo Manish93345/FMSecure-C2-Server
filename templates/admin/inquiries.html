@@ -1,0 +1,39 @@
+{% extends 'layout.html' %}
+{% block body %}
+<div class="portal-topbar">
+  <div class="portal-topbar-inner">
+    <div>
+      <div class="brand-lockup">
+        <span class="brand-mark"><img src="{{ brand.logo_png }}" alt="{{ brand.name }}" width="22"></span>
+        <span class="brand-copy"><strong>{{ brand.name }}</strong><span>{{ page_heading }}</span></span>
+      </div>
+      <div class="portal-meta">{{ page_subheading }}</div>
+    </div>
+    <div class="portal-nav">
+      {% for item in portal_nav %}<a href="{{ item.href }}" class="{% if request.url.path == item.href %}active{% endif %}">{{ item.label }}</a>{% endfor %}
+      <a href="/logout">Logout</a>
+    </div>
+  </div>
+</div>
+<div class="portal-page shell">
+  <section class="table-card">
+    <div class="toolbar"><div><div class="kicker">Pipeline</div><h2>All stored inquiries</h2></div></div>
+    {% if inquiries %}
+    <div class="table-wrap"><table class="table"><thead><tr><th>Type</th><th>Name</th><th>Email</th><th>Company</th><th>Subject</th><th>Seats</th><th>Status</th><th>Received</th></tr></thead><tbody>
+    {% for row in inquiries %}
+      <tr>
+        <td><span class="pill info">{{ row.kind|upper }}</span></td>
+        <td>{{ row.contact_name }}</td>
+        <td>{{ row.email }}</td>
+        <td>{{ row.company or '—' }}</td>
+        <td>{{ row.subject or row.message[:64] }}</td>
+        <td>{{ row.seats or '—' }}</td>
+        <td>{{ row.status }}</td>
+        <td>{{ row.created_at|dt('%Y-%m-%d %H:%M') }}</td>
+      </tr>
+    {% endfor %}
+    </tbody></table></div>
+    {% else %}<div class="empty">No inquiries captured yet.</div>{% endif %}
+  </section>
+</div>
+{% endblock %}

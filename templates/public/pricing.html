@@ -1,0 +1,32 @@
+{% extends 'layout.html' %}
+{% block body %}
+<div class="topbar"><div class="topbar-inner"><a class="brand-lockup" href="/"><span class="brand-mark"><img src="{{ brand.logo_png }}" alt="{{ brand.name }}" width="22"></span><span class="brand-copy"><strong>{{ brand.name }}</strong><span>{{ brand.tagline }}</span></span></a><nav class="nav-links">{% for item in public_nav %}<a href="{{ item.href }}" class="{% if request.url.path == item.href %}active{% endif %}">{{ item.label }}</a>{% endfor %}</nav><div class="topbar-cta"><a class="btn btn-ghost" href="/login">Login</a><a class="btn btn-primary" href="/enterprise">Talk to sales</a></div></div></div>
+<section class="hero shell"><div class="section-head center"><div class="eyebrow">Pricing</div><h1 class="display">Simple pricing for <span class="accent">self-serve or enterprise rollout</span>.</h1><p class="lead" style="margin-inline:auto">Keep the existing Razorpay backend while giving buyers a cleaner checkout experience.</p></div></section>
+<section class="section shell"><div class="price-grid">
+  <article class="price-card">
+    <div class="pill info">Monthly</div>
+    <h2>{{ pricing_display.pro_monthly.label }}</h2>
+    <div class="price">₹{{ pricing_display.pro_monthly.price }} <small>{{ pricing_display.pro_monthly.period }}</small></div>
+    <p>Best for evaluation, pilots, and smaller deployments that want the full protection and dashboard stack.</p>
+    <ul class="list-clean"><li>Real-time monitoring</li><li>Ransomware killswitch</li><li>Vault restore</li><li>Cloud C2 and licensing</li></ul>
+    <div class="stack-actions"><button class="btn btn-primary" type="button" onclick="startPayment('pro_monthly','{{ rzp_key }}','{{ base_url }}')">Buy monthly</button></div>
+  </article>
+  <article class="price-card featured">
+    <div class="pill success">Most popular</div>
+    <h2>{{ pricing_display.pro_annual.label }}</h2>
+    <div class="price">₹{{ pricing_display.pro_annual.price }} <small>{{ pricing_display.pro_annual.period }}</small></div>
+    <p>Designed for long-running customer environments with release management, tenant workflows, and commercial stability.</p>
+    <ul class="list-clean"><li>Everything in monthly</li><li>Lower annual cost</li><li>Recommended for managed service delivery</li><li>Works with enterprise onboarding flow</li></ul>
+    <div class="stack-actions"><button class="btn btn-primary" type="button" onclick="startPayment('pro_annual','{{ rzp_key }}','{{ base_url }}')">Buy annual</button></div>
+  </article>
+  <article class="price-card">
+    <div class="pill warning">Enterprise</div>
+    <h2>Custom rollout</h2>
+    <div class="price">Custom <small>quote</small></div>
+    <p>For teams needing a multi-tenant managed deployment, onboarding help, and organisational provisioning through the admin workspace.</p>
+    <ul class="list-clean"><li>Tenant provisioning</li><li>Commercial onboarding</li><li>Website inquiry pipeline</li><li>Priority deployment assistance</li></ul>
+    <div class="stack-actions"><a class="btn btn-secondary" href="/enterprise">Request enterprise access</a></div>
+  </article>
+</div></section>
+<section class="section shell"><div class="table-card"><div class="section-head"><div class="kicker">Checkout</div><h2>What the payment flow does</h2></div><p class="notice">The frontend posts to the existing order creation and signature verification endpoints. After verification, the backend still generates the same license key and success redirect.</p></div></section>
+{% endblock %}

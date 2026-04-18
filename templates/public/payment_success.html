@@ -1,0 +1,4 @@
+{% extends 'layout.html' %}
+{% block body %}
+<div class="auth-shell"><div class="auth-card"><a class="brand-lockup" href="/"><span class="brand-mark"><img src="{{ brand.logo_png }}" alt="{{ brand.name }}" width="22"></span><span class="brand-copy"><strong>{{ brand.name }}</strong><span>{{ brand.tagline }}</span></span></a><h1>Payment successful</h1><p>Your {{ tier_label }} purchase was verified successfully. Keep this license key safe.</p><div class="panel" style="padding:18px;margin-top:18px"><div class="field"><label>License key</label><input value="{{ key }}" readonly></div><div class="field"><label>Email</label><input value="{{ email }}" readonly></div></div><div class="stack-actions" style="margin-top:16px"><button class="btn btn-primary" type="button" onclick="fmCopy('{{ key }}','License key copied')">Copy key</button><a class="btn btn-secondary" href="/download">Download build</a></div></div></div>
+{% endblock %}
