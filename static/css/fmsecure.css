@@ -4,7 +4,7 @@
    Fonts: Syne (display) · DM Sans (body) · JetBrains Mono (code)
    ═══════════════════════════════════════════════════════════════════════════ */
 
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 /* ── Design Tokens ─────────────────────────────────────────────────────────── */
 :root {
@@ -42,7 +42,7 @@
   --t4: #2D3554;
 
   /* Typography */
-  --font-display: 'Syne', sans-serif;
+  --font-display: 'Inter', sans-serif;
   --font-body:    'DM Sans', sans-serif;
   --font-mono:    'JetBrains Mono', monospace;
 
@@ -433,7 +433,7 @@ input, textarea, select { font-family: var(--font-body); }
   font-family: var(--font-display);
   font-size: 32px;
   font-weight: 800;
-  letter-spacing: -1.5px;
+  letter-spacing: -0.5px;
   line-height: 1;
   margin-bottom: 6px;
 }
@@ -586,7 +586,7 @@ input, textarea, select { font-family: var(--font-body); }
   font-family: var(--font-display);
   font-size: clamp(28px, 4vw, 44px);
   font-weight: 800;
-  letter-spacing: -1.5px;
+  letter-spacing: -0.5px;
   line-height: 1.1;
   margin-bottom: 16px;
   color: var(--t1);
@@ -1055,7 +1055,7 @@ input, textarea, select { font-family: var(--font-body); }
   font-family: var(--font-display);
   font-size: clamp(26px, 4vw, 42px);
   font-weight: 800;
-  letter-spacing: -1.5px;
+  letter-spacing: -0.5px;
   margin-bottom: 14px;
 }
 .cta-sub {
