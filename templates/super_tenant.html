@@ -1,0 +1,239 @@
+{% extends "base_admin.html" %}
+
+{% block title %}{{ tenant.name }} — Tenant Detail{% endblock %}
+{% block sidebar_home %}/super/dashboard{% endblock %}
+{% block sidebar_context %}Super Admin{% endblock %}
+
+{% block sidebar_nav %}
+<div class="sidebar-section">Administration</div>
+<a href="/dashboard" class="sidebar-link"><span class="icon">🖥</span> C2 Endpoints</a>
+<a href="/super/dashboard" class="sidebar-link"><span class="icon">🏢</span> All Tenants</a>
+<a href="/licenses" class="sidebar-link"><span class="icon">🔑</span> Licenses</a>
+<div class="sidebar-section" style="margin-top:8px;">Current Tenant</div>
+<a href="#agents" class="sidebar-link"><span class="icon">📡</span> Agents</a>
+<a href="#alerts" class="sidebar-link"><span class="icon">🚨</span> Alerts</a>
+<a href="#users" class="sidebar-link"><span class="icon">👥</span> Admin Users</a>
+<a href="#actions" class="sidebar-link"><span class="icon">⚙️</span> Actions</a>
+{% endblock %}
+
+{% block sidebar_footer %}
+<a href="/super/dashboard" style="color:var(--t3);font-size:12px;">← All Tenants</a>
+<br><a href="/logout" style="margin-top:4px;display:block;">Sign out →</a>
+{% endblock %}
+
+{% block topbar_title %}{{ tenant.name }}{% endblock %}
+{% block topbar_sub %}{{ tenant.slug }} · {{ tenant.plan|upper }} · {{ tenant.contact_email }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="/super/dashboard" class="btn btn-secondary btn-sm">← All Tenants</a>
+{% if tenant.active %}
+<form method="POST" action="/super/tenants/{{ tenant.id }}/suspend?suspend=true&api_key={{ admin_api_key }}" style="display:inline;">
+  <button type="submit" class="btn btn-danger btn-sm"
+          onclick="return confirm('Suspend {{ tenant.name }}? Agents will lose C2 access.')">
+    Suspend
+  </button>
+</form>
+{% else %}
+<form method="POST" action="/super/tenants/{{ tenant.id }}/suspend?suspend=false&api_key={{ admin_api_key }}" style="display:inline;">
+  <button type="submit" class="btn btn-success btn-sm">Reactivate</button>
+</form>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+
+{% if msg == 'email_sent' %}
+<div class="admin-success-banner">✓ Welcome email sent to {{ tenant.contact_email }}</div>
+{% endif %}
+
+<!-- ── Key banner (if just regenerated) ──────────────────────────────────── -->
+{% if new_key %}
+<div style="background:var(--bg1);border:1px solid var(--green);border-radius:var(--r-lg);padding:20px 24px;margin-bottom:24px;">
+  <div style="font-weight:700;color:var(--green);margin-bottom:8px;">✅ New API Key Generated (copy now)</div>
+  <code style="font-family:var(--font-mono);font-size:14px;color:var(--cyan);background:var(--bg2);padding:8px 16px;border-radius:var(--r-md);display:block;word-break:break-all;margin-bottom:10px;">{{ new_key }}</code>
+  <button onclick="navigator.clipboard.writeText('{{ new_key }}');this.textContent='✓ Copied!'" class="btn btn-sm" style="background:var(--green-dim);color:var(--green);border:1px solid rgba(16,185,129,0.3);">Copy Key</button>
+</div>
+{% endif %}
+
+<!-- ── Stats row ──────────────────────────────────────────────────────────── -->
+<div class="stats-row" style="margin-bottom:24px;">
+  <div class="stat-card">
+    <div class="stat-value" style="color:var(--t1);">{{ agents|length }} / {{ tenant.max_agents }}</div>
+    <div class="stat-label">Seats Used</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value" style="color:var(--green);">{{ online_count }}</div>
+    <div class="stat-label">Online Now</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value" style="color:{% if alert_count > 0 %}var(--red){% else %}var(--green){% endif %};">{{ alert_count }}</div>
+    <div class="stat-label">Total Alerts</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value" style="color:{% if tenant.active %}var(--green){% else %}var(--red){% endif %};">
+      {{ 'Active' if tenant.active else 'Suspended' }}
+    </div>
+    <div class="stat-label">Account Status</div>
+  </div>
+</div>
+
+<!-- ── Agents ─────────────────────────────────────────────────────────────── -->
+<div class="panel" id="agents" style="margin-bottom:20px;">
+  <div class="panel-header">
+    <div class="panel-title">Enrolled Agents ({{ agents|length }})</div>
+  </div>
+  <div class="panel-table">
+    <div class="table-wrap" style="border:none;border-radius:0;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Machine ID</th><th>Hostname</th><th>User</th><th>IP</th>
+            <th>Status</th><th>Engine</th><th>Tier</th><th>Last Seen</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in agents %}
+          <tr>
+            <td class="mono">{{ a.machine_id[:20] }}…</td>
+            <td><strong style="color:var(--t1);">{{ a.hostname }}</strong></td>
+            <td>{{ a.username }}</td>
+            <td class="mono" style="font-size:11px;">{{ a.ip_address }}</td>
+            <td>
+              {% if a.status == 'online' %}
+              <span class="badge badge-online badge-dot">Online</span>
+              {% else %}
+              <span class="badge badge-offline">Offline</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if a.is_armed %}
+              <span class="badge badge-armed">Armed</span>
+              {% else %}
+              <span class="badge badge-unarmed">Unarmed</span>
+              {% endif %}
+            </td>
+            <td class="mono" style="font-size:11px;">{{ a.tier|upper }}</td>
+            <td class="mono" style="font-size:11px;color:var(--t3);">{{ a.last_seen_fmt }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="8" style="text-align:center;color:var(--t4);padding:32px;">No agents enrolled yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ── Alerts ─────────────────────────────────────────────────────────────── -->
+<div class="panel" id="alerts" style="margin-bottom:20px;">
+  <div class="panel-header">
+    <div class="panel-title">Recent Alerts (last 100)</div>
+  </div>
+  <div class="panel-table">
+    <div class="table-wrap" style="border:none;border-radius:0;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Severity</th><th>Type</th><th>Hostname</th>
+            <th>Message</th><th>Time</th><th>Ack</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for al in alerts %}
+          <tr style="{% if al.acknowledged %}opacity:0.45;{% endif %}">
+            <td>
+              {% if al.severity == 'CRITICAL' %}
+              <span class="badge badge-critical">CRITICAL</span>
+              {% elif al.severity == 'HIGH' %}
+              <span class="badge badge-high">HIGH</span>
+              {% elif al.severity == 'MEDIUM' %}
+              <span class="badge badge-medium">MEDIUM</span>
+              {% else %}
+              <span class="badge badge-info">{{ al.severity }}</span>
+              {% endif %}
+            </td>
+            <td style="font-size:12px;">{{ al.event_type }}</td>
+            <td>{{ al.hostname }}</td>
+            <td style="font-size:12px;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+              {{ al.message[:100] }}
+            </td>
+            <td class="mono" style="font-size:11px;color:var(--t3);">{{ al.created_fmt }}</td>
+            <td>
+              {% if al.acknowledged %}
+              <span style="color:var(--green);font-size:12px;">✓</span>
+              {% else %}
+              <span style="color:var(--t4);font-size:12px;">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" style="text-align:center;color:var(--t4);padding:32px;">No alerts recorded.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ── Admin Users ────────────────────────────────────────────────────────── -->
+<div class="panel" id="users" style="margin-bottom:20px;">
+  <div class="panel-header">
+    <div class="panel-title">IT Admin Users</div>
+  </div>
+  <div class="panel-table">
+    <div class="table-wrap" style="border:none;border-radius:0;">
+      <table class="data-table">
+        <thead>
+          <tr><th>Email</th><th>Role</th><th>Created</th></tr>
+        </thead>
+        <tbody>
+          {% for u in users %}
+          <tr>
+            <td>{{ u.email }}</td>
+            <td><span class="badge badge-medium">{{ u.role }}</span></td>
+            <td class="mono" style="font-size:11px;color:var(--t3);">{{ u.created_fmt }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="3" style="text-align:center;color:var(--t4);padding:24px;">No admin users — send welcome email to set up credentials.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ── Actions ────────────────────────────────────────────────────────────── -->
+<div class="panel" id="actions">
+  <div class="panel-header"><div class="panel-title">Tenant Actions</div></div>
+  <div class="panel-body">
+    <div style="display:flex;flex-wrap:wrap;gap:12px;">
+
+      <!-- Send welcome email -->
+      <form method="POST" action="/super/tenants/{{ tenant.id }}/send-welcome">
+        <button type="submit" class="btn btn-secondary">
+          📧 Resend Welcome Email
+        </button>
+      </form>
+
+      <!-- Regen API key -->
+      <form method="POST" action="/super/tenants/{{ tenant.id }}/regen-key?api_key={{ admin_api_key }}"
+            onsubmit="return confirm('Regenerate API key? All agents will need to be re-enrolled.')">
+        <button type="submit" class="btn btn-secondary">🔄 Regenerate API Key</button>
+      </form>
+
+      {% if tenant.active %}
+      <form method="POST" action="/super/tenants/{{ tenant.id }}/suspend?suspend=true&api_key={{ admin_api_key }}"
+            onsubmit="return confirm('Suspend {{ tenant.name }}?')">
+        <button type="submit" class="btn btn-danger">⏸ Suspend Tenant</button>
+      </form>
+      {% else %}
+      <form method="POST" action="/super/tenants/{{ tenant.id }}/suspend?suspend=false&api_key={{ admin_api_key }}">
+        <button type="submit" class="btn btn-success">▶ Reactivate Tenant</button>
+      </form>
+      {% endif %}
+
+    </div>
+  </div>
+</div>
+
+{% endblock %}

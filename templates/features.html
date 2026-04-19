@@ -1,0 +1,397 @@
+{% extends "base.html" %}
+{% block title %}Features{% endblock %}
+{% block description %}All FMSecure capabilities — real-time file integrity, ransomware killswitch, AES-256 vault, process attribution, registry monitor, threat intelligence, cloud C2 fleet management, and more.{% endblock %}
+
+{% block content %}
+<div class="page-body">
+
+<!-- ── Header ─────────────────────────────────────────────────────────────── -->
+<section style="padding:120px 0 72px;text-align:center;position:relative;overflow:hidden;">
+  <div style="position:absolute;inset:0;pointer-events:none;">
+    <div class="hero-grid" style="opacity:0.35;"></div>
+    <div style="position:absolute;top:-60px;left:50%;transform:translateX(-50%);width:600px;height:400px;background:radial-gradient(circle,rgba(14,165,233,0.08) 0%,transparent 70%);"></div>
+  </div>
+  <div class="container" style="position:relative;z-index:1;">
+    <span class="section-label anim-fade-up">All Capabilities</span>
+    <h1 class="section-title anim-fade-up delay-100" style="max-width:600px;margin:0 auto 16px;">
+      Every layer of defense, documented.
+    </h1>
+    <p class="section-sub anim-fade-up delay-200" style="margin:0 auto;">
+      Built layer by layer over 15 phases. Each component is independently functional —
+      a failure in one never compromises the others.
+    </p>
+  </div>
+</section>
+
+<!-- ── Category nav ───────────────────────────────────────────────────────── -->
+<div style="background:var(--bg1);border-top:1px solid var(--bd);border-bottom:1px solid var(--bd);padding:0;position:sticky;top:var(--nav-h);z-index:40;">
+  <div class="container">
+    <nav style="display:flex;gap:0;overflow-x:auto;" id="cat-nav">
+      {% for cat in [
+        ("core", "Core Engine"),
+        ("active", "Active Defense"),
+        ("cloud", "Cloud & C2"),
+        ("intel", "Threat Intel"),
+        ("auth", "Auth & Access"),
+        ("alerts", "Alerting"),
+      ] %}
+      <a href="#{{ cat[0] }}" style="display:block;padding:14px 20px;font-size:13px;font-weight:600;color:var(--t3);text-decoration:none;white-space:nowrap;border-bottom:2px solid transparent;transition:all 0.2s;" class="cat-link" data-cat="{{ cat[0] }}">{{ cat[1] }}</a>
+      {% endfor %}
+    </nav>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     CORE ENGINE
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<section class="section" id="core">
+  <div class="container">
+    <div style="margin-bottom:48px;" class="reveal">
+      <span class="section-label">Core Engine</span>
+      <h2 class="section-title" style="max-width:500px;">Real-time integrity monitoring.</h2>
+      <p class="section-sub">The foundation. Every other feature builds on top of a rock-solid, multithreaded integrity engine.</p>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;" class="feat-grid">
+
+      <div class="feat-card blue reveal">
+        <div class="feat-icon blue">🔍</div>
+        <div class="feat-title">Event-Driven File Monitoring</div>
+        <div class="feat-body">Replaced polling with <code style="font-family:var(--font-mono);color:var(--cyan);font-size:11px;">watchdog</code> event hooks. Detects create, modify, delete, rename — including editor "atomic save" patterns. Debounce timer (2s) prevents false positives during large file writes.</div>
+      </div>
+
+      <div class="feat-card cyan reveal reveal-delay-1">
+        <div class="feat-icon cyan">⚡</div>
+        <div class="feat-title">Multithreaded Hash Engine</div>
+        <div class="feat-body">Parallel hashing using <code style="font-family:var(--font-mono);color:var(--cyan);font-size:11px;">ThreadPoolExecutor</code> across all CPU cores. Benchmark: 119 GB in 65s (1,830 MB/s) on NVMe. Python is no longer the bottleneck — hardware I/O is the limit.</div>
+      </div>
+
+      <div class="feat-card green reveal">
+        <div class="feat-icon green">🔒</div>
+        <div class="feat-title">HMAC-Signed Audit Logs</div>
+        <div class="feat-body">Every log line is signed with an HMAC-SHA256 signature. Tamper detection operates at write time. Log rotation preserves matching <code style="font-family:var(--font-mono);color:var(--cyan);font-size:11px;">.sig</code> backup files. Secure viewer decrypts in RAM — files stay encrypted on disk.</div>
+      </div>
+
+      <div class="feat-card amber reveal reveal-delay-1">
+        <div class="feat-icon amber">🏗</div>
+        <div class="feat-title">State Hashing</div>
+        <div class="feat-body">Master hash = SHA-256(content_hash | attributes | mtime). Detects property-only changes — hidden bit, archive bit, modification timestamps. Hidden file tracking via <code style="font-family:var(--font-mono);color:var(--cyan);font-size:11px;">os.stat().st_file_attributes</code>.</div>
+      </div>
+
+      <div class="feat-card purple reveal">
+        <div class="feat-icon purple">🔄</div>
+        <div class="feat-title">Rename Detection</div>
+        <div class="feat-body">The <code style="font-family:var(--font-mono);color:var(--cyan);font-size:11px;">on_moved</code> handler distinguishes true renames from editor atomic-save patterns (write-new → rename-old → rename-new). Zero false positives from VS Code, PyCharm, or Notepad++.</div>
+      </div>
+
+      <div class="feat-card blue reveal reveal-delay-1">
+        <div class="feat-icon blue">⚙️</div>
+        <div class="feat-title">External Config + Hot Reload</div>
+        <div class="feat-body">All settings in <code style="font-family:var(--font-mono);color:var(--cyan);font-size:11px;">config.json</code> — watch folder, secret key, webhook URL, intervals. Runtime configuration reload without restart. Separation of core engine from interface layers.</div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     ACTIVE DEFENSE
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<section class="section" id="active">
+  <div class="container">
+    <div style="margin-bottom:48px;" class="reveal">
+      <span class="section-label">Active Defense</span>
+      <h2 class="section-title" style="max-width:500px;">Respond, not just detect.</h2>
+      <p class="section-sub">Automated countermeasures that trigger without any human input — from vault restoration to OS-level lockdown.</p>
+      <span class="badge badge-pro" style="margin-top:14px;">PRO only</span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;" class="feat-grid">
+
+      <div class="feat-card green reveal">
+        <div class="feat-icon green">🛡</div>
+        <div class="feat-title">Auto-Heal Vault</div>
+        <div class="feat-body">Selectively backs up files &lt;10 MB with allowed extensions. Hidden, obfuscated vault path (<code style="font-family:var(--font-mono);color:var(--cyan);font-size:11px;">sha256(path).enc</code> filenames). Instant restoration on modification or deletion. Infinite-loop prevention via debounce + content-hash comparison.</div>
+      </div>
+
+      <div class="feat-card red reveal reveal-delay-1">
+        <div class="feat-icon red">🛑</div>
+        <div class="feat-title">Ransomware Killswitch</div>
+        <div class="feat-body">Burst detection: ≥5 file events in 10 seconds. OS-level lockdown via Windows <code style="font-family:var(--font-mono);color:var(--cyan);font-size:11px;">icacls</code> — strips Write/Delete for Everyone at NTFS kernel level. Parallelizes ransomware encryption attempts at kernel level.</div>
+      </div>
+
+      <div class="feat-card amber reveal reveal-delay-2">
+        <div class="feat-icon amber">🪤</div>
+        <div class="feat-title">Honeypot Tripwire</div>
+        <div class="feat-body"><code style="font-family:var(--font-mono);color:var(--cyan);font-size:11px;">secret_passwords.txt</code> monitored separately. Any access — read, write, or attribute change — instantly detonates the killswitch and sends a CRITICAL alert with a forensic snapshot.</div>
+      </div>
+
+      <div class="feat-card purple reveal">
+        <div class="feat-icon purple">🧠</div>
+        <div class="feat-title">Process Attribution</div>
+        <div class="feat-body">Every file event records which process caused it. Attribution runs fully asynchronously — events log instantly, process info appears within seconds. One bulk OS call per cycle — GIL hold reduced from ~200ms to under 1ms.</div>
+      </div>
+
+      <div class="feat-card cyan reveal reveal-delay-1">
+        <div class="feat-icon cyan">⚠️</div>
+        <div class="feat-title">LOLBin Detection</div>
+        <div class="feat-body">25+ known-malicious Windows binaries identified: PowerShell, certutil, mshta, wscript, cscript, regsvr32, and more. Trusted-parent whitelist suppresses false positives from VS Code, PyCharm, Terminal — zero alert fatigue from dev tools.</div>
+      </div>
+
+      <div class="feat-card blue reveal reveal-delay-2">
+        <div class="feat-icon blue">🗂</div>
+        <div class="feat-title">System Path Protection</div>
+        <div class="feat-body">Monitoring expanded to Windows persistence locations: startup folders (HKCU + All Users), scheduled tasks directory, and hosts file. Files created or modified in startup folders trigger CRITICAL severity regardless of file type.</div>
+      </div>
+
+      <div class="feat-card amber reveal">
+        <div class="feat-icon amber">📋</div>
+        <div class="feat-title">Registry Persistence Monitor</div>
+        <div class="feat-body">14 Windows Registry keys used by malware families monitored via <code style="font-family:var(--font-mono);color:var(--cyan);font-size:11px;">RegNotifyChangeKeyValue()</code> — a kernel API that uses zero CPU when idle. New Run keys, IFEO debugger hijacks, AppInit DLL modifications, Winlogon changes all trigger CRITICAL alerts.</div>
+      </div>
+
+      <div class="feat-card red reveal reveal-delay-1">
+        <div class="feat-icon red">🔌</div>
+        <div class="feat-title">USB Device Control</div>
+        <div class="feat-body">Windows Registry <code style="font-family:var(--font-mono);color:var(--cyan);font-size:11px;">StorageDevicePolicies</code> enforcement. Blocks unauthorized USB write access across the entire device. Policy toggled remotely via C2 tenant settings or locally via the desktop agent.</div>
+      </div>
+
+      <div class="feat-card green reveal reveal-delay-2">
+        <div class="feat-icon green">📸</div>
+        <div class="feat-title">AES Forensic Snapshots</div>
+        <div class="feat-body">Auto-generated on every CRITICAL event. Captures system state, disk info, running process list, and last 15 log lines. Encrypted with AES-256 (Fernet) — <code style="font-family:var(--font-mono);color:var(--cyan);font-size:11px;">.dat</code> files unreadable without the hardware-bound KEK.</div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     CLOUD & C2
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<section class="section" id="cloud">
+  <div class="container">
+    <div style="margin-bottom:48px;" class="reveal">
+      <span class="section-label">Cloud & Command & Control</span>
+      <h2 class="section-title" style="max-width:520px;">Fleet visibility from any browser.</h2>
+      <p class="section-sub">Multi-tenant C2 architecture — your IT admins see only their organisation. Super admin sees everything.</p>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;" class="feat-grid">
+
+      <div class="feat-card blue reveal">
+        <div class="feat-icon blue">🌐</div>
+        <div class="feat-title">Multi-Tenant Cloud Server</div>
+        <div class="feat-body">FastAPI + PostgreSQL on Railway. Per-tenant data isolation enforced at every DB query. Tenant API keys generated with <code style="font-family:var(--font-mono);color:var(--cyan);font-size:11px;">secrets.token_urlsafe(32)</code> — 256 bits entropy. Keys stored as SHA-256 hash; plaintext shown once at creation.</div>
+      </div>
+
+      <div class="feat-card cyan reveal reveal-delay-1">
+        <div class="feat-icon cyan">📡</div>
+        <div class="feat-title">Live Fleet Telemetry</div>
+        <div class="feat-body">Agent heartbeats every 10 seconds. Offline sweeper marks agents offline after 45-second grace period — fixes "stuck online" after crash or network drop. Seat limit enforcement: HTTP 402 on overflow, agent shows banner and continues monitoring locally.</div>
+      </div>
+
+      <div class="feat-card red reveal">
+        <div class="feat-icon red">🔒</div>
+        <div class="feat-title">Remote Host Isolation</div>
+        <div class="feat-body">One-click lockdown from browser console — queues a LOCKDOWN command delivered on next heartbeat. Agent executes OS-level <code style="font-family:var(--font-mono);color:var(--cyan);font-size:11px;">icacls</code> lockdown to strip write access. Ideal for ransomware containment mid-outbreak.</div>
+      </div>
+
+      <div class="feat-card green reveal reveal-delay-1">
+        <div class="feat-icon green">☁️</div>
+        <div class="feat-title">Google Drive Cloud Recovery</div>
+        <div class="feat-body">OAuth 2.0 cloud backup. Per-machine encrypted vault identified by hardware <code style="font-family:var(--font-mono);color:var(--cyan);font-size:11px;">machine_id</code>. Two-tier restore: local vault → cloud rescue. Selective extension and size filtering. Full folder structure preserved.</div>
+      </div>
+
+      <div class="feat-card amber reveal">
+        <div class="feat-icon amber">🏢</div>
+        <div class="feat-title">IT Admin Scoped Portal</div>
+        <div class="feat-body">Org-scoped credentials separate from super admin. Live agent table: hostname, OS, IP, version, status. Alert feed: last 50 CRITICAL/HIGH events. Settings form: scan interval, alert thresholds, PRO feature flags — changes written to DB and pulled by agents on next startup.</div>
+      </div>
+
+      <div class="feat-card purple reveal reveal-delay-1">
+        <div class="feat-icon purple">🚀</div>
+        <div class="feat-title">Silent Mass Deployment</div>
+        <div class="feat-body">MSI-style deployment via <code style="font-family:var(--font-mono);color:var(--cyan);font-size:11px;">FMSECURE_TENANT_KEY</code> environment variable. Agent auto-enrolls on first launch without user interaction. Ideal for domain GPO or MDM deployment across hundreds of machines.</div>
+      </div>
+
+      <div class="feat-card blue reveal">
+        <div class="feat-icon blue">👁</div>
+        <div class="feat-title">Watchdog Stealth Mode</div>
+        <div class="feat-body">Separate process masquerading as <code style="font-family:var(--font-mono);color:var(--cyan);font-size:11px;">WinSysHost.exe</code>. Resurrects the main agent with <code style="font-family:var(--font-mono);color:var(--cyan);font-size:11px;">--recovery</code> flag if killed. Auto-starts monitoring on recovery. Survives Task Manager, Admin override required to stop permanently.</div>
+      </div>
+
+      <div class="feat-card cyan reveal reveal-delay-1">
+        <div class="feat-icon cyan">🔑</div>
+        <div class="feat-title">Device-Bound Licensing</div>
+        <div class="feat-body">License key activates on one device via hardware <code style="font-family:var(--font-mono);color:var(--cyan);font-size:11px;">machine_id</code> — not email. Key delivered within 60 seconds of payment via Razorpay + SendGrid. OTP-verified device transfer on request. Keys stored as HMAC-SHA256 signatures.</div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     THREAT INTELLIGENCE
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<section class="section" id="intel">
+  <div class="container">
+    <div style="margin-bottom:48px;" class="reveal">
+      <span class="section-label">Threat Intelligence</span>
+      <h2 class="section-title" style="max-width:500px;">Know what's attacking you.</h2>
+      <p class="section-sub">Every file gets checked against live malware databases — without slowing down monitoring.</p>
+      <span class="badge badge-pro" style="margin-top:14px;">PRO only</span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;" class="feat-grid">
+
+      <div class="feat-card cyan reveal">
+        <div class="feat-icon cyan">🧬</div>
+        <div class="feat-title">MalwareBazaar Hash Lookup</div>
+        <div class="feat-body">SHA-256 hash of every new or modified file checked asynchronously against abuse.ch MalwareBazaar. Known malware triggers CRITICAL alert with malware name, family, and reference URL. Zero impact on monitoring latency.</div>
+      </div>
+
+      <div class="feat-card purple reveal reveal-delay-1">
+        <div class="feat-icon purple">💾</div>
+        <div class="feat-title">Local SQLite Cache</div>
+        <div class="feat-body">Results cached in SQLite for 7 days. Zero network calls on repeat encounters — a hash seen once is never re-queried until cache expiry. Cache is AES-256 encrypted at rest alongside other local data files.</div>
+      </div>
+
+      <div class="feat-card blue reveal reveal-delay-2">
+        <div class="feat-icon blue">🔬</div>
+        <div class="feat-title">VirusTotal Integration</div>
+        <div class="feat-body">Optional VirusTotal API key support. When configured, a second async lookup provides multi-engine scan results for any hash not found in MalwareBazaar. Separate rate-limit guard prevents API key exhaustion.</div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     AUTH & ACCESS
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<section class="section" id="auth">
+  <div class="container">
+    <div style="margin-bottom:48px;" class="reveal">
+      <span class="section-label">Authentication & Access Control</span>
+      <h2 class="section-title" style="max-width:500px;">Zero-trust from the start.</h2>
+      <p class="section-sub">Multiple auth layers — every access point is independently secured.</p>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;" class="feat-grid">
+
+      <div class="feat-card blue reveal">
+        <div class="feat-icon blue">📧</div>
+        <div class="feat-title">Email OTP Registration</div>
+        <div class="feat-body">Account creation requires email verification via OTP. Password stored as SHA-256 with custom salt. Brute-force protection with attempt logging. Full password recovery flow with time-limited OTP codes.</div>
+      </div>
+
+      <div class="feat-card green reveal reveal-delay-1">
+        <div class="feat-icon green">🔑</div>
+        <div class="feat-title">Google SSO + Device PIN</div>
+        <div class="feat-body">"Continue with Google" OAuth login. Device PIN as secondary authentication factor — specific to each registered machine, preventing account sharing across devices.</div>
+      </div>
+
+      <div class="feat-card amber reveal reveal-delay-2">
+        <div class="feat-icon amber">👥</div>
+        <div class="feat-title">Role-Based Access Control</div>
+        <div class="feat-body">Admin / User role separation within each organisation. IT admin credentials are org-scoped — an IT admin from Company A cannot see Company B. Super admin has global access via separate environment variable.</div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     ALERTING
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<section class="section" id="alerts">
+  <div class="container">
+    <div style="margin-bottom:48px;" class="reveal">
+      <span class="section-label">Alerting & Reporting</span>
+      <h2 class="section-title" style="max-width:500px;">Never miss a critical event.</h2>
+      <p class="section-sub">Four severity levels, three delivery channels, zero missed alerts.</p>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;" class="feat-grid">
+
+      <div class="feat-card blue reveal">
+        <div class="feat-icon blue">🔔</div>
+        <div class="feat-title">Discord & Slack Rich Embeds</div>
+        <div class="feat-body">Color-coded webhook cards by severity: INFO (blue), MEDIUM (yellow), HIGH (orange), CRITICAL (red). Delivered in real-time with mobile push. Embed includes hostname, event type, file path, and process attribution.</div>
+      </div>
+
+      <div class="feat-card amber reveal reveal-delay-1">
+        <div class="feat-icon amber">📨</div>
+        <div class="feat-title">SMTP Forensic Email</div>
+        <div class="feat-body">Security alert emails via SendGrid with an AES-encrypted forensic <code style="font-family:var(--font-mono);color:var(--cyan);font-size:11px;">.dat</code> attachment for compliance trail. Forensic snapshot captures system state, disk info, process list, and last 15 log lines. Runs in a background thread — never delays monitoring.</div>
+      </div>
+
+      <div class="feat-card green reveal">
+        <div class="feat-icon green">📊</div>
+        <div class="feat-title">PDF Report Export</div>
+        <div class="feat-body">Embedded matplotlib severity charts exported to PDF via ReportLab. Includes event timeline, severity distribution, top event types, and system summary. Generated on demand from the desktop dashboard.</div>
+      </div>
+
+      <div class="feat-card purple reveal reveal-delay-1">
+        <div class="feat-icon purple">⚡</div>
+        <div class="feat-title">Severity Engine</div>
+        <div class="feat-body">Event-to-severity mapping for 20+ event types. Automated responses per level: INFO → log only · MEDIUM → alert + log · HIGH → alert + encrypted snapshot · CRITICAL → Safe Mode lockdown + admin alert. Persistent counters with thread-safe in-memory cache.</div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ── CTA ────────────────────────────────────────────────────────────────── -->
+<section class="section">
+  <div class="container">
+    <div class="cta-box reveal">
+      <h2 class="cta-title">Every feature available today.</h2>
+      <p class="cta-sub">Download free. Unlock PRO in 60 seconds with a license key.</p>
+      <div class="cta-actions">
+        <a href="/download" class="btn btn-primary btn-xl">⬇ Download Free</a>
+        <a href="/pricing" class="btn btn-secondary btn-xl">View Pricing →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+</div>
+
+<style>
+.feat-grid { }
+@media(max-width:900px) { .feat-grid { grid-template-columns:1fr!important; } }
+/* Cat nav active state */
+.cat-link.active { color:var(--blue)!important; border-bottom-color:var(--blue)!important; }
+.cat-link:hover { color:var(--t1)!important; }
+</style>
+
+<script>
+// Category nav highlight on scroll
+const sections = document.querySelectorAll('section[id]');
+const links = document.querySelectorAll('.cat-link');
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      links.forEach(l => l.classList.remove('active'));
+      const link = document.querySelector(`.cat-link[data-cat="${e.target.id}"]`);
+      if (link) link.classList.add('active');
+    }
+  });
+}, { threshold: 0.3, rootMargin: '-60px 0px -60px 0px' });
+sections.forEach(s => observer.observe(s));
+</script>
+{% endblock %}  

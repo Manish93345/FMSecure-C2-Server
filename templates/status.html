@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}System Status{% endblock %}
+{% block description %}FMSecure live system status — C2 server, API, licensing, and cloud services.{% endblock %}
+
+{% block content %}
+<div class="page-body">
+
+<section style="padding:100px 0 40px;text-align:center;position:relative;overflow:hidden;">
+  <div style="position:absolute;inset:0;pointer-events:none;">
+    <div class="hero-grid" style="opacity:0.3;"></div>
+  </div>
+  <div class="container" style="position:relative;z-index:1;max-width:700px;">
+    <span class="section-label anim-fade-up" style="margin-bottom:14px;">System Status</span>
+
+    <!-- Overall status badge -->
+    {% if overall == 'operational' %}
+    <div class="anim-fade-up delay-100" style="display:inline-flex;align-items:center;gap:10px;background:var(--green-dim);border:1px solid rgba(16,185,129,0.3);border-radius:var(--r-full);padding:10px 24px;margin-bottom:28px;">
+      <span style="width:10px;height:10px;border-radius:50%;background:var(--green);animation:pulse-dot 2s ease infinite;display:inline-block;"></span>
+      <span style="font-family:var(--font-display);font-weight:700;font-size:15px;color:var(--green);">All Systems Operational</span>
+    </div>
+    {% elif overall == 'degraded' %}
+    <div class="anim-fade-up delay-100" style="display:inline-flex;align-items:center;gap:10px;background:var(--amber-dim);border:1px solid rgba(245,158,11,0.3);border-radius:var(--r-full);padding:10px 24px;margin-bottom:28px;">
+      <span style="width:10px;height:10px;border-radius:50%;background:var(--amber);animation:pulse-dot 2s ease infinite;display:inline-block;"></span>
+      <span style="font-family:var(--font-display);font-weight:700;font-size:15px;color:var(--amber);">Partial Degradation</span>
+    </div>
+    {% else %}
+    <div class="anim-fade-up delay-100" style="display:inline-flex;align-items:center;gap:10px;background:var(--red-dim);border:1px solid rgba(244,63,94,0.3);border-radius:var(--r-full);padding:10px 24px;margin-bottom:28px;">
+      <span style="width:10px;height:10px;border-radius:50%;background:var(--red);animation:pulse-dot 2s ease infinite;display:inline-block;"></span>
+      <span style="font-family:var(--font-display);font-weight:700;font-size:15px;color:var(--red);">Service Disruption</span>
+    </div>
+    {% endif %}
+
+    <p class="anim-fade-up delay-200" style="font-size:13.5px;color:var(--t3);">
+      Last checked: <span id="last-check">{{ checked_at }}</span> ·
+      <button onclick="location.reload()" style="background:none;border:none;color:var(--blue);cursor:pointer;font-size:13.5px;padding:0;">Refresh</button>
+    </p>
+  </div>
+</section>
+
+<!-- ── Service Status Cards ──────────────────────────────────────────────── -->
+<section style="padding:20px 0 80px;">
+  <div class="container" style="max-width:700px;">
+
+    <div style="display:flex;flex-direction:column;gap:10px;" class="anim-fade-up delay-200">
+
+      {% for service in services %}
+      <div style="background:var(--bg1);border:1px solid var(--bd);border-radius:var(--r-lg);padding:18px 24px;display:flex;align-items:center;justify-content:space-between;transition:border-color 0.2s;" onmouseover="this.style.borderColor='var(--bdh)'" onmouseout="this.style.borderColor='var(--bd)'">
+        <div style="display:flex;align-items:center;gap:14px;">
+          <span style="font-size:20px;">{{ service.icon }}</span>
+          <div>
+            <div style="font-weight:600;font-size:14px;">{{ service.name }}</div>
+            <div style="font-size:12px;color:var(--t3);">{{ service.description }}</div>
+          </div>
+        </div>
+        {% if service.status == 'operational' %}
+        <span class="badge badge-online">Operational</span>
+        {% elif service.status == 'degraded' %}
+        <span class="badge badge-high">Degraded</span>
+        {% else %}
+        <span class="badge badge-critical">Down</span>
+        {% endif %}
+      </div>
+      {% endfor %}
+
+    </div>
+
+    <!-- Live stats -->
+    <div style="margin-top:32px;background:var(--bg1);border:1px solid var(--bd);border-radius:var(--r-lg);padding:24px;" class="anim-fade-up delay-300">
+      <div style="font-family:var(--font-mono);font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:16px;">Live Metrics</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0;">
+        <div style="text-align:center;padding:0 20px;border-right:1px solid var(--bd);">
+          <div style="font-family:var(--font-display);font-size:28px;font-weight:800;color:var(--green);">{{ stats.online_agents }}</div>
+          <div style="font-family:var(--font-mono);font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:1px;margin-top:4px;">Agents Online</div>
+        </div>
+        <div style="text-align:center;padding:0 20px;border-right:1px solid var(--bd);">
+          <div style="font-family:var(--font-display);font-size:28px;font-weight:800;color:var(--blue);">{{ stats.total_tenants }}</div>
+          <div style="font-family:var(--font-mono);font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:1px;margin-top:4px;">Active Orgs</div>
+        </div>
+        <div style="text-align:center;padding:0 20px;">
+          <div style="font-family:var(--font-display);font-size:28px;font-weight:800;color:var(--t1);">{{ stats.total_licenses }}</div>
+          <div style="font-family:var(--font-mono);font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:1px;margin-top:4px;">Active Licenses</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Uptime chart placeholder -->
+    <div style="margin-top:32px;background:var(--bg1);border:1px solid var(--bd);border-radius:var(--r-lg);padding:24px;" class="anim-fade-up delay-400">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <div style="font-family:var(--font-mono);font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:1.5px;">Uptime — Last 30 Days</div>
+        <div style="font-family:var(--font-display);font-size:16px;font-weight:700;color:var(--green);">{{ stats.uptime_pct }}%</div>
+      </div>
+      <!-- Bar chart -->
+      <div style="display:flex;gap:3px;align-items:flex-end;height:40px;" id="uptime-bars">
+        {% for day in uptime_days %}
+        <div style="flex:1;border-radius:2px;background:{% if day %}var(--green){% else %}var(--red){% endif %};height:{% if day %}100{% else %}30{% endif %}%;opacity:0.8;transition:opacity 0.2s;" title="{% if day %}Operational{% else %}Incident{% endif %}" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'"></div>
+        {% endfor %}
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:8px;font-family:var(--font-mono);font-size:10px;color:var(--t4);">
+        <span>30 days ago</span><span>Today</span>
+      </div>
+    </div>
+
+    <!-- Contact footer -->
+    <div style="margin-top:24px;text-align:center;" class="anim-fade-up delay-400">
+      <p style="font-size:13px;color:var(--t3);">
+        Experiencing an issue not shown here?
+        <a href="mailto:{{ brand.support_email }}" style="color:var(--blue);">Contact support →</a>
+      </p>
+    </div>
+
+  </div>
+</section>
+
+</div>
+
+<script>
+// Auto-refresh every 60 seconds
+setTimeout(() => location.reload(), 60000);
+
+// Live clock for "last checked"
+const el = document.getElementById('last-check');
+if (el) {
+  const d = new Date();
+  el.textContent = d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+</script>
+{% endblock %}

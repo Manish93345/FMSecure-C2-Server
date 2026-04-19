@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Terms of Service{% endblock %}
+
+{% block content %}
+<div class="page-body">
+<section style="padding:100px 0 80px;">
+  <div class="container-sm">
+
+    <div style="margin-bottom:40px;" class="anim-fade-up">
+      <span class="section-label" style="margin-bottom:12px;">Legal</span>
+      <h1 style="font-family:var(--font-display);font-size:38px;font-weight:800;letter-spacing:-1px;margin-bottom:10px;">Terms of Service</h1>
+      <p style="font-size:13.5px;color:var(--t3);">Last updated: January 2026 · {{ brand.company }}</p>
+    </div>
+
+    <div class="doc-prose anim-fade-up delay-100">
+
+      <h2>1. Acceptance of Terms</h2>
+      <p>By downloading, installing, or using {{ brand.name }} ("the Software"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, do not use the Software. These Terms constitute a legally binding agreement between you and {{ brand.company }} ("we", "us", "our").</p>
+
+      <h2>2. License Grant</h2>
+      <p>Subject to your payment of applicable fees and compliance with these Terms, we grant you a limited, non-exclusive, non-transferable, revocable license to use the Software on a single device (identified by hardware machine_id). The Free tier may be used on one device without payment.</p>
+      <p>PRO tier licenses are device-bound. Transferring to a new device requires contacting our support team — we will release the binding upon verification of the original purchase email.</p>
+
+      <h2>3. Restrictions</h2>
+      <p>You agree not to:</p>
+      <ul>
+        <li>Reverse engineer, decompile, or disassemble the Software</li>
+        <li>Use the Software to monitor systems you do not own or have explicit authorisation to monitor</li>
+        <li>Resell, sublicense, or distribute the Software without written permission</li>
+        <li>Attempt to circumvent license validation, device binding, or seat limits</li>
+        <li>Use the cloud C2 server for purposes other than monitoring your own enrolled endpoints</li>
+        <li>Use the icacls lockdown feature, honeypot tripwire, or USB control features against systems you do not own</li>
+      </ul>
+
+      <h2>4. Subscription and Payment</h2>
+      <p>PRO Monthly and PRO Annual subscriptions are charged through Razorpay. Licenses are delivered within 60 seconds of successful payment verification. Prices are displayed in Indian Rupees (INR) and are inclusive of applicable taxes.</p>
+      <p>Subscriptions are not auto-renewing — you will need to purchase a new license key when your current one expires. We will attempt to notify you by email 7 days before expiry if a valid email address is on file.</p>
+      <p>We do not offer refunds for digital software licenses once a key has been activated on a device. If you experience a technical issue preventing activation, contact us within 7 days of purchase.</p>
+
+      <h2>5. Cloud Services (PRO / Enterprise)</h2>
+      <p>Cloud services (C2 server, heartbeat API, remote fleet management) are provided on a best-effort basis. We target 99% monthly uptime but do not offer an SLA for individual or SMB customers. Enterprise customers may negotiate SLA terms separately.</p>
+      <p>We reserve the right to suspend or terminate cloud access for abuse, including but not limited to: spoofed machine_ids, automated abuse of the heartbeat API, or using the platform to monitor third-party systems without authorisation.</p>
+
+      <h2>6. Enterprise Tenants</h2>
+      <p>Enterprise customers are responsible for ensuring all users within their organisation comply with these Terms. The IT admin who accepts these Terms on behalf of the organisation represents that they have authority to bind the organisation. Seat limits are enforced technically — exceeding them requires upgrading your plan.</p>
+
+      <h2>7. Data and Privacy</h2>
+      <p>Our collection and use of personal data is described in our <a href="/privacy">Privacy Policy</a>, which is incorporated into these Terms by reference. By using the Software, you consent to the data practices described in the Privacy Policy.</p>
+      <p>You retain ownership of all data monitored by the Software. We do not access, analyse, or transmit the contents of your monitored files. SHA-256 hashes sent to MalwareBazaar for threat intelligence lookups do not reveal file contents.</p>
+
+      <h2>8. Disclaimer of Warranties</h2>
+      <p>THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, OR NON-INFRINGEMENT. WE DO NOT WARRANT THAT THE SOFTWARE WILL DETECT ALL THREATS, PREVENT ALL DATA LOSS, OR OPERATE WITHOUT INTERRUPTION OR ERROR.</p>
+      <p>{{ brand.name }} is a security monitoring tool. It is your responsibility to maintain backups and implement appropriate security controls in addition to using the Software.</p>
+
+      <h2>9. Limitation of Liability</h2>
+      <p>TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, {{ brand.company }} SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR ANY LOSS OF DATA, PROFITS, OR BUSINESS, ARISING OUT OF OR IN CONNECTION WITH YOUR USE OF THE SOFTWARE, EVEN IF WE HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.</p>
+      <p>OUR TOTAL LIABILITY TO YOU FOR ANY CLAIM ARISING FROM OR RELATED TO THE SOFTWARE SHALL NOT EXCEED THE AMOUNT YOU PAID TO US FOR THE SOFTWARE IN THE 12 MONTHS PRECEDING THE CLAIM.</p>
+
+      <h2>10. Indemnification</h2>
+      <p>You agree to indemnify and hold {{ brand.company }} harmless from any claims, damages, or expenses (including legal fees) arising from: your use of the Software in violation of these Terms, your use of the Software to monitor systems you do not have authorisation to monitor, or any breach of applicable law.</p>
+
+      <h2>11. Governing Law</h2>
+      <p>These Terms are governed by the laws of India. Any disputes shall be subject to the exclusive jurisdiction of the courts in India. If you are a consumer, you may also have rights under the consumer protection laws of your country of residence.</p>
+
+      <h2>12. Changes to Terms</h2>
+      <p>We reserve the right to modify these Terms at any time. Material changes will be communicated via email to active license holders and posted on this page with an updated effective date. Continued use of the Software after the effective date constitutes acceptance of the updated Terms.</p>
+
+      <h2>13. Termination</h2>
+      <p>We may terminate or suspend your access to the cloud services immediately, without prior notice, if you violate these Terms. Upon termination, all licenses granted under these Terms will immediately cease. Sections 8, 9, 10, and 11 survive termination.</p>
+
+      <h2>14. Contact</h2>
+      <p>For questions about these Terms: <a href="mailto:{{ brand.support_email }}">{{ brand.support_email }}</a><br>{{ brand.company }} · India 🇮🇳</p>
+
+    </div>
+
+  </div>
+</section>
+</div>
+
+<style>
+.doc-prose h2 { font-family:var(--font-display); font-size:18px; font-weight:700; color:var(--t1); margin:36px 0 12px; }
+.doc-prose p  { font-size:14px; color:var(--t2); line-height:1.75; margin-bottom:14px; }
+.doc-prose ul { padding-left:0; list-style:none; margin-bottom:16px; display:flex; flex-direction:column; gap:8px; }
+.doc-prose ul li { font-size:14px; color:var(--t2); padding-left:20px; position:relative; line-height:1.65; }
+.doc-prose ul li::before { content:'—'; position:absolute; left:0; color:var(--t4); }
+.doc-prose a { color:var(--blue); }
+</style>
+{% endblock %}

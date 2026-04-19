@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}{{ brand.name }}{% endblock %} | {{ brand.name }}</title>
+  <meta name="description" content="{% block description %}{{ brand.name }} — {{ brand.tagline }}. Enterprise-grade EDR with real-time file integrity monitoring, ransomware protection, and cloud C2 command & control.{% endblock %}">
+  <meta name="theme-color" content="#07080C">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/x-icon" href="{{ brand.logo_ico }}">
+  <link rel="shortcut icon" href="{{ brand.logo_ico }}">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="{% block og_title %}{{ brand.name }} — {{ brand.tagline }}{% endblock %}">
+  <meta property="og:description" content="{% block og_desc %}Enterprise EDR built for Windows. Real-time monitoring, AES-256 encryption, ransomware killswitch, and cloud C2 command & control.{% endblock %}">
+  <meta property="og:type" content="website">
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="/static/css/fmsecure.css">
+  {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+<!-- ── Navigation ─────────────────────────────────────────────────────────── -->
+<nav class="nav" id="nav">
+  <div class="nav-inner">
+    <a href="/" class="nav-logo">
+      <div class="nav-logo-icon">🛡</div>
+      <div>
+        <span>{{ brand.name }}</span>
+        <span class="nav-logo-tagline">{{ brand.tagline }}</span>
+      </div>
+    </a>
+
+    <ul class="nav-links">
+      <li><a href="/#features">Features</a></li>
+      <li><a href="/features">Capabilities</a></li>
+      <li><a href="/pricing">Pricing</a></li>
+      <li><a href="/documentation">Docs</a></li>
+      <li><a href="/contact">Contact</a></li>
+    </ul>
+
+    <div class="nav-actions">
+      <a href="/tenant/login" class="nav-portal-link">Client Portal</a>
+      <a href="/download" class="btn btn-primary btn-sm">Download</a>
+    </div>
+
+    <button class="nav-hamburger" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</nav>
+
+<!-- Mobile drawer -->
+<nav class="nav-drawer">
+  <a href="/#features">Features</a>
+  <a href="/features">All Capabilities</a>
+  <a href="/pricing">Pricing</a>
+  <a href="/documentation">Documentation</a>
+  <a href="/contact">Contact</a>
+  <a href="/tenant/login">Client Portal →</a>
+  <div style="padding-top:12px;border-top:1px solid var(--bd);margin-top:4px">
+    <a href="/download" class="btn btn-primary btn-full" style="display:flex;justify-content:center;">Download Agent</a>
+  </div>
+</nav>
+
+<!-- ── Page Content ─────────────────────────────────────────────────────────── -->
+{% block content %}{% endblock %}
+
+<!-- ── Footer ─────────────────────────────────────────────────────────────── -->
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <a href="/" class="nav-logo" style="margin-bottom:0">
+          <div class="nav-logo-icon">🛡</div>
+          <div>
+            <span>{{ brand.name }}</span>
+            <span class="nav-logo-tagline">{{ brand.tagline }}</span>
+          </div>
+        </a>
+        <p class="footer-brand-desc">
+          Enterprise endpoint detection &amp; response for Windows. Built in India, protecting endpoints worldwide.
+        </p>
+      </div>
+
+      <div class="footer-links">
+        <h4>Product</h4>
+        <ul>
+          <li><a href="/features">Features</a></li>
+          <li><a href="/pricing">Pricing</a></li>
+          <li><a href="/download">Download</a></li>
+          <li><a href="/documentation">Documentation</a></li>
+          <li><a href="/status">System Status</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-links">
+        <h4>Company</h4>
+        <ul>
+          <li><a href="/contact">Contact</a></li>
+          <li><a href="/privacy">Privacy Policy</a></li>
+          <li><a href="/terms">Terms of Service</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-links">
+        <h4>Portal</h4>
+        <ul>
+          <li><a href="/tenant/login">IT Admin Login</a></li>
+          <li><a href="/login">C2 Dashboard</a></li>
+          <li><a href="mailto:{{ brand.support_email }}">Support Email</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <p class="footer-copy">
+        &copy; {{ brand.copyright_year }} {{ brand.company }}. All rights reserved. Made in India 🇮🇳
+      </p>
+      <div class="footer-legal">
+        <a href="/privacy">Privacy</a>
+        <a href="/terms">Terms</a>
+        <a href="/status">Status</a>
+        <a href="mailto:{{ brand.support_email }}">Support</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<!-- ── Scripts ─────────────────────────────────────────────────────────────── -->
+<script src="/static/js/fmsecure.js"></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

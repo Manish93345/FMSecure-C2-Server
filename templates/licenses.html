@@ -1,0 +1,137 @@
+{% extends "base_admin.html" %}
+
+{% block title %}License Manager{% endblock %}
+{% block sidebar_home %}/dashboard{% endblock %}
+{% block sidebar_context %}Global C2{% endblock %}
+
+{% block sidebar_nav %}
+<div class="sidebar-section">Command & Control</div>
+<a href="/dashboard" class="sidebar-link"><span class="icon">🖥</span> Endpoints</a>
+<a href="/licenses" class="sidebar-link active"><span class="icon">🔑</span> Licenses</a>
+<a href="/super/dashboard" class="sidebar-link"><span class="icon">🏢</span> Tenants</a>
+<div class="sidebar-section" style="margin-top:8px;">Site</div>
+<a href="/" class="sidebar-link" target="_blank"><span class="icon">🌐</span> Product Page</a>
+{% endblock %}
+
+{% block sidebar_footer %}
+<strong>License Manager</strong>
+<a href="/logout">Sign out →</a>
+{% endblock %}
+
+{% block topbar_title %}License Manager{% endblock %}
+{% block topbar_sub %}{{ total }} total · {{ active_count }} active · {{ expired_count }} expired{% endblock %}
+
+{% block topbar_actions %}
+<input type="text" id="lic-search" class="form-input" style="width:200px;padding:6px 10px;font-size:12px;" placeholder="Search email or key…">
+<a href="/dashboard" class="btn btn-secondary btn-sm">← C2 Dashboard</a>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── Stats ───────────────────────────────────────────────────────────────── -->
+<div class="stats-row cols-3" style="margin-bottom:24px;">
+  <div class="stat-card">
+    <div class="stat-value" style="color:var(--t1);">{{ total }}</div>
+    <div class="stat-label">Total Licenses</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value" style="color:var(--green);">{{ active_count }}</div>
+    <div class="stat-label">Active</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value" style="color:var(--t3);">{{ expired_count }}</div>
+    <div class="stat-label">Expired / Inactive</div>
+  </div>
+</div>
+
+<!-- ── License Table ──────────────────────────────────────────────────────── -->
+<div class="panel">
+  <div class="panel-header">
+    <div class="panel-title">All Licenses</div>
+    <div style="display:flex;gap:8px;">
+      <select id="lic-filter" class="form-select" style="width:130px;padding:5px 8px;font-size:12px;">
+        <option value="all">All status</option>
+        <option value="active">Active only</option>
+        <option value="expired">Expired only</option>
+      </select>
+    </div>
+  </div>
+  <div class="panel-table">
+    <div class="table-wrap" style="border:none;border-radius:0;">
+      <table class="data-table" id="lic-table">
+        <thead>
+          <tr>
+            <th>License Key</th>
+            <th>Email</th>
+            <th>Plan</th>
+            <th>Status</th>
+            <th>Expires</th>
+            <th>Device ID</th>
+            <th>Created</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in licenses %}
+          <tr data-status="{{ 'active' if r.is_active else 'expired' }}">
+            <td>
+              <code style="font-family:var(--font-mono);font-size:11px;color:var(--cyan);
+                           background:var(--bg2);padding:3px 8px;border-radius:4px;">
+                {{ r.license_key }}
+              </code>
+            </td>
+            <td>{{ r.email }}</td>
+            <td>
+              <span style="font-family:var(--font-mono);font-size:11px;color:var(--t2);">
+                {{ r.tier }}
+              </span>
+            </td>
+            <td>
+              {% if r.is_active %}
+              <span class="badge badge-online">Active</span>
+              {% else %}
+              <span class="badge badge-offline">Expired</span>
+              {% endif %}
+            </td>
+            <td class="mono" style="font-size:12px;{% if r.is_expired %}color:var(--red);{% endif %}">
+              {{ r.expires_fmt }}
+            </td>
+            <td class="mono" style="font-size:11px;color:var(--t3);">
+              {% if r.machine_id %}{{ r.machine_id[:22] }}…{% else %}—{% endif %}
+            </td>
+            <td class="mono" style="font-size:11px;color:var(--t3);">{{ r.created_fmt }}</td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7" style="text-align:center;color:var(--t4);padding:48px;">
+              No licenses found.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const searchInput = document.getElementById('lic-search');
+const filterSel   = document.getElementById('lic-filter');
+const rows        = () => document.querySelectorAll('#lic-table tbody tr[data-status]');
+
+function applyFilters() {
+  const q   = searchInput ? searchInput.value.toLowerCase() : '';
+  const fil = filterSel ? filterSel.value : 'all';
+  rows().forEach(row => {
+    const textMatch   = row.textContent.toLowerCase().includes(q);
+    const statusMatch = fil === 'all' || row.dataset.status === fil;
+    row.style.display = (textMatch && statusMatch) ? '' : 'none';
+  });
+}
+
+if (searchInput) searchInput.addEventListener('input', applyFilters);
+if (filterSel)   filterSel.addEventListener('change', applyFilters);
+</script>
+{% endblock %}

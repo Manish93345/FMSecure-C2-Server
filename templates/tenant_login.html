@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Organisation Portal | {{ brand.name }}</title>
+  <link rel="icon" type="image/x-icon" href="{{ brand.logo_ico }}">
+  <link rel="stylesheet" href="/static/css/fmsecure.css">
+  <style>
+    body {
+      min-height: 100vh;
+      display: flex;
+      background: var(--bg);
+      overflow: hidden;
+    }
+    /* Left panel */
+    .split-left {
+      width: 420px;
+      flex-shrink: 0;
+      background: var(--bg1);
+      border-right: 1px solid var(--bd);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 40px;
+      position: relative;
+      overflow: hidden;
+    }
+    .split-left::before {
+      content: '';
+      position: absolute;
+      bottom: -60px; right: -60px;
+      width: 300px; height: 300px;
+      background: radial-gradient(circle, rgba(14,165,233,0.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .split-left-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 17px;
+      color: var(--t1);
+      text-decoration: none;
+    }
+    .split-left-brand-icon {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, var(--blue), var(--cyan));
+      border-radius: var(--r-sm);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+    .split-features { margin: auto 0; padding: 48px 0 32px; }
+    .split-features h2 {
+      font-family: var(--font-display);
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin-bottom: 10px;
+    }
+    .split-features p { font-size: 14px; color: var(--t2); margin-bottom: 28px; line-height: 1.65; }
+    .feature-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .feature-item-icon {
+      width: 32px; height: 32px;
+      border-radius: var(--r-sm);
+      background: var(--blue-dim);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px;
+      flex-shrink: 0;
+    }
+    .feature-item-text { font-size: 13px; color: var(--t2); line-height: 1.5; padding-top: 6px; }
+    .feature-item-text strong { color: var(--t1); display: block; font-size: 13.5px; margin-bottom: 1px; }
+    .split-footer { font-size: 12px; color: var(--t3); }
+    /* Right panel — form */
+    .split-right {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 24px;
+      position: relative;
+    }
+    .split-right::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(30,38,64,0.3) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(30,38,64,0.3) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: radial-gradient(ellipse at center, black 20%, transparent 75%);
+    }
+    .form-panel {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 380px;
+      animation: fadeUp 0.5s var(--ease-out) both;
+    }
+    .form-panel h2 {
+      font-family: var(--font-display);
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin-bottom: 6px;
+    }
+    .form-panel p { font-size: 14px; color: var(--t2); margin-bottom: 28px; }
+    @media(max-width: 800px) {
+      .split-left { display: none; }
+      body { display: block; }
+      .split-right { min-height: 100vh; padding: 40px 20px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Left info panel -->
+  <div class="split-left">
+    <a href="/" class="split-left-brand">
+      <div class="split-left-brand-icon">🛡</div>
+      {{ brand.name }}
+    </a>
+
+    <div class="split-features">
+      <h2>IT Admin Portal</h2>
+      <p>Manage your organisation's endpoints, respond to alerts, and configure security policies — all from one place.</p>
+
+      <div class="feature-item">
+        <div class="feature-item-icon">📡</div>
+        <div class="feature-item-text">
+          <strong>Live endpoint visibility</strong>
+          Real-time agent status across all enrolled machines
+        </div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-item-icon">🚨</div>
+        <div class="feature-item-text">
+          <strong>Scoped alert feed</strong>
+          CRITICAL and HIGH events from your organisation only
+        </div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-item-icon">⚙️</div>
+        <div class="feature-item-text">
+          <strong>Remote policy control</strong>
+          Push scan intervals and vault settings to all agents
+        </div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-item-icon">🔒</div>
+        <div class="feature-item-text">
+          <strong>Isolated data access</strong>
+          You can only see your organisation's data — never others
+        </div>
+      </div>
+    </div>
+
+    <div class="split-footer">
+      &copy; {{ brand.copyright_year }} {{ brand.company }} · {{ brand.name }}
+    </div>
+  </div>
+
+  <!-- Right form panel -->
+  <div class="split-right">
+    <div class="form-panel">
+      <h2>Sign in</h2>
+      <p>Access your organisation's security dashboard</p>
+
+      {% if error %}
+      <div class="alert alert-error" style="margin-bottom:18px;">
+        <span>⚠</span> {{ error }}
+      </div>
+      {% endif %}
+
+      <form method="POST" action="/tenant/login">
+        <div class="form-group">
+          <label class="form-label">Email Address</label>
+          <input type="email" name="email" class="form-input" required autofocus
+                 placeholder="admin@yourcompany.com" autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input type="password" name="password" class="form-input" required
+                 placeholder="••••••••" autocomplete="current-password">
+        </div>
+
+        <div style="text-align:right;margin-top:-8px;margin-bottom:20px;">
+          <a href="/tenant/forgot-password" style="font-size:12.5px;color:var(--t3);">Forgot password?</a>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-full btn-lg">Sign In →</button>
+      </form>
+
+      <p style="font-size:12.5px;color:var(--t3);text-align:center;margin-top:24px;line-height:1.7;">
+        Lost your API key? Contact
+        <a href="mailto:{{ brand.support_email }}" style="color:var(--blue);">{{ brand.support_email }}</a>
+      </p>
+
+      <div style="padding-top:20px;margin-top:20px;border-top:1px solid var(--bd);text-align:center;">
+        <a href="/" style="font-size:12.5px;color:var(--t3);">← Back to {{ brand.name }}</a>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

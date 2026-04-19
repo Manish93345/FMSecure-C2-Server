@@ -1,0 +1,330 @@
+{% extends "base.html" %}
+{% block title %}Documentation{% endblock %}
+{% block description %}FMSecure setup guide, agent configuration, tenant deployment, API reference, and troubleshooting.{% endblock %}
+
+{% block content %}
+<div class="page-body">
+<div style="display:flex;min-height:calc(100vh - var(--nav-h));">
+
+  <!-- ── Sidebar ──────────────────────────────────────────────────────────── -->
+  <aside style="width:240px;flex-shrink:0;background:var(--bg1);border-right:1px solid var(--bd);padding:24px 16px;position:sticky;top:var(--nav-h);height:calc(100vh - var(--nav-h));overflow-y:auto;" id="docs-sidebar">
+
+    <div style="font-family:var(--font-mono);font-size:9px;font-weight:700;color:var(--t4);text-transform:uppercase;letter-spacing:1.5px;padding:8px 8px 6px;margin-bottom:4px;">Getting Started</div>
+    <a href="#quickstart" class="doc-link active">Quick Start</a>
+    <a href="#install" class="doc-link">Installation</a>
+    <a href="#first-run" class="doc-link">First Run</a>
+    <a href="#folders" class="doc-link">Monitoring Folders</a>
+
+    <div style="font-family:var(--font-mono);font-size:9px;font-weight:700;color:var(--t4);text-transform:uppercase;letter-spacing:1.5px;padding:16px 8px 6px;margin-bottom:4px;">Configuration</div>
+    <a href="#config" class="doc-link">config.json</a>
+    <a href="#license" class="doc-link">License Activation</a>
+    <a href="#webhooks" class="doc-link">Webhook Alerts</a>
+    <a href="#email-alerts" class="doc-link">Email Alerts</a>
+
+    <div style="font-family:var(--font-mono);font-size:9px;font-weight:700;color:var(--t4);text-transform:uppercase;letter-spacing:1.5px;padding:16px 8px 6px;margin-bottom:4px;">Enterprise</div>
+    <a href="#tenant-setup" class="doc-link">Tenant Setup</a>
+    <a href="#mass-deploy" class="doc-link">Mass Deployment</a>
+    <a href="#it-admin" class="doc-link">IT Admin Portal</a>
+    <a href="#api-ref" class="doc-link">API Reference</a>
+
+    <div style="font-family:var(--font-mono);font-size:9px;font-weight:700;color:var(--t4);text-transform:uppercase;letter-spacing:1.5px;padding:16px 8px 6px;margin-bottom:4px;">Troubleshooting</div>
+    <a href="#faq-tech" class="doc-link">Common Issues</a>
+    <a href="#build" class="doc-link">Build Commands</a>
+
+  </aside>
+
+  <!-- ── Main content ─────────────────────────────────────────────────────── -->
+  <main style="flex:1;padding:48px 56px;max-width:860px;" id="docs-main">
+
+    <!-- ── Quick Start ──────────────────────────────────────────────────── -->
+    <section id="quickstart" style="margin-bottom:64px;">
+      <span class="section-label" style="margin-bottom:10px;">Getting Started</span>
+      <h1 style="font-family:var(--font-display);font-size:34px;font-weight:800;letter-spacing:-1px;margin-bottom:14px;">Quick Start</h1>
+      <p style="font-size:15px;color:var(--t2);line-height:1.7;margin-bottom:28px;">Get {{ brand.name }} running in under 3 minutes. No installer, no kernel drivers, no IT approval needed.</p>
+
+      <div class="terminal" style="margin-bottom:28px;">
+        <div class="terminal-header">
+          <div class="terminal-dot red"></div><div class="terminal-dot amber"></div><div class="terminal-dot green"></div>
+          <span class="terminal-title">Windows PowerShell — Admin</span>
+        </div>
+        <div class="terminal-body">
+          <span class="terminal-line"><span class="terminal-prompt"># 1. Right-click SecureFIM.exe → Run as Administrator</span></span>
+          <span class="terminal-line"><span class="terminal-output">#    First launch: register admin account with email OTP</span></span>
+          <span class="terminal-line">&nbsp;</span>
+          <span class="terminal-line"><span class="terminal-prompt"># 2. Select a folder to monitor → Start Monitoring</span></span>
+          <span class="terminal-line"><span class="terminal-output">#    Initial hash baseline runs at ~1.8 GB/s (NVMe)</span></span>
+          <span class="terminal-line">&nbsp;</span>
+          <span class="terminal-line"><span class="terminal-prompt"># 3. (PRO) Activate your license</span></span>
+          <span class="terminal-line"><span class="terminal-output">#    Click username → Activate License → paste key</span></span>
+          <span class="terminal-line">&nbsp;</span>
+          <span class="terminal-line"><span class="terminal-ok">✓ FMSecure is now protecting your endpoints.</span></span>
+        </div>
+      </div>
+    </section>
+
+    <div style="height:1px;background:var(--bd);margin-bottom:56px;"></div>
+
+    <!-- ── Installation ──────────────────────────────────────────────────── -->
+    <section id="install" style="margin-bottom:64px;">
+      <h2 style="font-family:var(--font-display);font-size:24px;font-weight:700;letter-spacing:-0.5px;margin-bottom:14px;">Installation</h2>
+      <p style="color:var(--t2);font-size:14px;line-height:1.7;margin-bottom:20px;">{{ brand.name }} ships as a single <code style="font-family:var(--font-mono);color:var(--cyan);font-size:12px;background:var(--bg2);padding:2px 6px;border-radius:4px;">SecureFIM.exe</code> compiled with Nuitka (or PyInstaller). No Python installation required on the target machine.</p>
+
+      <div style="background:var(--bg1);border:1px solid var(--bd);border-radius:var(--r-lg);padding:24px;margin-bottom:20px;">
+        <div style="font-family:var(--font-mono);font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:14px;">System Requirements</div>
+        {% for row in [
+          ("OS", "Windows 10 / 11 (64-bit only)"),
+          ("Privileges", "Administrator (UAC elevation prompt on first run)"),
+          ("Disk", "~25 MB for the agent + vault storage"),
+          ("RAM", "Minimum 256 MB free"),
+          ("Internet", "Optional — required for cloud backup and C2 heartbeat"),
+          ("Antivirus", "Add SecureFIM.exe and WinSysHost.exe as exclusions"),
+        ] %}
+        <div style="display:flex;gap:20px;padding:8px 0;border-bottom:1px solid var(--bd);font-size:13.5px;">
+          <span style="font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--t3);min-width:100px;padding-top:1px;">{{ row[0] }}</span>
+          <span style="color:var(--t1);">{{ row[1] }}</span>
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="alert alert-info">
+        <span>ℹ</span>
+        <span>The Watchdog process (<code style="font-family:var(--font-mono);">WinSysHost.exe</code>) is placed in <code style="font-family:var(--font-mono);">AppData\Roaming\WinSysHost\</code> on first launch. It masquerades as a Windows service and auto-starts on login.</span>
+      </div>
+    </section>
+
+    <div style="height:1px;background:var(--bd);margin-bottom:56px;"></div>
+
+    <!-- ── Config ────────────────────────────────────────────────────────── -->
+    <section id="config" style="margin-bottom:64px;">
+      <h2 style="font-family:var(--font-display);font-size:24px;font-weight:700;letter-spacing:-0.5px;margin-bottom:14px;">config.json</h2>
+      <p style="color:var(--t2);font-size:14px;line-height:1.7;margin-bottom:20px;">All settings are stored in <code style="font-family:var(--font-mono);color:var(--cyan);font-size:12px;background:var(--bg2);padding:2px 6px;border-radius:4px;">AppData\Roaming\FMSecure\config.json</code>. Changes take effect on next startup or via hot-reload from the dashboard.</p>
+
+      <div class="terminal">
+        <div class="terminal-header">
+          <div class="terminal-dot red"></div><div class="terminal-dot amber"></div><div class="terminal-dot green"></div>
+          <span class="terminal-title">config.json</span>
+        </div>
+        <div class="terminal-body" style="font-size:12px;">
+<pre style="margin:0;color:var(--t2);font-family:var(--font-mono);">{
+  <span style="color:var(--blue);">"watch_folder"</span>: <span style="color:var(--green);">"C:\\Users\\YourUser\\Documents"</span>,
+  <span style="color:var(--blue);">"verify_interval"</span>: <span style="color:var(--amber);">60</span>,          <span style="color:var(--t4);">// seconds between periodic checks</span>
+  <span style="color:var(--blue);">"webhook_url"</span>: <span style="color:var(--green);">""</span>,              <span style="color:var(--t4);">// Discord or Slack webhook URL</span>
+  <span style="color:var(--blue);">"admin_email"</span>: <span style="color:var(--green);">""</span>,              <span style="color:var(--t4);">// SMTP alert recipient</span>
+  <span style="color:var(--blue);">"vault_max_size_mb"</span>: <span style="color:var(--amber);">10</span>,       <span style="color:var(--t4);">// max file size to back up (PRO)</span>
+  <span style="color:var(--blue);">"vault_allowed_exts"</span>: [        <span style="color:var(--t4);">// extensions eligible for vault</span>
+    <span style="color:var(--green);">".txt"</span>, <span style="color:var(--green);">".json"</span>, <span style="color:var(--green);">".py"</span>, <span style="color:var(--green);">".html"</span>,
+    <span style="color:var(--green);">".js"</span>, <span style="color:var(--green);">".css"</span>, <span style="color:var(--green);">".md"</span>
+  ],
+  <span style="color:var(--blue);">"lolbin_whitelist"</span>: [          <span style="color:var(--t4);">// trusted parent processes</span>
+    <span style="color:var(--green);">"Code.exe"</span>, <span style="color:var(--green);">"pycharm64.exe"</span>
+  ]
+}</pre>
+        </div>
+      </div>
+    </section>
+
+    <div style="height:1px;background:var(--bd);margin-bottom:56px;"></div>
+
+    <!-- ── Webhooks ───────────────────────────────────────────────────────── -->
+    <section id="webhooks" style="margin-bottom:64px;">
+      <h2 style="font-family:var(--font-display);font-size:24px;font-weight:700;letter-spacing:-0.5px;margin-bottom:14px;">Webhook Alerts</h2>
+      <p style="color:var(--t2);font-size:14px;line-height:1.7;margin-bottom:20px;">Both Discord and Slack webhooks are supported. Alerts are color-coded by severity and include hostname, event type, file path, and process attribution.</p>
+
+      <div style="background:var(--bg1);border:1px solid var(--bd);border-radius:var(--r-lg);padding:24px;">
+        <div style="font-family:var(--font-mono);font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:16px;">Severity → Color Mapping</div>
+        {% for item in [
+          ("INFO", "Blue (#2f81f7)", "badge-medium"),
+          ("MEDIUM", "Yellow (#f0883e)", "badge-high"),
+          ("HIGH", "Orange (#e3b341)", "badge-high"),
+          ("CRITICAL", "Red (#f85149)", "badge-critical"),
+        ] %}
+        <div style="display:flex;align-items:center;gap:14px;padding:10px 0;border-bottom:1px solid var(--bd);">
+          <span class="badge {{ item[2] }}" style="min-width:80px;justify-content:center;">{{ item[0] }}</span>
+          <span style="font-size:13.5px;color:var(--t2);">{{ item[1] }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <div style="height:1px;background:var(--bd);margin-bottom:56px;"></div>
+
+    <!-- ── Tenant Setup ───────────────────────────────────────────────────── -->
+    <section id="tenant-setup" style="margin-bottom:64px;">
+      <h2 style="font-family:var(--font-display);font-size:24px;font-weight:700;letter-spacing:-0.5px;margin-bottom:14px;">Tenant Setup (Enterprise)</h2>
+      <p style="color:var(--t2);font-size:14px;line-height:1.7;margin-bottom:20px;">Enterprise customers get a dedicated tenant with a unique API key, seat limit, and scoped IT admin portal. Setup takes under 5 minutes.</p>
+
+      <ol style="list-style:none;display:flex;flex-direction:column;gap:0;">
+        {% for step in [
+          ("Contact us at " ~ brand.support_email ~ " or use the Contact page", "We provision your tenant and send the API key + IT admin credentials to your contact email."),
+          ("Distribute the API key to your machines", "Set the FMSECURE_TENANT_KEY environment variable on each machine via GPO, MDM, or manual configuration. The agent auto-enrolls on next launch."),
+          ("IT admin logs in to the portal", "Visit /tenant/login with the credentials provided. The dashboard shows all enrolled endpoints scoped to your organisation only."),
+          ("Push policy from the portal", "Use the Settings form to configure scan interval, vault size, allowed extensions, and webhook URLs. Agents pull the new config on next heartbeat."),
+        ] %}
+        <div style="display:flex;gap:20px;padding:22px 0;border-bottom:1px solid var(--bd);">
+          <div style="width:28px;height:28px;border-radius:50%;background:var(--blue-dim);border:1px solid rgba(14,165,233,0.3);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:800;color:var(--blue);flex-shrink:0;font-size:12px;">{{ loop.index }}</div>
+          <div>
+            <div style="font-weight:600;font-size:14px;margin-bottom:5px;">{{ step[0] }}</div>
+            <p style="font-size:13.5px;color:var(--t2);line-height:1.65;margin:0;">{{ step[1] }}</p>
+          </div>
+        </div>
+        {% endfor %}
+      </ol>
+    </section>
+
+    <div style="height:1px;background:var(--bd);margin-bottom:56px;"></div>
+
+    <!-- ── Mass Deploy ────────────────────────────────────────────────────── -->
+    <section id="mass-deploy" style="margin-bottom:64px;">
+      <h2 style="font-family:var(--font-display);font-size:24px;font-weight:700;letter-spacing:-0.5px;margin-bottom:14px;">Mass Deployment</h2>
+      <p style="color:var(--t2);font-size:14px;line-height:1.7;margin-bottom:20px;">Silent deployment via environment variable — no user interaction required on target machines.</p>
+
+      <div class="terminal">
+        <div class="terminal-header">
+          <div class="terminal-dot red"></div><div class="terminal-dot amber"></div><div class="terminal-dot green"></div>
+          <span class="terminal-title">GPO / Registry — Silent Enrollment</span>
+        </div>
+        <div class="terminal-body">
+          <span class="terminal-line"><span class="terminal-prompt"># Method 1: Environment variable (GPO / MDM)</span></span>
+          <span class="terminal-line"><span class="terminal-cmd">FMSECURE_TENANT_KEY=fms-tenant-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</span></span>
+          <span class="terminal-line">&nbsp;</span>
+          <span class="terminal-line"><span class="terminal-prompt"># Method 2: Registry (HKLM for all users)</span></span>
+          <span class="terminal-line"><span class="terminal-cmd">reg add "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" \</span></span>
+          <span class="terminal-line"><span class="terminal-cmd">  /v FMSECURE_TENANT_KEY /t REG_SZ /d "fms-tenant-xxx..." /f</span></span>
+          <span class="terminal-line">&nbsp;</span>
+          <span class="terminal-line"><span class="terminal-ok"># Agent auto-enrolls on first launch — no wizard shown</span></span>
+        </div>
+      </div>
+    </section>
+
+    <div style="height:1px;background:var(--bd);margin-bottom:56px;"></div>
+
+    <!-- ── API Reference ──────────────────────────────────────────────────── -->
+    <section id="api-ref" style="margin-bottom:64px;">
+      <h2 style="font-family:var(--font-display);font-size:24px;font-weight:700;letter-spacing:-0.5px;margin-bottom:14px;">API Reference</h2>
+      <p style="color:var(--t2);font-size:14px;line-height:1.7;margin-bottom:24px;">Agent-to-server communication uses <code style="font-family:var(--font-mono);color:var(--cyan);font-size:12px;">x-tenant-key</code> header over HTTPS. All endpoints return JSON.</p>
+
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        {% for ep in [
+          ("POST", "/api/heartbeat", "Agent check-in. Creates agent row on first contact, updates last_seen. Returns queued command and tenant config."),
+          ("POST", "/api/agent/alert", "Push a CRITICAL/HIGH alert to the server. Stored in tenant_alerts table."),
+          ("GET",  "/agent/config", "Pull current policy config for the agent's organisation. Returns scan interval, vault settings, webhook URL."),
+          ("POST", "/api/license/validate", "Validate a license key against a machine_id. Binds key to device on first activation."),
+          ("POST", "/api/license/request_transfer", "Initiate a device transfer — sends OTP to purchase email."),
+          ("POST", "/api/license/confirm_transfer", "Confirm device transfer with OTP, rebinds key to new machine_id."),
+          ("GET",  "/version.json", "Latest published version, release notes, and download URL. Used by agents for update banners."),
+        ] %}
+        <div style="background:var(--bg1);border:1px solid var(--bd);border-radius:var(--r-md);padding:16px 20px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:7px;">
+            <span style="font-family:var(--font-mono);font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;{% if ep[0] == 'POST' %}background:var(--blue-dim);color:var(--blue);{% else %}background:var(--green-dim);color:var(--green);{% endif %}">{{ ep[0] }}</span>
+            <code style="font-family:var(--font-mono);font-size:13px;color:var(--cyan);">{{ ep[1] }}</code>
+          </div>
+          <p style="font-size:13px;color:var(--t2);margin:0;line-height:1.55;">{{ ep[2] }}</p>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <div style="height:1px;background:var(--bd);margin-bottom:56px;"></div>
+
+    <!-- ── Build Commands ─────────────────────────────────────────────────── -->
+    <section id="build" style="margin-bottom:64px;">
+      <h2 style="font-family:var(--font-display);font-size:24px;font-weight:700;letter-spacing:-0.5px;margin-bottom:14px;">Build Commands</h2>
+      <p style="color:var(--t2);font-size:14px;line-height:1.7;margin-bottom:20px;">Official build uses Nuitka for maximum performance. PyInstaller is also supported.</p>
+
+      <div class="terminal" style="margin-bottom:16px;">
+        <div class="terminal-header">
+          <div class="terminal-dot red"></div><div class="terminal-dot amber"></div><div class="terminal-dot green"></div>
+          <span class="terminal-title">Nuitka — Recommended</span>
+        </div>
+        <div class="terminal-body" style="font-size:11.5px;">
+<pre style="margin:0;font-family:var(--font-mono);color:var(--t2);">
+<span style="color:var(--t4);"># Watchdog process</span>
+python -m nuitka --standalone --windows-disable-console \
+  --output-dir=dist --output-filename=WinSysHost.exe \
+  --lto=yes sys_watchdog.py
+
+<span style="color:var(--t4);"># Main agent</span>
+python -m nuitka --standalone --windows-disable-console \
+  --enable-plugin=tk-inter --enable-plugin=anti-bloat \
+  --output-dir=dist --output-filename=SecureFIM.exe \
+  --windows-icon-from-ico=assets/icons/app_icon.ico \
+  --include-data-dir=assets=assets \
+  --include-package=customtkinter --include-package=pystray \
+  --include-package=PIL --include-package=cryptography \
+  --include-package=google --include-package=watchdog \
+  --include-package=core --include-package=gui \
+  --lto=yes run.py
+</pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Common Issues ─────────────────────────────────────────────────── -->
+    <section id="faq-tech" style="margin-bottom:64px;">
+      <h2 style="font-family:var(--font-display);font-size:24px;font-weight:700;letter-spacing:-0.5px;margin-bottom:24px;">Common Issues</h2>
+
+      <div class="faq-list" style="max-width:100%;">
+        {% for q, a in [
+          ("Antivirus flags WinSysHost.exe as suspicious", "This is expected. WinSysHost.exe intentionally masquerades as a Windows process. Add it and SecureFIM.exe to your AV exclusion list. Both are built from source — no obfuscated or packed payloads."),
+          ("Agent shows 'Seat limit reached' banner", "Your organisation has reached the maximum enrolled agents. Contact your IT admin to request a seat increase, or unenroll unused machines from the IT admin portal."),
+          ("icacls lockdown was triggered — how do I unlock?", "Open PowerShell as Administrator and run: icacls <folder_path> /reset /T to restore default inheritance. Then reopen FMSecure and disable Safe Mode from the dashboard."),
+          ("Google Drive backup failing", "Re-authenticate Google OAuth from the desktop dashboard (Settings → Cloud Backup → Re-link Google Account). OAuth tokens expire after 90 days of inactivity."),
+          ("Hash baseline scan is very slow", "Ensure SecureFIM.exe is excluded from real-time AV scanning. The scanner will conflict with concurrent hashing and reduce throughput from 1.8 GB/s to under 100 MB/s."),
+        ] %}
+        <div class="faq-item">
+          <button class="faq-question">{{ q }}<span class="faq-chevron">›</span></button>
+          <div class="faq-answer"><div class="faq-answer-inner">{{ a }}</div></div>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <!-- Footer call-out -->
+    <div style="background:var(--bg1);border:1px solid var(--bd);border-radius:var(--r-lg);padding:24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;">
+      <div>
+        <div style="font-family:var(--font-display);font-weight:700;margin-bottom:4px;">Need more help?</div>
+        <div style="font-size:13.5px;color:var(--t2);">Email us at <a href="mailto:{{ brand.support_email }}" style="color:var(--blue);">{{ brand.support_email }}</a> — we respond within 24 hours.</div>
+      </div>
+      <a href="/contact" class="btn btn-primary">Contact Support →</a>
+    </div>
+
+  </main>
+</div>
+</div>
+
+<style>
+.doc-link {
+  display: block;
+  padding: 7px 10px;
+  border-radius: var(--r-sm);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--t2);
+  text-decoration: none;
+  transition: all 0.15s;
+  margin-bottom: 2px;
+}
+.doc-link:hover { color: var(--t1); background: var(--bg2); }
+.doc-link.active { color: var(--blue); background: var(--blue-dim); }
+@media(max-width:900px) {
+  #docs-sidebar { display: none; }
+  #docs-main { padding: 32px 20px; max-width:100%; }
+}
+</style>
+
+<script>
+// Sidebar active link on scroll
+const docSections = document.querySelectorAll('#docs-main section[id]');
+const docLinks = document.querySelectorAll('.doc-link');
+const sidebarObserver = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      docLinks.forEach(l => l.classList.remove('active'));
+      const link = document.querySelector(`.doc-link[href="#${e.target.id}"]`);
+      if (link) link.classList.add('active');
+    }
+  });
+}, { threshold: 0.2, rootMargin: '-80px 0px -50% 0px' });
+docSections.forEach(s => sidebarObserver.observe(s));
+</script>
+{% endblock %}

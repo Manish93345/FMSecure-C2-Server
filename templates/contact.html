@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}Contact{% endblock %}
+{% block description %}Contact the FMSecure team for enterprise pricing, technical support, or general enquiries.{% endblock %}
+
+{% block content %}
+<div class="page-body">
+
+<section style="padding:120px 0 80px;position:relative;overflow:hidden;">
+  <div style="position:absolute;inset:0;pointer-events:none;">
+    <div class="hero-grid" style="opacity:0.35;"></div>
+    <div style="position:absolute;top:-60px;left:50%;transform:translateX(-50%);width:600px;height:400px;background:radial-gradient(circle,rgba(14,165,233,0.08) 0%,transparent 70%);"></div>
+  </div>
+
+  <div class="container" style="position:relative;z-index:1;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:flex-start;">
+
+      <!-- Left: info -->
+      <div>
+        <span class="section-label anim-fade-up" style="margin-bottom:12px;">Get in Touch</span>
+        <h1 class="section-title anim-fade-up delay-100" style="max-width:420px;margin-bottom:18px;">
+          Talk to the team.
+        </h1>
+        <p class="section-sub anim-fade-up delay-200" style="margin-bottom:40px;">
+          Whether you need enterprise pricing, technical support, or just have a question —
+          we respond within 24 hours.
+        </p>
+
+        <!-- Contact options -->
+        <div style="display:flex;flex-direction:column;gap:14px;" class="anim-fade-up delay-300">
+
+          <div style="display:flex;gap:16px;align-items:flex-start;background:var(--bg1);border:1px solid var(--bd);border-radius:var(--r-lg);padding:18px 20px;transition:border-color 0.2s;" onmouseover="this.style.borderColor='var(--bdh)'" onmouseout="this.style.borderColor='var(--bd)'">
+            <div style="width:40px;height:40px;border-radius:var(--r-md);background:var(--blue-dim);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">📧</div>
+            <div>
+              <div style="font-weight:700;font-size:14px;margin-bottom:3px;">Email Support</div>
+              <a href="mailto:{{ brand.support_email }}" style="font-size:13.5px;color:var(--blue);">{{ brand.support_email }}</a>
+              <p style="font-size:12px;color:var(--t3);margin-top:2px;">Typical response: &lt; 24 hours</p>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:16px;align-items:flex-start;background:var(--bg1);border:1px solid var(--bd);border-radius:var(--r-lg);padding:18px 20px;transition:border-color 0.2s;" onmouseover="this.style.borderColor='var(--bdh)'" onmouseout="this.style.borderColor='var(--bd)'">
+            <div style="width:40px;height:40px;border-radius:var(--r-md);background:var(--green-dim);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">🏢</div>
+            <div>
+              <div style="font-weight:700;font-size:14px;margin-bottom:3px;">Enterprise Sales</div>
+              <p style="font-size:13.5px;color:var(--t2);margin:0;">Multi-seat licensing, custom deployment, SLA agreements</p>
+              <p style="font-size:12px;color:var(--t3);margin-top:2px;">Use the form and select "Enterprise"</p>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:16px;align-items:flex-start;background:var(--bg1);border:1px solid var(--bd);border-radius:var(--r-lg);padding:18px 20px;transition:border-color 0.2s;" onmouseover="this.style.borderColor='var(--bdh)'" onmouseout="this.style.borderColor='var(--bd)'">
+            <div style="width:40px;height:40px;border-radius:var(--r-md);background:var(--amber-dim);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">🛡</div>
+            <div>
+              <div style="font-weight:700;font-size:14px;margin-bottom:3px;">{{ brand.company }}</div>
+              <p style="font-size:13.5px;color:var(--t2);margin:0;">Registered in India 🇮🇳</p>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Right: form -->
+      <div class="anim-fade-up delay-200">
+        {% if success %}
+        <div style="background:var(--bg1);border:1px solid var(--green);border-radius:var(--r-xl);padding:48px 40px;text-align:center;">
+          <div style="font-size:48px;margin-bottom:16px;">✅</div>
+          <h2 style="font-family:var(--font-display);font-size:22px;font-weight:700;margin-bottom:8px;">Message received!</h2>
+          <p style="font-size:14px;color:var(--t2);margin-bottom:24px;">We'll get back to you within 24 hours at the email you provided.</p>
+          <a href="/" class="btn btn-secondary">← Back to home</a>
+        </div>
+        {% else %}
+        <div style="background:var(--bg1);border:1px solid var(--bd);border-radius:var(--r-xl);padding:36px 32px;">
+          <h2 style="font-family:var(--font-display);font-size:20px;font-weight:700;margin-bottom:4px;">Send a message</h2>
+          <p style="font-size:13.5px;color:var(--t2);margin-bottom:24px;">We read every submission personally.</p>
+
+          {% if error %}
+          <div class="alert alert-error" style="margin-bottom:16px;"><span>⚠</span> {{ error }}</div>
+          {% endif %}
+
+          <form method="POST" action="/contact">
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Your Name *</label>
+                <input type="text" name="name" class="form-input" required placeholder="Jane Smith" value="{{ form.name|default('') }}">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Email Address *</label>
+                <input type="email" name="email" class="form-input" required placeholder="jane@company.com" value="{{ form.email|default('') }}">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Enquiry Type *</label>
+              <select name="type" class="form-select" required>
+                <option value="">Select type…</option>
+                <option value="support" {% if form.type == 'support' %}selected{% endif %}>Technical Support</option>
+                <option value="enterprise" {% if form.type == 'enterprise' %}selected{% endif %}>Enterprise / Sales</option>
+                <option value="license" {% if form.type == 'license' %}selected{% endif %}>License / Billing</option>
+                <option value="general" {% if form.type == 'general' %}selected{% endif %}>General Question</option>
+                <option value="other" {% if form.type == 'other' %}selected{% endif %}>Other</option>
+              </select>
+            </div>
+
+            <div class="form-group" id="company-row" style="display:none;">
+              <label class="form-label">Company Name</label>
+              <input type="text" name="company" class="form-input" placeholder="Acme Corp" value="{{ form.company|default('') }}">
+            </div>
+
+            <div class="form-group" id="seats-row" style="display:none;">
+              <label class="form-label">Approximate Number of Endpoints</label>
+              <select name="seats" class="form-select">
+                <option value="1-10">1 – 10</option>
+                <option value="11-50">11 – 50</option>
+                <option value="51-200">51 – 200</option>
+                <option value="200+">200+</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Message *</label>
+              <textarea name="message" class="form-textarea" required rows="5"
+                        placeholder="Describe your question or requirement…">{{ form.message|default('') }}</textarea>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-full btn-lg">
+              Send Message →
+            </button>
+
+            <p style="font-size:11.5px;color:var(--t3);text-align:center;margin-top:14px;">
+              By submitting, you agree to our <a href="/privacy" style="color:var(--t3);">Privacy Policy</a>.
+            </p>
+          </form>
+        </div>
+        {% endif %}
+      </div>
+
+    </div>
+  </div>
+</section>
+
+</div>
+
+<style>
+@media(max-width:900px){
+  section > .container > div { grid-template-columns:1fr!important; gap:40px!important; }
+}
+</style>
+
+<script>
+const typeSelect = document.querySelector('select[name="type"]');
+const companyRow = document.getElementById('company-row');
+const seatsRow = document.getElementById('seats-row');
+if (typeSelect) {
+  const toggle = () => {
+    const isEnterprise = typeSelect.value === 'enterprise';
+    companyRow.style.display = isEnterprise ? 'block' : 'none';
+    seatsRow.style.display   = isEnterprise ? 'block' : 'none';
+  };
+  typeSelect.addEventListener('change', toggle);
+  toggle();
+}
+</script>
+{% endblock %}

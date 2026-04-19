@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reset Password | {{ brand.name }}</title>
+  <link rel="icon" type="image/x-icon" href="{{ brand.logo_ico }}">
+  <link rel="stylesheet" href="/static/css/fmsecure.css">
+  <style>
+    body { min-height:100vh; display:flex; align-items:center; justify-content:center; background:var(--bg); padding:24px; position:relative; overflow:hidden; }
+    body::before { content:''; position:fixed; inset:0; background-image:linear-gradient(rgba(30,38,64,0.35) 1px,transparent 1px),linear-gradient(90deg,rgba(30,38,64,0.35) 1px,transparent 1px); background-size:48px 48px; mask-image:radial-gradient(ellipse at center,black 20%,transparent 75%); pointer-events:none; z-index:0; }
+    .card { position:relative; z-index:1; background:var(--bg1); border:1px solid var(--bd); border-radius:var(--r-xl); padding:44px 40px; width:100%; max-width:420px; animation:fadeUp 0.5s var(--ease-out) both; }
+    /* OTP input styling */
+    .otp-input { font-family:var(--font-mono); font-size:22px; letter-spacing:8px; text-align:center; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <a href="/tenant/login" style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--t3);margin-bottom:28px;text-decoration:none;">
+      ← Back to login
+    </a>
+
+    <div style="width:48px;height:48px;background:var(--green-dim);border:1px solid rgba(16,185,129,0.3);border-radius:var(--r-md);display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:20px;">🔐</div>
+
+    <h2 style="font-family:var(--font-display);font-size:22px;font-weight:700;margin-bottom:8px;">Reset your password</h2>
+    <p style="font-size:13.5px;color:var(--t2);margin-bottom:28px;line-height:1.65;">
+      Enter the 6-digit code sent to your email and choose a new password.
+    </p>
+
+    {% if error %}
+    <div class="alert alert-error" style="margin-bottom:18px;"><span>⚠</span> {{ error }}</div>
+    {% endif %}
+
+    <form method="POST" action="/tenant/reset-password">
+      <input type="hidden" name="email" value="{{ email }}">
+
+      <div class="form-group">
+        <label class="form-label">6-Digit Reset Code</label>
+        <input type="text" name="otp" class="form-input otp-input" placeholder="000000"
+               maxlength="6" inputmode="numeric" pattern="[0-9]{6}" required autofocus>
+      </div>
+      <div class="form-group">
+        <label class="form-label">New Password</label>
+        <input type="password" name="new_password" class="form-input" required
+               placeholder="Minimum 8 characters" minlength="8">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Confirm New Password</label>
+        <input type="password" name="confirm_password" class="form-input" required
+               placeholder="Repeat password">
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-full btn-lg" style="margin-top:4px;">
+        Reset Password
+      </button>
+    </form>
+
+    <p style="font-size:12px;color:var(--t3);text-align:center;margin-top:20px;">
+      Code expires in 5 minutes. <a href="/tenant/forgot-password" style="color:var(--blue);">Request a new one →</a>
+    </p>
+  </div>
+</body>
+</html>

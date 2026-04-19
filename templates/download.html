@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% block title %}Download{% endblock %}
+{% block description %}Download FMSecure v{{ version }} — Enterprise EDR for Windows. Free to start, PRO features unlock instantly with your license key.{% endblock %}
+
+{% block content %}
+<div class="page-body">
+
+<!-- ── Hero ──────────────────────────────────────────────────────────────── -->
+<section style="position:relative;padding:120px 0 80px;text-align:center;overflow:hidden;">
+  <div style="position:absolute;inset:0;pointer-events:none;">
+    <div class="hero-grid" style="opacity:0.35;"></div>
+    <div style="position:absolute;top:-80px;left:50%;transform:translateX(-50%);width:700px;height:500px;background:radial-gradient(circle,rgba(14,165,233,0.09) 0%,transparent 70%);"></div>
+  </div>
+  <div class="container" style="position:relative;z-index:1;">
+    <div class="anim-fade-up">
+      <span class="badge badge-online badge-dot" style="margin-bottom:20px;display:inline-flex;">
+        v{{ version }} — Latest Release
+      </span>
+    </div>
+    <h1 class="section-title anim-fade-up delay-100" style="font-size:clamp(36px,5.5vw,62px);margin-bottom:14px;">
+      Download <span class="grad-text">{{ brand.name }}</span>
+    </h1>
+    <p class="section-sub anim-fade-up delay-200" style="margin:0 auto 40px;max-width:520px;">
+      {{ brand.tagline }}. One EXE, no installer, no kernel drivers.
+      Free to use — PRO features activate instantly with your license key.
+    </p>
+
+    <!-- Release notes -->
+    {% if notes %}
+    <div class="anim-fade-up delay-300" style="display:inline-block;background:var(--bg1);border:1px solid var(--bd);border-radius:var(--r-lg);padding:14px 24px;margin-bottom:36px;font-size:13.5px;color:var(--t2);max-width:520px;text-align:left;">
+      <span style="font-family:var(--font-mono);font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:1.5px;display:block;margin-bottom:6px;">What's new in v{{ version }}</span>
+      {{ notes }}
+    </div>
+    {% endif %}
+
+    <!-- Download button -->
+    <div class="anim-fade-up delay-300" style="margin-bottom:20px;">
+      <a href="{{ direct_url }}" class="btn btn-primary" id="dl-btn"
+         style="font-size:17px;padding:16px 48px;border-radius:var(--r-lg);display:inline-flex;gap:12px;align-items:center;">
+        <span style="font-size:20px;">⬇</span>
+        Download {{ brand.name }} v{{ version }}
+      </a>
+    </div>
+    <p class="anim-fade-up delay-400" style="font-size:12.5px;color:var(--t3);">
+      Windows 10/11 · 64-bit · No installation required · Free to try
+    </p>
+
+    <!-- Download counter animation -->
+    <div class="anim-fade-up delay-500" style="margin-top:28px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px;color:var(--t3);">
+      <span style="width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse-dot 2s ease infinite;display:inline-block;"></span>
+      Secured by HMAC-signed integrity checks · <a href="/changelog" style="color:var(--blue);">View changelog →</a>
+    </div>
+  </div>
+</section>
+
+<!-- ── What's included ────────────────────────────────────────────────────── -->
+<section style="padding:0 0 80px;">
+  <div class="container">
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;" id="dl-feats">
+
+      <div class="feat-card blue reveal" style="padding:22px;">
+        <div class="feat-icon blue" style="width:40px;height:40px;font-size:18px;margin-bottom:14px;">🛡</div>
+        <div class="feat-title" style="font-size:14px;">Active Defense</div>
+        <div class="feat-body" style="font-size:12.5px;">Auto-restores tampered or deleted files from the AES-256 encrypted vault</div>
+      </div>
+
+      <div class="feat-card red reveal reveal-delay-1" style="padding:22px;">
+        <div class="feat-icon red" style="width:40px;height:40px;font-size:18px;margin-bottom:14px;">🛑</div>
+        <div class="feat-title" style="font-size:14px;">Ransomware Killswitch</div>
+        <div class="feat-body" style="font-size:12.5px;">OS-level NTFS lockdown on burst file operations — triggers in seconds</div>
+      </div>
+
+      <div class="feat-card green reveal reveal-delay-2" style="padding:22px;">
+        <div class="feat-icon green" style="width:40px;height:40px;font-size:18px;margin-bottom:14px;">☁️</div>
+        <div class="feat-title" style="font-size:14px;">Cloud Backup</div>
+        <div class="feat-body" style="font-size:12.5px;">Google Drive disaster recovery with per-machine encrypted vault sync</div>
+      </div>
+
+      <div class="feat-card amber reveal reveal-delay-3" style="padding:22px;">
+        <div class="feat-icon amber" style="width:40px;height:40px;font-size:18px;margin-bottom:14px;">🔌</div>
+        <div class="feat-title" style="font-size:14px;">USB Device Control</div>
+        <div class="feat-body" style="font-size:12.5px;">Block unauthorized USB write access via Windows Registry DLP policy</div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ── Quick Start ────────────────────────────────────────────────────────── -->
+<section class="section">
+  <div class="container">
+    <div style="max-width:720px;margin:0 auto;">
+      <div class="section-center reveal" style="margin-bottom:40px;">
+        <span class="section-label">Quick Start</span>
+        <h2 class="section-title">Running in 3 minutes.</h2>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:0;" class="reveal">
+
+        <!-- Step 1 -->
+        <div style="display:flex;gap:20px;padding:24px 0;border-bottom:1px solid var(--bd);">
+          <div style="width:36px;height:36px;border-radius:50%;background:var(--blue-dim);border:1px solid rgba(14,165,233,0.3);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:800;color:var(--blue);flex-shrink:0;font-size:14px;">1</div>
+          <div>
+            <div style="font-family:var(--font-display);font-weight:700;font-size:15px;margin-bottom:6px;">Run as Administrator</div>
+            <p style="font-size:13.5px;color:var(--t2);line-height:1.65;">Right-click <code style="font-family:var(--font-mono);color:var(--cyan);font-size:12px;background:var(--bg2);padding:1px 6px;border-radius:4px;">SecureFIM.exe</code> → Run as Administrator. Register your admin account with email OTP. The Watchdog process (<code style="font-family:var(--font-mono);color:var(--cyan);font-size:12px;background:var(--bg2);padding:1px 6px;border-radius:4px;">WinSysHost.exe</code>) installs silently in the background.</p>
+          </div>
+        </div>
+
+        <!-- Step 2 -->
+        <div style="display:flex;gap:20px;padding:24px 0;border-bottom:1px solid var(--bd);">
+          <div style="width:36px;height:36px;border-radius:50%;background:var(--blue-dim);border:1px solid rgba(14,165,233,0.3);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:800;color:var(--blue);flex-shrink:0;font-size:14px;">2</div>
+          <div>
+            <div style="font-family:var(--font-display);font-weight:700;font-size:15px;margin-bottom:6px;">Select folders to monitor</div>
+            <p style="font-size:13.5px;color:var(--t2);line-height:1.65;">Add up to 5 directories (PRO) or 1 (Free). Initial hash baseline scan runs at up to 1.8 GB/s using multithreaded hashing across all CPU cores. PRO users get vault backup enabled automatically.</p>
+          </div>
+        </div>
+
+        <!-- Step 3 -->
+        <div style="display:flex;gap:20px;padding:24px 0;">
+          <div style="width:36px;height:36px;border-radius:50%;background:var(--blue-dim);border:1px solid rgba(14,165,233,0.3);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:800;color:var(--blue);flex-shrink:0;font-size:14px;">3</div>
+          <div>
+            <div style="font-family:var(--font-display);font-weight:700;font-size:15px;margin-bottom:6px;">(Optional) Activate PRO</div>
+            <p style="font-size:13.5px;color:var(--t2);line-height:1.65;">Click your username → Activate License → paste your key. PRO features (Active Defense, ransomware killswitch, cloud C2) unlock immediately. Get your key at <a href="/pricing" style="color:var(--blue);">pricing →</a></p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ── System requirements ────────────────────────────────────────────────── -->
+<section class="section-sm">
+  <div class="container">
+    <div style="max-width:700px;margin:0 auto;" class="reveal">
+      <h3 style="font-family:var(--font-display);font-size:18px;font-weight:700;margin-bottom:20px;">System Requirements</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        {% for item in [
+          ("OS", "Windows 10 / 11 (64-bit)"),
+          ("Runtime", "No runtime required — standalone EXE"),
+          ("RAM", "Minimum 256 MB free"),
+          ("Disk", "~25 MB for the agent"),
+          ("Privileges", "Administrator (UAC elevation)"),
+          ("Internet", "Optional — for C2 and cloud backup"),
+          ("Antivirus", "May need exclusion for WinSysHost.exe"),
+          ("Framework", ".NET / VC++ not required"),
+        ] %}
+        <div style="background:var(--bg1);border:1px solid var(--bd);border-radius:var(--r-md);padding:14px 18px;display:flex;gap:14px;align-items:flex-start;">
+          <span style="font-family:var(--font-mono);font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:1px;min-width:80px;padding-top:2px;">{{ item[0] }}</span>
+          <span style="font-size:13.5px;color:var(--t1);">{{ item[1] }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ── CTA ────────────────────────────────────────────────────────────────── -->
+<section class="section">
+  <div class="container">
+    <div class="cta-box reveal">
+      <h2 class="cta-title">Ready to secure your endpoints?</h2>
+      <p class="cta-sub">Free download, no account required to start monitoring.</p>
+      <div class="cta-actions">
+        <a href="{{ direct_url }}" class="btn btn-primary btn-xl">⬇ Download v{{ version }}</a>
+        <a href="/pricing" class="btn btn-secondary btn-xl">View PRO Pricing →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+</div>
+
+<style>
+@media(max-width:900px){#dl-feats{grid-template-columns:1fr 1fr!important;}}
+@media(max-width:500px){#dl-feats{grid-template-columns:1fr!important;}}
+</style>
+{% endblock %}

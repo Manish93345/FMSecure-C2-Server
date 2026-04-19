@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payment Successful | {{ brand.name }}</title>
+  <link rel="icon" type="image/x-icon" href="{{ brand.logo_ico }}">
+  <link rel="stylesheet" href="/static/css/fmsecure.css">
+  <style>
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg);
+      padding: 24px;
+      position: relative;
+      overflow: hidden;
+    }
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(30,38,64,0.3) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(30,38,64,0.3) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: radial-gradient(ellipse at center, black 20%, transparent 75%);
+      pointer-events: none;
+    }
+    .success-glow {
+      position: fixed;
+      top: -100px; left: 50%; transform: translateX(-50%);
+      width: 600px; height: 500px;
+      background: radial-gradient(circle, rgba(16,185,129,0.07) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .card {
+      position: relative;
+      z-index: 1;
+      background: var(--bg1);
+      border: 1px solid rgba(16,185,129,0.3);
+      border-radius: var(--r-2xl);
+      padding: 48px 44px;
+      width: 100%;
+      max-width: 500px;
+      text-align: center;
+      animation: scaleIn 0.5s var(--ease-bounce) both;
+      box-shadow: 0 0 60px rgba(16,185,129,0.08);
+    }
+    .key-box {
+      background: var(--bg);
+      border: 1px solid var(--bd);
+      border-radius: var(--r-lg);
+      padding: 20px;
+      margin: 24px 0;
+    }
+    .key-label {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      font-weight: 700;
+      color: var(--t3);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: 12px;
+    }
+    .key-value {
+      font-family: var(--font-mono);
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--blue);
+      letter-spacing: 3px;
+      word-break: break-all;
+      line-height: 1.5;
+    }
+    .copy-btn {
+      margin-top: 14px;
+      background: var(--bg2);
+      border: 1px solid var(--bd);
+      color: var(--t2);
+      border-radius: var(--r-sm);
+      padding: 7px 18px;
+      font-size: 12.5px;
+      font-family: var(--font-body);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .copy-btn:hover { border-color: var(--green); color: var(--green); }
+    .steps-box {
+      background: var(--bg);
+      border: 1px solid var(--bd);
+      border-radius: var(--r-lg);
+      padding: 20px 24px;
+      text-align: left;
+      font-size: 13.5px;
+      color: var(--t2);
+      line-height: 2.2;
+    }
+    .steps-box strong { color: var(--t1); }
+  </style>
+</head>
+<body>
+  <div class="success-glow"></div>
+
+  <div class="card">
+
+    <!-- Checkmark animation -->
+    <div style="font-size:60px;margin-bottom:16px;animation:fadeUp 0.5s 0.2s both;">✅</div>
+
+    <h1 style="font-family:var(--font-display);font-size:26px;font-weight:800;letter-spacing:-0.5px;margin-bottom:8px;color:var(--green);">
+      Payment Successful!
+    </h1>
+    <p style="font-size:14px;color:var(--t2);margin-bottom:0;line-height:1.65;">
+      Your <strong style="color:var(--t1);">{{ tier_label }}</strong> is now active.<br>
+      We've also emailed this key to <strong style="color:var(--t1);">{{ email }}</strong>
+    </p>
+
+    <!-- Key display -->
+    <div class="key-box">
+      <div class="key-label">Your License Key</div>
+      <div class="key-value" id="key-display">{{ key }}</div>
+      <button class="copy-btn" id="copy-btn"
+              onclick="navigator.clipboard.writeText('{{ key }}').then(()=>{ this.textContent='✓ Copied!'; this.style.color='var(--green)'; this.style.borderColor='var(--green)'; })">
+        Copy Key
+      </button>
+    </div>
+
+    <!-- Activation steps -->
+    <div class="steps-box">
+      <strong>How to activate {{ brand.name }}:</strong><br>
+      1. Open <strong>{{ brand.name }}</strong> on your PC<br>
+      2. Click your <strong>username</strong> (top-right corner)<br>
+      3. Click <strong>Activate License</strong><br>
+      4. Paste this key — no email needed<br>
+      5. Click <strong>Activate</strong> — PRO unlocks immediately
+    </div>
+
+    <!-- Important note -->
+    <div style="margin-top:20px;padding:12px 16px;background:var(--blue-dim);border:1px solid rgba(14,165,233,0.2);border-radius:var(--r-md);font-size:12.5px;color:#93c5fd;text-align:left;line-height:1.6;">
+      <strong style="display:block;margin-bottom:2px;">🔒 Device-bound license</strong>
+      This key activates on one PC. To transfer to a new device, email
+      <a href="mailto:{{ brand.support_email }}" style="color:var(--blue);">{{ brand.support_email }}</a>
+      with your key and original purchase email.
+    </div>
+
+    <!-- Actions -->
+    <div style="margin-top:24px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
+      <a href="/download" class="btn btn-primary">⬇ Download Agent</a>
+      <a href="/" class="btn btn-secondary">← Home</a>
+    </div>
+
+    <p style="margin-top:20px;font-size:11.5px;color:var(--t4);">
+      {{ brand.name }} v2.5 · {{ brand.tagline }} · Made in India 🇮🇳
+    </p>
+  </div>
+</body>
+</html>

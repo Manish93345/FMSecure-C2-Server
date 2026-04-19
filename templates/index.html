@@ -1,0 +1,717 @@
+{% extends "base.html" %}
+
+{% block title %}{{ brand.name }} — {{ brand.tagline }}{% endblock %}
+{% block description %}{{ brand.name }} is an enterprise EDR for Windows with real-time file integrity monitoring, ransomware killswitch, AES-256 encryption, cloud disaster recovery, and live C2 command &amp; control. Start free.{% endblock %}
+
+{% block content %}
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     HERO
+     ══════════════════════════════════════════════════════════════════════════ -->
+<section style="position:relative; min-height:100vh; display:flex; align-items:center; padding-top:var(--nav-h);">
+
+  <!-- Background effects -->
+  <div class="hero-bg">
+    <div class="hero-grid"></div>
+    <div class="hero-glow-1"></div>
+    <div class="hero-glow-2"></div>
+  </div>
+
+  <div class="container" style="position:relative; z-index:1; padding-top:80px; padding-bottom:80px;">
+    <div style="max-width:780px;">
+
+      <!-- Version badge -->
+      <div class="anim-fade-up" style="margin-bottom:24px;">
+        <span class="badge badge-online badge-dot" style="font-size:10px;">
+          v2.5.0 — EDR Engine Active
+        </span>
+        &nbsp;&nbsp;
+        <span class="badge" style="background:var(--amber-dim);color:var(--amber);border:1px solid rgba(245,158,11,0.2);font-size:10px;">
+          Phase E — Process Attribution Live
+        </span>
+      </div>
+
+      <!-- Headline -->
+      <h1 class="anim-fade-up delay-100" style="font-family:var(--font-display);font-size:clamp(40px,6.5vw,76px);font-weight:800;letter-spacing:-3px;line-height:1.0;margin-bottom:20px;">
+        The Core of<br>
+        <span class="grad-text">Endpoint Security.</span>
+      </h1>
+
+      <!-- Subheading -->
+      <p class="anim-fade-up delay-200" style="font-size:clamp(16px,2vw,19px);color:var(--t2);line-height:1.65;max-width:580px;margin-bottom:36px;">
+        Enterprise EDR for Windows — real-time file integrity monitoring,
+        ransomware killswitch, AES-256 vault, and live cloud C2 command &amp; control.
+        <span style="color:var(--t1);font-weight:500;">No kernel drivers. No IT approval needed.</span>
+      </p>
+
+      <!-- CTAs -->
+      <div class="anim-fade-up delay-300" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:40px;">
+        <a href="/download" class="btn btn-primary btn-xl">
+          ⬇ Download Agent
+        </a>
+        <a href="#features" class="btn btn-secondary btn-xl">
+          Explore Features →
+        </a>
+      </div>
+
+      <!-- Trust signals -->
+      <div class="anim-fade-up delay-400" style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--t3);">
+          <span style="color:var(--green);">✓</span> Free tier available
+        </div>
+        <div style="display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--t3);">
+          <span style="color:var(--green);">✓</span> Single EXE, no installation
+        </div>
+        <div style="display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--t3);">
+          <span style="color:var(--green);">✓</span> License key in 60 seconds
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Hero terminal (desktop) -->
+    <div class="anim-scale-in delay-400" style="position:absolute;right:0;top:50%;transform:translateY(-50%);width:420px;display:none;" id="hero-terminal">
+      <div class="terminal terminal-animate">
+        <div class="terminal-header">
+          <div class="terminal-dot red"></div>
+          <div class="terminal-dot amber"></div>
+          <div class="terminal-dot green"></div>
+          <span class="terminal-title">fmsecure — live monitor</span>
+        </div>
+        <div class="terminal-body" style="font-size:11.5px;">
+          <span class="terminal-line">
+            <span class="terminal-prompt" data-type="[FMSecure] " data-speed="25"></span>
+            <span class="terminal-cmd" data-type="Starting integrity engine..." data-speed="30"></span>
+          </span>
+          <span class="terminal-line">
+            <span class="terminal-output" data-type="✓ Watchdog process registered (WinSysHost.exe)" data-speed="20"></span>
+          </span>
+          <span class="terminal-line">
+            <span class="terminal-output" data-type="✓ AES-256 vault loaded (PBKDF2 200k iter)" data-speed="20"></span>
+          </span>
+          <span class="terminal-line">
+            <span class="terminal-output" data-type="✓ C2 heartbeat connected → fmsecure.in" data-speed="20"></span>
+          </span>
+          <span class="terminal-line">&nbsp;</span>
+          <span class="terminal-line">
+            <span class="terminal-warn" data-type="[ALERT] HIGH — Modified: system32\hosts" data-speed="25"></span>
+          </span>
+          <span class="terminal-line">
+            <span class="terminal-output" data-type="  Process: powershell.exe (LOLBin detected)" data-speed="20"></span>
+          </span>
+          <span class="terminal-line">
+            <span class="terminal-ok" data-type="  Snapshot encrypted → vault/incident_001.dat" data-speed="20"></span>
+          </span>
+          <span class="terminal-line">&nbsp;</span>
+          <span class="terminal-line">
+            <span class="terminal-err" data-type="[CRITICAL] Ransomware burst — 7 events/10s" data-speed="25"></span>
+          </span>
+          <span class="terminal-line">
+            <span class="terminal-ok" data-type="  Killswitch armed. icacls lockdown active." data-speed="20"></span>
+          </span>
+          <span class="terminal-line">
+            <span class="terminal-value cursor" data-type="  Awaiting C2 command..." data-speed="30"></span>
+          </span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Scroll indicator -->
+  <div style="position:absolute;bottom:32px;left:50%;transform:translateX(-50%);opacity:0.4;animation:fadeIn 1s 1.5s ease both;">
+    <div style="width:1px;height:48px;background:linear-gradient(to bottom,var(--blue),transparent);margin:0 auto 8px;"></div>
+    <div style="font-family:var(--font-mono);font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:2px;text-align:center;">SCROLL</div>
+  </div>
+
+</section>
+
+<style>
+  @media (min-width: 1100px) {
+    #hero-terminal { display: block !important; }
+    section > .container > h1 { font-size: clamp(40px, 5.5vw, 68px); }
+  }
+</style>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     STATS STRIP
+     ══════════════════════════════════════════════════════════════════════════ -->
+<div class="stats-strip">
+  <div class="stats-strip-inner">
+    <div class="strip-stat">
+      <div class="strip-num" data-count="1830" data-suffix=" MB/s">—</div>
+      <div class="strip-lbl">Hashing Throughput</div>
+    </div>
+    <div class="strip-stat">
+      <div class="strip-num" data-count="119" data-suffix=" GB">—</div>
+      <div class="strip-lbl">Max Folder Size Tested</div>
+    </div>
+    <div class="strip-stat">
+      <div class="strip-num" data-count="256" data-suffix="-bit">—</div>
+      <div class="strip-lbl">AES Encryption</div>
+    </div>
+    <div class="strip-stat">
+      <div class="strip-num" data-count="14" data-suffix="">—</div>
+      <div class="strip-lbl">Registry Keys Monitored</div>
+    </div>
+    <div class="strip-stat">
+      <div class="strip-num" data-count="25" data-suffix="+">—</div>
+      <div class="strip-lbl">LOLBin Signatures</div>
+    </div>
+    <div class="strip-stat">
+      <div class="strip-num" data-count="45" data-suffix="s">—</div>
+      <div class="strip-lbl">Offline Detection Grace</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     FEATURES GRID
+     ══════════════════════════════════════════════════════════════════════════ -->
+<section class="section" id="features">
+  <div class="container">
+
+    <div class="section-center reveal" style="margin-bottom:56px;">
+      <span class="section-label">Core Capabilities</span>
+      <h2 class="section-title">Multi-layer defense.<br>Single binary.</h2>
+      <p class="section-sub">
+        Every layer operates independently — a failure in one never compromises the others.
+        No kernel driver signing. No IT department approval.
+      </p>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:20px;" id="features-grid">
+
+      <div class="feat-card blue reveal">
+        <div class="feat-icon blue">🔍</div>
+        <div class="feat-title">Real-Time File Integrity</div>
+        <div class="feat-body">
+          Event-driven watchdog replaces polling. SHA-256 hashing with HMAC-signed records.
+          Detects create, modify, delete, rename — even editor "atomic save" patterns.
+          Debounce timer prevents false positives on large writes.
+        </div>
+      </div>
+
+      <div class="feat-card red reveal reveal-delay-1">
+        <div class="feat-icon red">🛑</div>
+        <div class="feat-title">Ransomware Killswitch</div>
+        <div class="feat-body">
+          Burst detection triggers on ≥5 file events in 10 seconds. OS-level lockdown via
+          Windows <code style="font-family:var(--font-mono);color:var(--cyan);font-size:11px;">icacls</code>
+          — strips Write/Delete for Everyone at NTFS kernel level. Honeypot tripwire detonates instantly.
+        </div>
+      </div>
+
+      <div class="feat-card green reveal reveal-delay-2">
+        <div class="feat-icon green">🔒</div>
+        <div class="feat-title">AES-256 Auto-Heal Vault</div>
+        <div class="feat-body">
+          Self-healing vault backs up critical files (under 10 MB) and restores them instantly
+          on modification or deletion. AES-256 Fernet encryption at rest. Hardware-bound KEK
+          via PBKDF2 200k iterations — stolen key files are permanently unreadable.
+        </div>
+      </div>
+
+      <div class="feat-card amber reveal">
+        <div class="feat-icon amber">⚡</div>
+        <div class="feat-title">Process Attribution</div>
+        <div class="feat-body">
+          Every file event records which process caused it. LOLBin detection identifies 25+ 
+          known-malicious Windows binaries (PowerShell, certutil, mshta, etc.). 
+          Trusted-parent whitelist suppresses false positives from IDEs and dev tools.
+        </div>
+      </div>
+
+      <div class="feat-card purple reveal reveal-delay-1">
+        <div class="feat-icon purple">📡</div>
+        <div class="feat-title">Registry Persistence Monitor</div>
+        <div class="feat-body">
+          14 Windows Registry keys used by malware families monitored via
+          <code style="font-family:var(--font-mono);color:var(--cyan);font-size:11px;">RegNotifyChangeKeyValue()</code>
+          — a kernel API that uses zero CPU when idle. New Run keys, IFEO hijacks, AppInit DLLs,
+          and Winlogon changes trigger CRITICAL alerts instantly.
+        </div>
+      </div>
+
+      <div class="feat-card cyan reveal reveal-delay-2">
+        <div class="feat-icon cyan">🌐</div>
+        <div class="feat-title">Cloud C2 Command &amp; Control</div>
+        <div class="feat-body">
+          Multi-tenant cloud server on Railway + PostgreSQL. Live fleet telemetry, remote host isolation
+          from browser, per-organisation IT admin portal with scoped visibility. 
+          Seat enforcement, offline sweeper, role-based access control.
+        </div>
+      </div>
+
+      <div class="feat-card blue reveal">
+        <div class="feat-icon blue">☁️</div>
+        <div class="feat-title">Cloud Disaster Recovery</div>
+        <div class="feat-body">
+          Google Drive OAuth 2.0 backup. Per-machine encrypted cloud vaults identified by
+          hardware <code style="font-family:var(--font-mono);color:var(--cyan);font-size:11px;">machine_id</code>.
+          Two-tier restore: local vault → cloud rescue. Folder structure backup with
+          selective extension and size filtering.
+        </div>
+      </div>
+
+      <div class="feat-card green reveal reveal-delay-1">
+        <div class="feat-icon green">🧬</div>
+        <div class="feat-title">Threat Intelligence</div>
+        <div class="feat-body">
+          SHA-256 hash of every new or modified file checked asynchronously against MalwareBazaar (abuse.ch).
+          Results cached locally in SQLite for 7 days — zero network calls on repeat encounters.
+          Optional VirusTotal integration via API key.
+        </div>
+      </div>
+
+      <div class="feat-card red reveal reveal-delay-2">
+        <div class="feat-icon red">🚨</div>
+        <div class="feat-title">Dual-Channel Alerting</div>
+        <div class="feat-body">
+          Discord/Slack rich embeds with color-coded severity, real-time mobile push.
+          SMTP email alerts with AES-encrypted forensic <code style="font-family:var(--font-mono);color:var(--cyan);font-size:11px;">.dat</code>
+          attachments for compliance trail. Forensic snapshots capture system state, disk info,
+          process list, and last 15 log lines.
+        </div>
+      </div>
+
+    </div>
+
+    <div style="text-align:center;margin-top:40px;" class="reveal">
+      <a href="/features" class="btn btn-secondary btn-lg">
+        View All Capabilities →
+      </a>
+    </div>
+
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     ARCHITECTURE DIAGRAM
+     ══════════════════════════════════════════════════════════════════════════ -->
+<section class="section" id="architecture">
+  <div class="container">
+    <div style="display:flex;gap:72px;align-items:flex-start;flex-wrap:wrap;">
+
+      <!-- Left text -->
+      <div style="flex:1;min-width:300px;">
+        <div class="reveal">
+          <span class="section-label">Technical Architecture</span>
+          <h2 class="section-title" style="max-width:400px;">Multi-layer defense.<br/>Single binary.</h2>
+          <p class="section-sub" style="margin-bottom:28px;">
+            {{ brand.name }} is not a script wrapper. It is a layered security architecture
+            where each tier is independently functional — a failure in one layer never
+            compromises the others.
+          </p>
+        </div>
+
+        <ul style="list-style:none;display:flex;flex-direction:column;gap:11px;" class="reveal">
+          <li style="display:flex;align-items:flex-start;gap:10px;font-size:14px;color:var(--t2);">
+            <span style="color:var(--green);font-weight:700;flex-shrink:0;margin-top:2px;">✓</span>
+            HMAC SHA-256 signed on every log line — tamper detection at write time
+          </li>
+          <li style="display:flex;align-items:flex-start;gap:10px;font-size:14px;color:var(--t2);">
+            <span style="color:var(--green);font-weight:700;flex-shrink:0;margin-top:2px;">✓</span>
+            Hardware KEK ensures stolen key files are permanently unreadable elsewhere
+          </li>
+          <li style="display:flex;align-items:flex-start;gap:10px;font-size:14px;color:var(--t2);">
+            <span style="color:var(--green);font-weight:700;flex-shrink:0;margin-top:2px;">✓</span>
+            Two-tier vault: local AES-256, automatic cloud fallback on recovery
+          </li>
+          <li style="display:flex;align-items:flex-start;gap:10px;font-size:14px;color:var(--t2);">
+            <span style="color:var(--green);font-weight:700;flex-shrink:0;margin-top:2px;">✓</span>
+            Watchdog survives Task Manager — Admin override required to stop
+          </li>
+          <li style="display:flex;align-items:flex-start;gap:10px;font-size:14px;color:var(--t2);">
+            <span style="color:var(--green);font-weight:700;flex-shrink:0;margin-top:2px;">✓</span>
+            icacls lockdown operates at NTFS kernel level, not Python file locks
+          </li>
+          <li style="display:flex;align-items:flex-start;gap:10px;font-size:14px;color:var(--t2);">
+            <span style="color:var(--green);font-weight:700;flex-shrink:0;margin-top:2px;">✓</span>
+            Machine ID — not email — is the cloud identity anchor
+          </li>
+        </ul>
+      </div>
+
+      <!-- Right: layer stack -->
+      <div style="flex:1;min-width:300px;max-width:440px;">
+        <div class="arch-layer">
+          <div class="arch-layer-left">
+            <span class="arch-layer-icon">🌐</span>
+            <div>
+              <div class="arch-layer-name">C2 Cloud Server</div>
+              <div class="arch-layer-desc">FastAPI · Railway · PostgreSQL</div>
+            </div>
+          </div>
+          <span class="badge badge-online">Live</span>
+        </div>
+        <div class="arch-layer">
+          <div class="arch-layer-left">
+            <span class="arch-layer-icon">☁️</span>
+            <div>
+              <div class="arch-layer-name">Cloud Key Escrow</div>
+              <div class="arch-layer-desc">Google Drive · machine_id KEK</div>
+            </div>
+          </div>
+          <span class="badge badge-pro">PRO</span>
+        </div>
+        <div class="arch-layer">
+          <div class="arch-layer-left">
+            <span class="arch-layer-icon">🔒</span>
+            <div>
+              <div class="arch-layer-name">AES-256 Local Vault</div>
+              <div class="arch-layer-desc">AppData · PBKDF2 KEK · .enc</div>
+            </div>
+          </div>
+          <span class="badge badge-medium">Local</span>
+        </div>
+        <div class="arch-layer">
+          <div class="arch-layer-left">
+            <span class="arch-layer-icon">👁️</span>
+            <div>
+              <div class="arch-layer-name">Watchdog Process</div>
+              <div class="arch-layer-desc">WinSysHost.exe · daemon · --recovery</div>
+            </div>
+          </div>
+          <span class="badge badge-medium">Local</span>
+        </div>
+        <div class="arch-layer">
+          <div class="arch-layer-left">
+            <span class="arch-layer-icon">🔎</span>
+            <div>
+              <div class="arch-layer-name">File Integrity Engine</div>
+              <div class="arch-layer-desc">watchdog · SHA-256 · HMAC · debounce</div>
+            </div>
+          </div>
+          <span class="badge badge-medium">Local</span>
+        </div>
+        <div class="arch-layer">
+          <div class="arch-layer-left">
+            <span class="arch-layer-icon">⚙️</span>
+            <div>
+              <div class="arch-layer-name">OS Permission Layer</div>
+              <div class="arch-layer-desc">icacls · Registry · WMI · NTFS</div>
+            </div>
+          </div>
+          <span class="badge badge-critical">Kernel</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     HOW IT WORKS
+     ══════════════════════════════════════════════════════════════════════════ -->
+<section class="section" id="howitworks">
+  <div class="container">
+
+    <div class="section-center reveal" style="margin-bottom:0;">
+      <span class="section-label">Deployment</span>
+      <h2 class="section-title">Up and protecting in 3 steps.</h2>
+      <p class="section-sub">
+        No kernel driver signing. No IT department approval. One EXE with UAC elevation
+        and an optional invisible Watchdog service.
+      </p>
+    </div>
+
+    <div class="steps-grid">
+      <div class="step reveal">
+        <div class="step-num">01</div>
+        <div class="step-title">Download &amp; Run</div>
+        <p class="step-body">
+          Run <code style="font-family:var(--font-mono);color:var(--cyan);font-size:12px;">SecureFIM.exe</code>
+          as Administrator. Register your admin account with email OTP. The Watchdog installs silently
+          as a background process that survives Task Manager kills and reboots.
+        </p>
+      </div>
+      <div class="step reveal reveal-delay-1">
+        <div class="step-num">02</div>
+        <div class="step-title">Configure Your Folders</div>
+        <p class="step-body">
+          Add up to 5 monitored directories. Baseline hashes are generated concurrently across
+          all CPU threads — verified at 1.8 GB/s on NVMe. PRO users get cloud sync and vault
+          backup enabled automatically on first folder add.
+        </p>
+      </div>
+      <div class="step reveal reveal-delay-2">
+        <div class="step-num">03</div>
+        <div class="step-title">Monitor &amp; Respond</div>
+        <p class="step-body">
+          Real-time alerts via dashboard, Discord/Slack webhook, and SMTP email with forensic
+          .dat attachments. Forensic snapshots auto-generated on every CRITICAL event.
+          Remote lockdown from the C2 browser console.
+        </p>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     COMPARISON TABLE
+     ══════════════════════════════════════════════════════════════════════════ -->
+<section class="section" id="compare">
+  <div class="container">
+
+    <div class="section-center reveal" style="margin-bottom:48px;">
+      <span class="section-label">Plan Comparison</span>
+      <h2 class="section-title">Free vs PRO — at a glance.</h2>
+      <p class="section-sub">Every capability, side by side. No hidden limits.</p>
+    </div>
+
+    <div class="compare-wrap reveal">
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th style="text-align:left;">Capability</th>
+            <th>Free</th>
+            <th class="pro">PRO Monthly / Annual</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Monitored folders</td><td class="compare-num">1</td><td class="compare-num">Up to 5</td></tr>
+          <tr><td>SHA-256 file integrity monitoring</td><td><span class="compare-check">✓</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>Real-time watchdog (create / modify / delete / rename)</td><td><span class="compare-check">✓</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>HMAC-signed tamper-proof audit logs</td><td><span class="compare-check">✓</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>AES-256 encryption at rest</td><td><span class="compare-check">✓</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>Hardware-bound KEK (PBKDF2 200k iter.)</td><td><span class="compare-check">✓</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>Email OTP registration + password recovery</td><td><span class="compare-check">✓</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>Google SSO with device PIN 2FA</td><td><span class="compare-check">✓</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>Discord / Slack webhook alerts</td><td><span class="compare-check">✓</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>PDF report export + severity charts</td><td><span class="compare-check">✓</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>Self-healing Watchdog process (WinSysHost.exe)</td><td><span class="compare-check">✓</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>Process attribution + LOLBin detection</td><td><span class="compare-no">—</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>Active Defense auto-heal vault</td><td><span class="compare-no">—</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>Ransomware behavioral killswitch (icacls)</td><td><span class="compare-no">—</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>Honeypot tripwire</td><td><span class="compare-no">—</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>Google Drive cloud disaster recovery</td><td><span class="compare-no">—</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>AES-encrypted forensic incident vault</td><td><span class="compare-no">—</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>USB device control (DLP)</td><td><span class="compare-no">—</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>Live C2 fleet telemetry dashboard</td><td><span class="compare-no">—</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>Remote host isolation (cloud-triggered lockdown)</td><td><span class="compare-no">—</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>Threat intelligence (MalwareBazaar / VirusTotal)</td><td><span class="compare-no">—</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>Registry persistence monitor (14 keys)</td><td><span class="compare-no">—</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>SMTP security alert email (with forensic attachment)</td><td><span class="compare-no">—</span></td><td><span class="compare-check">✓</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div style="text-align:center;margin-top:28px;" class="reveal">
+      <a href="/pricing" class="btn btn-primary btn-lg">See Pricing →</a>
+    </div>
+
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     PRICING TEASER
+     ══════════════════════════════════════════════════════════════════════════ -->
+<section class="section" id="pricing">
+  <div class="container">
+
+    <div class="section-center reveal" style="margin-bottom:0;">
+      <span class="section-label">Pricing</span>
+      <h2 class="section-title">Simple, transparent pricing.</h2>
+      <p class="section-sub">
+        Start free. Upgrade when your threat model demands it.
+        License key delivered within 60 seconds of payment.
+      </p>
+    </div>
+
+    <div class="pricing-grid">
+
+      <!-- Free -->
+      <div class="price-card">
+        <div class="price-plan">Free</div>
+        <div class="price-amount"><sup>₹</sup>0</div>
+        <div class="price-desc">For personal use and learning</div>
+        <div class="price-divider"></div>
+        <ul class="price-features">
+          <li><span class="check">✓</span> 1 monitored folder</li>
+          <li><span class="check">✓</span> Real-time file integrity</li>
+          <li><span class="check">✓</span> HMAC audit logs</li>
+          <li><span class="check">✓</span> AES-256 encryption</li>
+          <li><span class="check">✓</span> Email OTP + Google SSO</li>
+          <li><span class="cross">—</span> Active Defense vault</li>
+          <li><span class="cross">—</span> Ransomware killswitch</li>
+          <li><span class="cross">—</span> Cloud C2 dashboard</li>
+        </ul>
+        <a href="/download" class="btn btn-secondary btn-full">Download Free</a>
+      </div>
+
+      <!-- PRO Monthly -->
+      <div class="price-card featured">
+        <div class="price-badge">Most Popular</div>
+        <div class="price-plan">PRO Monthly</div>
+        <div class="price-amount"><sup>₹</sup>499<span class="period">/mo</span></div>
+        <div class="price-desc">For professionals and power users</div>
+        <div class="price-divider"></div>
+        <ul class="price-features">
+          <li><span class="check">✓</span> Everything in Free</li>
+          <li><span class="check">✓</span> Up to 5 monitored folders</li>
+          <li><span class="check">✓</span> Active Defense auto-heal vault</li>
+          <li><span class="check">✓</span> Ransomware killswitch</li>
+          <li><span class="check">✓</span> Google Drive cloud recovery</li>
+          <li><span class="check">✓</span> Live C2 fleet dashboard</li>
+          <li><span class="check">✓</span> Remote host isolation</li>
+          <li><span class="check">✓</span> Threat intelligence (MalwareBazaar)</li>
+        </ul>
+        <a href="/pricing" class="btn btn-primary btn-full">Get PRO Monthly</a>
+      </div>
+
+      <!-- PRO Annual -->
+      <div class="price-card">
+        <div class="price-plan">PRO Annual</div>
+        <div class="price-amount"><sup>₹</sup>4,999<span class="period">/yr</span></div>
+        <div class="price-desc">Best value — save ₹989 vs monthly</div>
+        <div class="price-divider"></div>
+        <ul class="price-features">
+          <li><span class="check">✓</span> Everything in PRO Monthly</li>
+          <li><span class="check">✓</span> 12 months at 17% discount</li>
+          <li><span class="check">✓</span> Priority support</li>
+          <li><span class="check">✓</span> Early access to new features</li>
+        </ul>
+        <a href="/pricing" class="btn btn-secondary btn-full">Get PRO Annual</a>
+      </div>
+
+    </div>
+
+    <div style="text-align:center;margin-top:24px;" class="reveal">
+      <p style="font-size:13px;color:var(--t3);">
+        Need enterprise deployment? 
+        <a href="/contact" style="color:var(--blue);">Contact us for multi-seat licensing →</a>
+      </p>
+    </div>
+
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     FAQ
+     ══════════════════════════════════════════════════════════════════════════ -->
+<section class="section" id="faq">
+  <div class="container">
+
+    <div class="section-center reveal" style="margin-bottom:48px;">
+      <span class="section-label">FAQ</span>
+      <h2 class="section-title">Frequently asked questions.</h2>
+    </div>
+
+    <div class="faq-list reveal">
+
+      <div class="faq-item">
+        <button class="faq-question">
+          Does {{ brand.name }} require a kernel driver or admin privileges?
+          <span class="faq-chevron">›</span>
+        </button>
+        <div class="faq-answer">
+          <div class="faq-answer-inner">
+            No kernel driver is required or installed. {{ brand.name }} runs in user-space with UAC elevation (Administrator privileges). This means no driver signing, no Secure Boot conflicts, and no IT department approval needed. The Watchdog process (<code style="font-family:var(--font-mono);">WinSysHost.exe</code>) uses Windows APIs to resurrect the main agent if it's killed.
+          </div>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-question">
+          How does the license key work? Can I transfer it to a new PC?
+          <span class="faq-chevron">›</span>
+        </button>
+        <div class="faq-answer">
+          <div class="faq-answer-inner">
+            Your license key activates on one device via hardware <code style="font-family:var(--font-mono);">machine_id</code>. The key is delivered to your email within 60 seconds of payment via our Razorpay integration. To transfer to a new device, contact us at <a href="mailto:{{ brand.support_email }}" style="color:var(--blue);">{{ brand.support_email }}</a> with your original key and we'll reset the machine binding.
+          </div>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-question">
+          What happens if my PC is offline? Does monitoring still work?
+          <span class="faq-chevron">›</span>
+        </button>
+        <div class="faq-answer">
+          <div class="faq-answer-inner">
+            Yes. All core monitoring functions — file integrity, ransomware killswitch, vault, alerts — operate entirely offline. The cloud C2 server is used for remote fleet management, license validation, and cloud backup sync. If offline, the agent continues protecting locally and syncs events when connectivity is restored. Agents appear as "offline" on the C2 dashboard after a 45-second grace period.
+          </div>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-question">
+          How fast is the initial hash baseline scan?
+          <span class="faq-chevron">›</span>
+        </button>
+        <div class="faq-answer">
+          <div class="faq-answer-inner">
+            Very fast. {{ brand.name }} uses <code style="font-family:var(--font-mono);">concurrent.futures.ThreadPoolExecutor</code> with parallel hashing across all CPU threads. Benchmark: a 119 GB folder completed in 1 minute 5 seconds (from 2 minutes 18 seconds sequential), achieving 1,830 MB/s sustained read throughput on NVMe SSD. The Python code is no longer the bottleneck — hardware I/O is.
+          </div>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-question">
+          Is this suitable for enterprise / multi-machine deployment?
+          <span class="faq-chevron">›</span>
+        </button>
+        <div class="faq-answer">
+          <div class="faq-answer-inner">
+            Yes. The multi-tenant architecture supports MSI-style mass deployment via the <code style="font-family:var(--font-mono);">FMSECURE_TENANT_KEY</code> environment variable. IT admins get a scoped portal to view all endpoints, receive alerts, and push policy changes. Contact us for enterprise pricing and volume licensing.
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     CTA BANNER
+     ══════════════════════════════════════════════════════════════════════════ -->
+<section class="section">
+  <div class="container">
+    <div class="cta-box reveal">
+      <h2 class="cta-title">
+        Start protecting your endpoints<br>
+        <span class="grad-text">today. For free.</span>
+      </h2>
+      <p class="cta-sub">
+        One EXE. No drivers. No IT approval.
+        PRO features unlock within 60 seconds of payment.
+      </p>
+      <div class="cta-actions">
+        <a href="/download" class="btn btn-primary btn-xl">⬇ Download Agent</a>
+        <a href="/pricing" class="btn btn-secondary btn-xl">View Pricing</a>
+      </div>
+      <p style="margin-top:20px;font-size:12px;color:var(--t3);">
+        Built by <strong style="color:var(--t2);">{{ brand.company }}</strong> · 
+        <a href="mailto:{{ brand.support_email }}" style="color:var(--t3);">{{ brand.support_email }}</a>
+      </p>
+    </div>
+  </div>
+</section>
+
+<style>
+/* Responsive features grid */
+@media (max-width: 900px) {
+  #features-grid { grid-template-columns: 1fr 1fr !important; }
+}
+@media (max-width: 600px) {
+  #features-grid { grid-template-columns: 1fr !important; }
+}
+</style>
+
+{% endblock %}

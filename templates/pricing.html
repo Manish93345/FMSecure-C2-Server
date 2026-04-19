@@ -1,0 +1,336 @@
+{% extends "base.html" %}
+
+{% block title %}Pricing{% endblock %}
+{% block description %}FMSecure PRO — ₹499/month or ₹4,999/year. License key delivered within 60 seconds. Ransomware killswitch, AES-256 vault, cloud C2 fleet management, and more.{% endblock %}
+
+{% block content %}
+
+<div class="page-body">
+
+<!-- ── Header ─────────────────────────────────────────────────────────────── -->
+<section class="section" style="padding-top:100px;padding-bottom:60px;text-align:center;position:relative;overflow:hidden;">
+  <div style="position:absolute;inset:0;pointer-events:none;">
+    <div class="hero-grid" style="opacity:0.4;"></div>
+    <div style="position:absolute;top:-100px;left:50%;transform:translateX(-50%);width:600px;height:400px;background:radial-gradient(circle,rgba(14,165,233,0.08) 0%,transparent 70%);"></div>
+  </div>
+  <div class="container" style="position:relative;z-index:1;">
+    <span class="section-label">Pricing</span>
+    <h1 class="section-title" style="max-width:500px;margin:0 auto 16px;">Simple, transparent pricing.</h1>
+    <p class="section-sub" style="margin:0 auto;">
+      Start free. Upgrade when your threat model demands it.
+      License key delivered within 60 seconds of payment.
+    </p>
+  </div>
+</section>
+
+<!-- ── Pricing Cards ──────────────────────────────────────────────────────── -->
+<section style="padding-bottom:80px;">
+  <div class="container">
+    <div class="pricing-grid">
+
+      <!-- Free -->
+      <div class="price-card">
+        <div class="price-plan">Free Forever</div>
+        <div class="price-amount"><sup>₹</sup>0</div>
+        <div class="price-desc">For personal use, homelabs, and learning.</div>
+        <div class="price-divider"></div>
+        <ul class="price-features">
+          <li><span class="check">✓</span> 1 monitored folder</li>
+          <li><span class="check">✓</span> Real-time file integrity (SHA-256)</li>
+          <li><span class="check">✓</span> HMAC-signed tamper-proof logs</li>
+          <li><span class="check">✓</span> AES-256 encryption at rest</li>
+          <li><span class="check">✓</span> Hardware-bound KEK</li>
+          <li><span class="check">✓</span> Email OTP registration</li>
+          <li><span class="check">✓</span> Google SSO + device PIN 2FA</li>
+          <li><span class="check">✓</span> Discord/Slack webhooks</li>
+          <li><span class="check">✓</span> PDF report export</li>
+          <li><span class="check">✓</span> Self-healing Watchdog</li>
+          <li><span class="cross">—</span> Active Defense vault</li>
+          <li><span class="cross">—</span> Ransomware killswitch</li>
+          <li><span class="cross">—</span> Cloud C2 dashboard</li>
+          <li><span class="cross">—</span> Threat intelligence</li>
+        </ul>
+        <a href="/download" class="btn btn-secondary btn-full">Download Free</a>
+      </div>
+
+      <!-- PRO Monthly -->
+      <div class="price-card featured">
+        <div class="price-badge">Most Popular</div>
+        <div class="price-plan">PRO Monthly</div>
+        <div class="price-amount"><sup>₹</sup>{{ pricing.pro_monthly.price }}<span class="period">{{ pricing.pro_monthly.period }}</span></div>
+        <div class="price-desc">Full protection for professionals.</div>
+        <div class="price-divider"></div>
+        <ul class="price-features">
+          <li><span class="check">✓</span> Everything in Free</li>
+          <li><span class="check">✓</span> Up to 5 monitored folders</li>
+          <li><span class="check">✓</span> Process attribution + LOLBin detection</li>
+          <li><span class="check">✓</span> Active Defense auto-heal vault</li>
+          <li><span class="check">✓</span> Ransomware behavioral killswitch</li>
+          <li><span class="check">✓</span> Honeypot tripwire</li>
+          <li><span class="check">✓</span> Google Drive cloud recovery</li>
+          <li><span class="check">✓</span> AES forensic incident snapshots</li>
+          <li><span class="check">✓</span> USB device control (DLP)</li>
+          <li><span class="check">✓</span> Live C2 fleet dashboard</li>
+          <li><span class="check">✓</span> Remote host isolation</li>
+          <li><span class="check">✓</span> Registry persistence monitor</li>
+          <li><span class="check">✓</span> Threat intelligence (MalwareBazaar)</li>
+          <li><span class="check">✓</span> SMTP forensic email alerts</li>
+        </ul>
+
+        <!-- Email form for PRO Monthly -->
+        <div id="form-pro_monthly">
+          <div class="form-group" style="margin-bottom:12px;">
+            <label class="form-label">Email Address</label>
+            <input type="email" id="email-pro_monthly" class="form-input"
+                   placeholder="you@example.com" required>
+          </div>
+          <button onclick="startPayment('pro_monthly')" class="btn btn-primary btn-full">
+            Get PRO Monthly →
+          </button>
+        </div>
+        <div id="loading-pro_monthly" style="display:none;text-align:center;padding:12px 0;color:var(--t2);font-size:13px;">
+          ⏳ Creating order…
+        </div>
+      </div>
+
+      <!-- PRO Annual -->
+      <div class="price-card">
+        <div class="price-plan">PRO Annual</div>
+        <div class="price-amount"><sup>₹</sup>{{ pricing.pro_annual.price }}<span class="period">{{ pricing.pro_annual.period }}</span></div>
+        <div class="price-desc">Best value — save ₹989 vs monthly billing.</div>
+        <div class="price-divider"></div>
+        <ul class="price-features">
+          <li><span class="check">✓</span> Everything in PRO Monthly</li>
+          <li><span class="check">✓</span> 12 months at 17% discount</li>
+          <li><span class="check">✓</span> Priority email support</li>
+          <li><span class="check">✓</span> Early access to new features</li>
+        </ul>
+
+        <!-- Email form for PRO Annual -->
+        <div id="form-pro_annual">
+          <div class="form-group" style="margin-bottom:12px;">
+            <label class="form-label">Email Address</label>
+            <input type="email" id="email-pro_annual" class="form-input"
+                   placeholder="you@example.com" required>
+          </div>
+          <button onclick="startPayment('pro_annual')" class="btn btn-secondary btn-full"
+                  style="border-color:var(--blue);color:var(--blue);">
+            Get PRO Annual →
+          </button>
+        </div>
+        <div id="loading-pro_annual" style="display:none;text-align:center;padding:12px 0;color:var(--t2);font-size:13px;">
+          ⏳ Creating order…
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Trust line -->
+    <div style="text-align:center;margin-top:32px;" class="reveal">
+      <p style="font-size:13px;color:var(--t3);">
+        🔒 Payments secured by <strong style="color:var(--t2);">Razorpay</strong> ·
+        License key delivered to your email in under 60 seconds ·
+        One device per key · 
+        <a href="mailto:{{ brand.support_email }}" style="color:var(--blue);">{{ brand.support_email }}</a> for transfers
+      </p>
+    </div>
+
+    <!-- Error message -->
+    <div id="pay-error" style="display:none;max-width:500px;margin:16px auto 0;">
+      <div class="alert alert-error" id="pay-error-msg"></div>
+    </div>
+
+    <!-- Success message -->
+    <div id="pay-success" style="display:none;max-width:500px;margin:24px auto 0;">
+      <div class="alert alert-success">
+        <div>
+          <strong>Payment successful!</strong><br>
+          Your license key has been sent to your email. Check your spam folder if you don't see it within 2 minutes.
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ── Full Feature Comparison ────────────────────────────────────────────── -->
+<section class="section">
+  <div class="container">
+
+    <div class="section-center reveal" style="margin-bottom:48px;">
+      <span class="section-label">Full Comparison</span>
+      <h2 class="section-title">Every feature, side by side.</h2>
+    </div>
+
+    <div class="compare-wrap reveal">
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th style="text-align:left;">Capability</th>
+            <th>Free</th>
+            <th class="pro">PRO</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="3" style="background:var(--bg);color:var(--t3);font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:10px 24px;">Core Engine</td></tr>
+          <tr><td>Monitored folders</td><td class="compare-num">1</td><td class="compare-num">Up to 5</td></tr>
+          <tr><td>SHA-256 file integrity monitoring</td><td><span class="compare-check">✓</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>Real-time watchdog (create / modify / delete / rename)</td><td><span class="compare-check">✓</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>Rename detection (vs editor atomic-save)</td><td><span class="compare-check">✓</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>Hidden file tracking (Windows attributes)</td><td><span class="compare-check">✓</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>Multithreaded hashing (ThreadPoolExecutor)</td><td><span class="compare-check">✓</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>Debounce timer (2s, prevents false alerts)</td><td><span class="compare-check">✓</span></td><td><span class="compare-check">✓</span></td></tr>
+
+          <tr><td colspan="3" style="background:var(--bg);color:var(--t3);font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:10px 24px;">Security &amp; Crypto</td></tr>
+          <tr><td>HMAC-signed tamper-proof audit logs</td><td><span class="compare-check">✓</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>AES-256 encryption at rest (logs, vault, records)</td><td><span class="compare-check">✓</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>Hardware-bound KEK (PBKDF2 200k iter.)</td><td><span class="compare-check">✓</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>State hashing (content + attributes + mtime)</td><td><span class="compare-check">✓</span></td><td><span class="compare-check">✓</span></td></tr>
+
+          <tr><td colspan="3" style="background:var(--bg);color:var(--t3);font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:10px 24px;">Authentication</td></tr>
+          <tr><td>Email OTP registration + password recovery</td><td><span class="compare-check">✓</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>Google SSO with device PIN 2FA</td><td><span class="compare-check">✓</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>Admin / User role separation</td><td><span class="compare-check">✓</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>Brute-force login protection</td><td><span class="compare-check">✓</span></td><td><span class="compare-check">✓</span></td></tr>
+
+          <tr><td colspan="3" style="background:var(--bg);color:var(--t3);font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:10px 24px;">Alerting &amp; Reporting</td></tr>
+          <tr><td>Discord / Slack rich embed webhooks</td><td><span class="compare-check">✓</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>PDF report export + severity charts</td><td><span class="compare-check">✓</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>SMTP forensic email (with .dat attachment)</td><td><span class="compare-no">—</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>AES-encrypted forensic incident snapshots</td><td><span class="compare-no">—</span></td><td><span class="compare-check">✓</span></td></tr>
+
+          <tr><td colspan="3" style="background:var(--bg);color:var(--t3);font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:10px 24px;">Active Defense (PRO Only)</td></tr>
+          <tr><td>Process attribution (which process caused file event)</td><td><span class="compare-no">—</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>LOLBin detection (25+ known-malicious binaries)</td><td><span class="compare-no">—</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>Active Defense auto-heal vault (AES, &lt;10 MB files)</td><td><span class="compare-no">—</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>Ransomware behavioral killswitch (≥5 events/10s)</td><td><span class="compare-no">—</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>Honeypot tripwire (instant killswitch detonation)</td><td><span class="compare-no">—</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>Registry persistence monitor (14 keys, kernel API)</td><td><span class="compare-no">—</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>System path protection (startup, scheduled tasks)</td><td><span class="compare-no">—</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>USB device control (DLP via Registry)</td><td><span class="compare-no">—</span></td><td><span class="compare-check">✓</span></td></tr>
+
+          <tr><td colspan="3" style="background:var(--bg);color:var(--t3);font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:10px 24px;">Cloud &amp; Threat Intelligence</td></tr>
+          <tr><td>MalwareBazaar hash lookup (async, SQLite cache)</td><td><span class="compare-no">—</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>Optional VirusTotal integration</td><td><span class="compare-no">—</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>Google Drive cloud disaster recovery</td><td><span class="compare-no">—</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>Live C2 fleet telemetry dashboard</td><td><span class="compare-no">—</span></td><td><span class="compare-check">✓</span></td></tr>
+          <tr><td>Remote host isolation (browser-triggered lockdown)</td><td><span class="compare-no">—</span></td><td><span class="compare-check">✓</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ── CTA ────────────────────────────────────────────────────────────────── -->
+<section class="section">
+  <div class="container">
+    <div class="cta-box reveal">
+      <h2 class="cta-title">Ready to protect your endpoints?</h2>
+      <p class="cta-sub">Download free today. Upgrade anytime. License key in 60 seconds.</p>
+      <div class="cta-actions">
+        <a href="/download" class="btn btn-secondary btn-xl">Download Free</a>
+        <a href="#" onclick="document.getElementById('email-pro_monthly').focus();document.getElementById('email-pro_monthly').scrollIntoView({behavior:'smooth'});return false;" class="btn btn-primary btn-xl">Get PRO →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+</div>
+
+<!-- Razorpay payment script -->
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script>
+const RZP_KEY = "{{ rzp_key_id }}";
+
+async function startPayment(plan) {
+  const emailInput = document.getElementById('email-' + plan);
+  const email = emailInput ? emailInput.value.trim() : '';
+
+  if (!email || !email.includes('@')) {
+    document.getElementById('pay-error').style.display = 'block';
+    document.getElementById('pay-error-msg').textContent = 'Please enter a valid email address.';
+    emailInput && emailInput.focus();
+    return;
+  }
+
+  document.getElementById('pay-error').style.display = 'none';
+  document.getElementById('form-' + plan).style.display = 'none';
+  document.getElementById('loading-' + plan).style.display = 'block';
+
+  try {
+    const res = await fetch('/payment/create-order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tier: plan, email })
+    });
+    const data = await res.json();
+
+    if (!res.ok || data.error) {
+      throw new Error(data.error || 'Failed to create order');
+    }
+
+    document.getElementById('loading-' + plan).style.display = 'none';
+    document.getElementById('form-' + plan).style.display = 'block';
+
+    const options = {
+      key: RZP_KEY,
+      amount: data.amount,
+      currency: data.currency,
+      name: '{{ brand.name }}',
+      description: data.description,
+      order_id: data.order_id,
+      prefill: { email: email },
+      theme: { color: '#0EA5E9' },
+      handler: async function (response) {
+        try {
+          const verifyRes = await fetch('/payment/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id:   response.razorpay_order_id,
+              razorpay_signature:  response.razorpay_signature,
+              email: email,
+              tier: plan
+            })
+          });
+          const verifyData = await verifyRes.json();
+          if (verifyData.success) {
+            window.location.href = '/payment/success?key='
+              + encodeURIComponent(verifyData.license_key)
+              + '&email=' + encodeURIComponent(email)
+              + '&tier=' + encodeURIComponent(plan);
+          } else {
+            throw new Error(verifyData.error || 'Payment verification failed');
+          }
+        } catch (err) {
+          document.getElementById('pay-error').style.display = 'block';
+          document.getElementById('pay-error-msg').textContent = 'Verification error: ' + err.message;
+        }
+      },
+      modal: {
+        ondismiss: function() {
+          document.getElementById('loading-' + plan).style.display = 'none';
+          document.getElementById('form-' + plan).style.display = 'block';
+        }
+      }
+    };
+
+    const rzp = new Razorpay(options);
+    rzp.open();
+
+  } catch (err) {
+    document.getElementById('loading-' + plan).style.display = 'none';
+    document.getElementById('form-' + plan).style.display = 'block';
+    document.getElementById('pay-error').style.display = 'block';
+    document.getElementById('pay-error-msg').textContent = 'Error: ' + err.message;
+  }
+}
+</script>
+
+{% endblock %}

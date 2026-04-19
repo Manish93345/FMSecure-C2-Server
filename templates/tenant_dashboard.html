@@ -1,0 +1,386 @@
+{% extends "base_admin.html" %}
+
+{% block title %}{{ tenant.name }} — Security Dashboard{% endblock %}
+{% block sidebar_home %}/tenant/dashboard{% endblock %}
+{% block sidebar_context %}{{ tenant.name }}{% endblock %}
+
+{% block sidebar_nav %}
+<div class="sidebar-section">Security Center</div>
+<a href="#overview" class="sidebar-link active"><span class="icon">📊</span> Overview</a>
+<a href="#endpoints" class="sidebar-link"><span class="icon">📡</span> Endpoints</a>
+<a href="#alerts" class="sidebar-link">
+  <span class="icon">🚨</span> Alerts
+  {% if stats.unacked_alerts > 0 %}
+  <span class="sidebar-badge">{{ stats.unacked_alerts }}</span>
+  {% endif %}
+</a>
+<a href="#settings" class="sidebar-link"><span class="icon">⚙️</span> Policy Settings</a>
+
+<div class="sidebar-section" style="margin-top:8px;">Info</div>
+<a href="/features" class="sidebar-link" target="_blank"><span class="icon">🔍</span> Capabilities</a>
+<a href="/docs" class="sidebar-link" target="_blank"><span class="icon">📖</span> Documentation</a>
+<a href="/contact" class="sidebar-link" target="_blank"><span class="icon">📬</span> Support</a>
+{% endblock %}
+
+{% block sidebar_footer %}
+<strong>{{ session_email }}</strong>
+<div style="font-size:11px;color:var(--t3);margin-top:2px;">{{ tenant.plan|upper }} · {{ agents|length }}/{{ tenant.max_agents }} seats</div>
+<a href="/tenant/logout" style="margin-top:6px;display:inline-block;">Sign out →</a>
+{% endblock %}
+
+{% block topbar_title %}{{ tenant.name }}{% endblock %}
+{% block topbar_sub %}Security Dashboard · {{ tenant.plan|upper }} Plan{% endblock %}
+
+{% block topbar_actions %}
+<span class="topbar-user">{{ session_email }}</span>
+<a href="/tenant/logout" class="btn btn-secondary btn-sm">Sign Out</a>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.sev-dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+.sev-CRITICAL { background: var(--red); }
+.sev-HIGH     { background: var(--amber); }
+.sev-MEDIUM   { background: var(--blue); }
+.sev-INFO     { background: var(--green); }
+
+.ack-btn {
+  background: var(--bg2);
+  border: 1px solid var(--bd);
+  color: var(--t2);
+  border-radius: var(--r-sm);
+  padding: 3px 10px;
+  font-size: 11.5px;
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.ack-btn:hover { border-color: var(--green); color: var(--green); }
+
+.isolate-btn {
+  background: var(--red-dim);
+  border: 1px solid rgba(244,63,94,0.3);
+  color: var(--red);
+  border-radius: var(--r-sm);
+  padding: 3px 10px;
+  font-size: 11.5px;
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.isolate-btn:hover { background: var(--red); color: #fff; }
+
+/* Settings accordion */
+.settings-panel { }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── Critical alert banner ──────────────────────────────────────────────── -->
+{% if stats.critical_alerts %}
+<div class="admin-alert-banner">
+  <span style="font-size:18px;">⚠</span>
+  <span>{{ stats.critical_alerts }} unacknowledged CRITICAL alert{{ 's' if stats.critical_alerts != 1 }} require immediate attention</span>
+  <a href="#alerts" style="margin-left:auto;color:var(--red);font-size:12.5px;font-weight:600;">View alerts →</a>
+</div>
+{% endif %}
+
+{% if config_saved %}
+<div class="admin-success-banner">✓ Policy settings saved and queued for agent sync.</div>
+{% endif %}
+
+<!-- ── Stats ───────────────────────────────────────────────────────────────── -->
+<div id="overview" class="stats-row" style="margin-bottom:24px;">
+  <div class="stat-card">
+    <div class="stat-value" style="color:var(--t1);">{{ stats.total_agents }}</div>
+    <div class="stat-label">Total Endpoints</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value" style="color:var(--green);">{{ online_count }}</div>
+    <div class="stat-label">Online Now</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value" style="color:var(--blue);">{{ armed_count }}</div>
+    <div class="stat-label">Engines Armed</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value" style="color:{% if stats.unacked_alerts %}var(--red){% else %}var(--green){% endif %};">
+      {{ stats.unacked_alerts }}
+    </div>
+    <div class="stat-label">Unacked Alerts</div>
+  </div>
+</div>
+
+<!-- Seat progress bar -->
+<div style="background:var(--bg1);border:1px solid var(--bd);border-radius:var(--r-md);padding:12px 18px;margin-bottom:24px;display:flex;align-items:center;gap:14px;">
+  <div style="font-size:12.5px;color:var(--t2);flex-shrink:0;">
+    Seat usage: <strong style="color:var(--t1);">{{ agents|length }} / {{ tenant.max_agents }}</strong>
+  </div>
+  <div style="flex:1;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden;">
+    <div style="height:100%;border-radius:3px;width:{{ [((agents|length / tenant.max_agents * 100) if tenant.max_agents else 0)|int, 100]|min }}%;background:{% if agents|length >= tenant.max_agents %}var(--red){% elif agents|length > tenant.max_agents * 0.8 %}var(--amber){% else %}var(--green){% endif %};transition:width 0.5s;"></div>
+  </div>
+  {% if agents|length >= tenant.max_agents %}
+  <span class="badge badge-critical" style="flex-shrink:0;">At capacity</span>
+  {% endif %}
+</div>
+
+<!-- ── Endpoints table ────────────────────────────────────────────────────── -->
+<div class="panel" id="endpoints" style="margin-bottom:20px;">
+  <div class="panel-header">
+    <div class="panel-title">Endpoints ({{ agents|length }})</div>
+    <input type="text" id="ep-search" class="form-input"
+           style="width:180px;padding:6px 10px;font-size:12px;" placeholder="Filter hostname…">
+  </div>
+  <div class="panel-table">
+    <div class="table-wrap" style="border:none;border-radius:0;">
+      <table class="data-table" id="ep-table">
+        <thead>
+          <tr>
+            <th>Hostname</th><th>User</th><th>IP</th>
+            <th>Status</th><th>Engine</th><th>Tier</th><th>Version</th>
+            <th>Last Seen</th><th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in agents %}
+          <tr>
+            <td><strong style="color:var(--t1);">{{ a.hostname }}</strong></td>
+            <td>{{ a.username }}</td>
+            <td class="mono" style="font-size:11px;">{{ a.ip_address }}</td>
+            <td>
+              {% if a.status == 'online' %}
+              <span class="badge badge-online badge-dot">Online</span>
+              {% else %}
+              <span class="badge badge-offline">Offline</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if a.is_armed %}
+              <span class="badge badge-armed">Armed</span>
+              {% else %}
+              <span class="badge badge-unarmed">Unarmed</span>
+              {% endif %}
+            </td>
+            <td class="mono" style="font-size:11px;">{{ a.tier|upper }}</td>
+            <td class="mono" style="font-size:11px;color:var(--t3);">{{ a.agent_version }}</td>
+            <td class="mono" style="font-size:11px;color:var(--t3);">{{ a.last_seen_fmt }}</td>
+            <td>
+              <button class="isolate-btn" onclick="sendCmd('{{ a.machine_id }}', 'LOCKDOWN')">
+                Isolate
+              </button>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="9" style="text-align:center;color:var(--t4);padding:48px;font-size:13.5px;">
+              No agents enrolled yet.<br>
+              <span style="font-size:12px;color:var(--t4);">Install {{ brand.name }} on endpoints and set the <code style="font-family:var(--font-mono);color:var(--cyan);">FMSECURE_TENANT_KEY</code> environment variable.</span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ── Alerts feed ────────────────────────────────────────────────────────── -->
+<div class="panel" id="alerts" style="margin-bottom:20px;">
+  <div class="panel-header">
+    <div class="panel-title">Security Alerts (last 50)</div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <select id="sev-filter" class="form-select" style="width:130px;padding:5px 8px;font-size:12px;">
+        <option value="all">All severity</option>
+        <option value="CRITICAL">Critical</option>
+        <option value="HIGH">High</option>
+        <option value="MEDIUM">Medium</option>
+      </select>
+    </div>
+  </div>
+  <div class="panel-table">
+    <div class="table-wrap" style="border:none;border-radius:0;">
+      <table class="data-table" id="alert-table">
+        <thead>
+          <tr>
+            <th>Severity</th><th>Type</th><th>Hostname</th>
+            <th>Message</th><th>Time</th><th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for al in alerts %}
+          <tr id="alert-{{ al.id }}" data-sev="{{ al.severity }}"
+              style="{% if al.acknowledged %}opacity:0.4;{% endif %}">
+            <td>
+              <div style="display:flex;align-items:center;">
+                <span class="sev-dot sev-{{ al.severity }}"></span>
+                {% if al.severity == 'CRITICAL' %}
+                <span class="badge badge-critical" style="font-size:9px;">CRIT</span>
+                {% elif al.severity == 'HIGH' %}
+                <span class="badge badge-high" style="font-size:9px;">HIGH</span>
+                {% elif al.severity == 'MEDIUM' %}
+                <span class="badge badge-medium" style="font-size:9px;">MED</span>
+                {% else %}
+                <span class="badge badge-info" style="font-size:9px;">{{ al.severity }}</span>
+                {% endif %}
+              </div>
+            </td>
+            <td style="font-size:12px;">{{ al.event_type }}</td>
+            <td>{{ al.hostname }}</td>
+            <td style="font-size:12px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+                title="{{ al.message }}">
+              {{ al.message[:90] }}
+            </td>
+            <td class="mono" style="font-size:11px;color:var(--t3);">{{ al.created_fmt }}</td>
+            <td>
+              {% if al.acknowledged %}
+              <span style="color:var(--green);font-size:12px;">✓ Acked</span>
+              {% else %}
+              <button class="ack-btn" onclick="ackAlert('{{ al.id }}')">Acknowledge</button>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="6" style="text-align:center;color:var(--t4);padding:32px;">
+              No alerts recorded. System is clean. ✓
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ── Policy settings ────────────────────────────────────────────────────── -->
+<div class="panel" id="settings">
+  <div class="panel-header">
+    <div class="panel-title">Policy Settings</div>
+    <span class="badge badge-info" style="font-size:10px;">pushed to all agents on next heartbeat</span>
+  </div>
+  <div class="panel-body">
+    <p style="font-size:13px;color:var(--t2);margin-bottom:20px;">
+      Changes here override individual machine configs. Agents pull new policy on the next 10-second heartbeat cycle.
+    </p>
+    <form method="POST" action="/tenant/config">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Alert Email</label>
+          <input name="alert_email" type="email" class="form-input"
+                 value="{{ config.alert_email or '' }}"
+                 placeholder="it-alerts@yourcompany.com">
+          <div class="form-hint">Receives SMTP forensic alert emails</div>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Discord / Slack Webhook URL</label>
+          <input name="webhook_url" class="form-input"
+                 value="{{ config.webhook_url or '' }}"
+                 placeholder="https://discord.com/api/webhooks/…">
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Verify Interval (seconds)</label>
+          <input name="verify_interval" type="number" class="form-input"
+                 value="{{ config.verify_interval or 60 }}" min="10" max="86400">
+          <div class="form-hint">Minimum: 10s · Maximum: 86400s (1 day)</div>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Max Vault File Size (MB)</label>
+          <input name="max_vault_mb" type="number" class="form-input"
+                 value="{{ config.max_vault_mb or 10 }}" min="1" max="500">
+        </div>
+        <div class="form-group" style="margin-bottom:0;grid-column:1/-1;">
+          <label class="form-label">Allowed Vault Extensions (comma-separated)</label>
+          <input name="allowed_exts" class="form-input"
+                 value="{{ config.allowed_exts or '.txt,.json,.py,.html,.js,.css' }}"
+                 placeholder=".txt,.json,.py,.html,.js,.css">
+          <div class="form-hint">Only files with these extensions are backed up to the auto-heal vault</div>
+        </div>
+      </div>
+      <div style="margin-top:18px;display:flex;align-items:center;gap:12px;">
+        <button type="submit" class="btn btn-primary">Save Policy →</button>
+        <span style="font-size:12px;color:var(--t3);">All {{ agents|length }} enrolled agents will receive this policy on next heartbeat</span>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Endpoint search
+const epSearch = document.getElementById('ep-search');
+if (epSearch) {
+  epSearch.addEventListener('input', () => {
+    const q = epSearch.value.toLowerCase();
+    document.querySelectorAll('#ep-table tbody tr').forEach(r => {
+      r.style.display = r.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+  });
+}
+
+// Severity filter
+const sevFilter = document.getElementById('sev-filter');
+if (sevFilter) {
+  sevFilter.addEventListener('change', () => {
+    const v = sevFilter.value;
+    document.querySelectorAll('#alert-table tbody tr[data-sev]').forEach(r => {
+      r.style.display = (v === 'all' || r.dataset.sev === v) ? '' : 'none';
+    });
+  });
+}
+
+// Acknowledge alert
+async function ackAlert(id) {
+  try {
+    await fetch('/tenant/alerts/' + id + '/ack', { method: 'POST' });
+    const row = document.getElementById('alert-' + id);
+    if (row) {
+      row.style.opacity = '0.4';
+      const btn = row.querySelector('.ack-btn');
+      if (btn) { btn.outerHTML = '<span style="color:var(--green);font-size:12px;">✓ Acked</span>'; }
+    }
+    window.FMSecure.showToast('Alert acknowledged', 'success');
+  } catch(e) {
+    window.FMSecure.showToast('Failed: ' + e.message, 'error');
+  }
+}
+
+// Send command to agent
+async function sendCmd(machineId, cmd) {
+  const label = machineId.substring(0, 12) + '…';
+  if (!confirm(`Send ${cmd} to ${label}?\n\nThis will trigger OS-level isolation on that endpoint.`)) return;
+  try {
+    const r = await fetch(`/tenant/command/${machineId}?cmd=${cmd}`, { method: 'POST' });
+    const d = await r.json();
+    window.FMSecure.showToast(d.message || `${cmd} queued`, 'success');
+  } catch(e) {
+    window.FMSecure.showToast('Failed: ' + e.message, 'error');
+  }
+}
+
+// Auto-refresh (skip if user is in settings form)
+setInterval(() => {
+  const inSettings = document.querySelector('#settings input:focus, #settings select:focus');
+  if (!inSettings) location.reload();
+}, 15000);
+
+// Smooth scroll for sidebar links
+document.querySelectorAll('.sidebar-link[href^="#"]').forEach(a => {
+  a.addEventListener('click', e => {
+    const target = document.querySelector(a.getAttribute('href'));
+    if (target) {
+      e.preventDefault();
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
+});
+</script>
+{% endblock %}

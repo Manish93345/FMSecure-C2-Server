@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Privacy Policy{% endblock %}
+
+{% block content %}
+<div class="page-body">
+<section style="padding:100px 0 80px;">
+  <div class="container-sm">
+
+    <div style="margin-bottom:40px;" class="anim-fade-up">
+      <span class="section-label" style="margin-bottom:12px;">Legal</span>
+      <h1 style="font-family:var(--font-display);font-size:38px;font-weight:800;letter-spacing:-1px;margin-bottom:10px;">Privacy Policy</h1>
+      <p style="font-size:13.5px;color:var(--t3);">Last updated: January 2026 · {{ brand.company }}</p>
+    </div>
+
+    <div class="doc-prose anim-fade-up delay-100">
+
+      <h2>1. Who we are</h2>
+      <p>{{ brand.name }} is a product of {{ brand.company }}, registered in India. Our cloud server and licensing system are hosted on Railway (USA). For any privacy-related concerns, contact us at <a href="mailto:{{ brand.support_email }}">{{ brand.support_email }}</a>.</p>
+
+      <h2>2. What data we collect</h2>
+      <h3>2a. When you purchase a license</h3>
+      <p>We collect your email address for license key delivery and support. We do not store your payment card details — payment processing is handled entirely by Razorpay and subject to their privacy policy. We store: your email, license key (as an HMAC hash), plan tier, expiry date, and hardware machine_id (only after license activation).</p>
+
+      <h3>2b. When you use the cloud C2 (PRO / Enterprise)</h3>
+      <p>The desktop agent sends heartbeat data to our server every 10 seconds when enrolled in a tenant. This includes: machine hostname, operating system information, IP address, agent version, armed/unarmed state, and a hardware-derived machine_id. This data is scoped to your tenant and is never shared with other organisations.</p>
+
+      <h3>2c. When you submit a contact form</h3>
+      <p>We store your name, email, enquiry type, and message in our database to respond to your request. We do not use this for marketing without your explicit consent.</p>
+
+      <h3>2d. What we do NOT collect</h3>
+      <ul>
+        <li>The contents of any monitored files</li>
+        <li>File hashes from your monitored folders (these stay local)</li>
+        <li>Keystrokes, browser activity, or screen content</li>
+        <li>Any data from your Google Drive — cloud backup uses OAuth scopes limited to FMSecure-created folders only</li>
+      </ul>
+
+      <h2>3. How we use your data</h2>
+      <ul>
+        <li><strong>License delivery</strong> — your email is used to send your license key and any renewal notices</li>
+        <li><strong>Fleet management</strong> — heartbeat data populates your organisation's C2 dashboard</li>
+        <li><strong>Support</strong> — contact form submissions are used solely to respond to your enquiry</li>
+        <li><strong>Security</strong> — machine_id is used to bind and transfer licenses, preventing unauthorised use</li>
+      </ul>
+      <p>We do not sell, rent, or share your personal data with third parties for marketing purposes.</p>
+
+      <h2>4. Data retention</h2>
+      <ul>
+        <li>License records: retained for the life of the subscription + 90 days after expiry</li>
+        <li>Agent telemetry: retained for 30 days of inactivity, then purged automatically</li>
+        <li>Alert records: retained for 90 days</li>
+        <li>Contact form submissions: retained for 12 months</li>
+      </ul>
+
+      <h2>5. Third-party services</h2>
+      <ul>
+        <li><strong>Razorpay</strong> — payment processing (India). PCI-DSS compliant. Their privacy policy applies to payment data.</li>
+        <li><strong>SendGrid (Twilio)</strong> — transactional email delivery. We pass only your email address and the message body.</li>
+        <li><strong>Railway</strong> — cloud infrastructure hosting our server and PostgreSQL database. Data is stored in US-East region.</li>
+        <li><strong>Google (OAuth)</strong> — optional cloud backup. Access is limited to a single application folder in your Drive.</li>
+        <li><strong>abuse.ch MalwareBazaar</strong> — we send SHA-256 hashes of new/modified files for threat intelligence lookups. No file names or contents are sent.</li>
+      </ul>
+
+      <h2>6. Security measures</h2>
+      <ul>
+        <li>All server communication uses HTTPS (TLS 1.2+)</li>
+        <li>License keys are stored as HMAC-SHA256 hashes — not reversible</li>
+        <li>Tenant API keys are stored as SHA-256 hashes — plaintext shown only once at creation</li>
+        <li>Passwords are hashed with SHA-256 + custom salt</li>
+        <li>All local data files (logs, vault, records) are AES-256 encrypted using a hardware-bound KEK</li>
+      </ul>
+
+      <h2>7. Your rights</h2>
+      <p>You have the right to: request a copy of your data, request deletion of your data, correct inaccurate data, and withdraw consent at any time. To exercise these rights, email us at <a href="mailto:{{ brand.support_email }}">{{ brand.support_email }}</a>. We will respond within 30 days.</p>
+
+      <h2>8. Cookies</h2>
+      <p>Our web server uses a single session cookie (<code style="font-family:var(--font-mono);">fmsecure_session</code> or <code style="font-family:var(--font-mono);">fms_tenant_session</code>) to maintain your login state. These are HttpOnly, Secure, and expire after 24 hours. We do not use analytics cookies, tracking pixels, or advertising cookies.</p>
+
+      <h2>9. Changes to this policy</h2>
+      <p>We may update this policy as the product evolves. Material changes will be announced via email to active license holders. Continued use after the effective date constitutes acceptance.</p>
+
+      <h2>10. Contact</h2>
+      <p>Privacy concerns: <a href="mailto:{{ brand.support_email }}">{{ brand.support_email }}</a><br>{{ brand.company }} · India 🇮🇳</p>
+
+    </div>
+
+  </div>
+</section>
+</div>
+
+<style>
+.doc-prose h2 { font-family:var(--font-display); font-size:18px; font-weight:700; color:var(--t1); margin:36px 0 12px; }
+.doc-prose h3 { font-size:15px; font-weight:600; color:var(--t1); margin:20px 0 8px; }
+.doc-prose p  { font-size:14px; color:var(--t2); line-height:1.75; margin-bottom:14px; }
+.doc-prose ul { padding-left:0; list-style:none; margin-bottom:16px; display:flex; flex-direction:column; gap:8px; }
+.doc-prose ul li { font-size:14px; color:var(--t2); padding-left:20px; position:relative; line-height:1.65; }
+.doc-prose ul li::before { content:'—'; position:absolute; left:0; color:var(--t4); }
+.doc-prose a { color:var(--blue); }
+.doc-prose code { font-family:var(--font-mono); font-size:12px; background:var(--bg2); padding:2px 6px; border-radius:4px; color:var(--cyan); }
+</style>
+{% endblock %}

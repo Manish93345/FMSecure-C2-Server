@@ -1,0 +1,199 @@
+{% extends "base_admin.html" %}
+
+{% block title %}C2 Dashboard{% endblock %}
+{% block sidebar_home %}/dashboard{% endblock %}
+{% block sidebar_context %}Global C2{% endblock %}
+
+{% block sidebar_nav %}
+<div class="sidebar-section">Command & Control</div>
+<a href="/dashboard" class="sidebar-link">
+  <span class="icon">🖥</span> Endpoints
+</a>
+<a href="/licenses" class="sidebar-link">
+  <span class="icon">🔑</span> Licenses
+</a>
+<a href="/super/dashboard" class="sidebar-link">
+  <span class="icon">🏢</span> Tenants
+</a>
+
+<div class="sidebar-section" style="margin-top:8px;">Site</div>
+<a href="/" class="sidebar-link" target="_blank">
+  <span class="icon">🌐</span> Product Page
+</a>
+<a href="/pricing" class="sidebar-link" target="_blank">
+  <span class="icon">💳</span> Pricing
+</a>
+<a href="/status" class="sidebar-link" target="_blank">
+  <span class="icon">📡</span> Status Page
+</a>
+{% endblock %}
+
+{% block sidebar_footer %}
+<strong>Super Admin</strong>
+<a href="/logout">Sign out →</a>
+{% endblock %}
+
+{% block topbar_title %}Global C2 Dashboard{% endblock %}
+{% block topbar_sub %}Legacy free-tier agent endpoints{% endblock %}
+
+{% block topbar_actions %}
+<a href="/super/dashboard" class="btn btn-secondary btn-sm">Tenant Orgs →</a>
+<a href="/licenses" class="btn btn-secondary btn-sm">Licenses</a>
+<a href="/logout" class="btn btn-danger btn-sm">Sign Out</a>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.agent-row td { vertical-align: middle; }
+.isolate-btn {
+  background: var(--red-dim);
+  color: var(--red);
+  border: 1px solid rgba(244,63,94,0.3);
+  border-radius: var(--r-sm);
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font-body);
+  transition: all 0.2s;
+}
+.isolate-btn:hover { background: var(--red); color: #fff; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── Version Publisher ───────────────────────────────────────────────────── -->
+<div class="panel" style="margin-bottom:24px;">
+  <div class="panel-header">
+    <div>
+      <div class="panel-title">Publish New Version</div>
+    </div>
+    <span class="badge badge-online" style="font-size:10px;">auto-notifies all agents</span>
+  </div>
+  <div class="panel-body">
+    <p style="font-size:13px;color:var(--t2);margin-bottom:18px;">When you ship a new EXE, fill this in. Every running agent will show an update banner within seconds.</p>
+    <form method="POST" action="/api/version/publish-form">
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;">
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Version Number *</label>
+          <input name="version" class="form-input" placeholder="e.g. 2.6.0" required>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Release Notes (shown in banner)</label>
+          <input name="release_notes" class="form-input" placeholder="Bug fixes, new cloud features…">
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Download URL (blank = default)</label>
+          <input name="download_url" class="form-input" placeholder="https://…">
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Changelog URL (blank = default)</label>
+          <input name="changelog_url" class="form-input" placeholder="https://…">
+        </div>
+        <div style="grid-column:1/-1;">
+          <button type="submit" class="btn btn-success">Publish Version →</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── Agent Table ────────────────────────────────────────────────────────── -->
+<div class="panel">
+  <div class="panel-header">
+    <div class="panel-title">Legacy Free-Tier Endpoints ({{ agents|length }})</div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <input type="text" id="agent-search" class="form-input" style="width:180px;padding:6px 10px;font-size:12px;" placeholder="Search hostname…">
+    </div>
+  </div>
+  <div class="panel-table">
+    <div class="table-wrap" style="border:none;border-radius:0;">
+      <table class="data-table" id="agent-table">
+        <thead>
+          <tr>
+            <th>Machine ID</th>
+            <th>Hostname</th>
+            <th>User</th>
+            <th>IP</th>
+            <th>Status</th>
+            <th>Engine</th>
+            <th>Last Seen</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if agents %}
+            {% for mid, info in agents.items() %}
+            <tr class="agent-row">
+              <td class="mono">{{ mid[:14] }}…</td>
+              <td><strong style="color:var(--t1);">{{ info.hostname }}</strong></td>
+              <td>{{ info.username }}</td>
+              <td class="mono">{{ info.ip }}</td>
+              <td>
+                {% if info.online %}
+                <span class="badge badge-online badge-dot">Online</span>
+                {% else %}
+                <span class="badge badge-offline">Offline</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if info.is_armed %}
+                <span class="badge badge-armed">Armed</span>
+                {% else %}
+                <span class="badge badge-unarmed">Unarmed</span>
+                {% endif %}
+              </td>
+              <td class="mono" style="font-size:11px;">{{ info.last_seen_fmt }}</td>
+              <td>
+                <button class="isolate-btn" onclick="lockdown('{{ mid }}')">
+                  Isolate
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="8" style="text-align:center;color:var(--t4);padding:48px;font-size:13.5px;">
+                No legacy endpoints connected. Free-tier agents connect here. Enterprise endpoints appear in <a href="/super/dashboard" style="color:var(--blue);">Tenant dashboard →</a>
+              </td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Search filter
+const searchInput = document.getElementById('agent-search');
+if (searchInput) {
+  searchInput.addEventListener('input', () => {
+    const q = searchInput.value.toLowerCase();
+    document.querySelectorAll('#agent-table tbody tr').forEach(row => {
+      row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+  });
+}
+
+// Auto-refresh (skips if user is typing)
+setInterval(() => {
+  if (!document.querySelector('input:focus, textarea:focus')) location.reload();
+}, 8000);
+
+async function lockdown(mid) {
+  if (!confirm(`Send LOCKDOWN to ${mid.substring(0,14)}…?\n\nThis will trigger icacls lockdown on that endpoint.`)) return;
+  try {
+    const r = await fetch('/api/trigger_lockdown/' + mid, { method: 'POST' });
+    const d = await r.json();
+    window.FMSecure.showToast('Lockdown queued for ' + mid.substring(0,12) + '…', 'success');
+  } catch(e) {
+    window.FMSecure.showToast('Failed: ' + e.message, 'error');
+  }
+}
+</script>
+{% endblock %}

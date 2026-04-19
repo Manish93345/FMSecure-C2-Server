@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Forgot Password | {{ brand.name }}</title>
+  <link rel="icon" type="image/x-icon" href="{{ brand.logo_ico }}">
+  <link rel="stylesheet" href="/static/css/fmsecure.css">
+  <style>
+    body { min-height:100vh; display:flex; align-items:center; justify-content:center; background:var(--bg); padding:24px; position:relative; overflow:hidden; }
+    body::before { content:''; position:fixed; inset:0; background-image:linear-gradient(rgba(30,38,64,0.35) 1px,transparent 1px),linear-gradient(90deg,rgba(30,38,64,0.35) 1px,transparent 1px); background-size:48px 48px; mask-image:radial-gradient(ellipse at center,black 20%,transparent 75%); pointer-events:none; z-index:0; }
+    .card { position:relative; z-index:1; background:var(--bg1); border:1px solid var(--bd); border-radius:var(--r-xl); padding:44px 40px; width:100%; max-width:400px; animation:fadeUp 0.5s var(--ease-out) both; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <a href="/tenant/login" style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--t3);margin-bottom:28px;text-decoration:none;">
+      ← Back to login
+    </a>
+
+    <div style="width:48px;height:48px;background:var(--blue-dim);border:1px solid rgba(14,165,233,0.3);border-radius:var(--r-md);display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:20px;">🔑</div>
+
+    <h2 style="font-family:var(--font-display);font-size:22px;font-weight:700;margin-bottom:8px;">Forgot password?</h2>
+    <p style="font-size:13.5px;color:var(--t2);margin-bottom:28px;line-height:1.65;">
+      Enter your registered IT admin email. If it matches our records, we'll send a 6-digit reset code.
+    </p>
+
+    {% if error %}
+    <div class="alert alert-error" style="margin-bottom:18px;"><span>⚠</span> {{ error }}</div>
+    {% endif %}
+    {% if success %}
+    <div class="alert alert-success" style="margin-bottom:18px;"><span>✓</span> {{ success }}</div>
+    {% endif %}
+
+    <form method="POST" action="/tenant/forgot-password">
+      <div class="form-group">
+        <label class="form-label">Email Address</label>
+        <input type="email" name="email" class="form-input" required autofocus placeholder="admin@company.com">
+      </div>
+      <button type="submit" class="btn btn-primary btn-full btn-lg" style="margin-top:4px;">
+        Send Reset Code
+      </button>
+    </form>
+
+    <p style="font-size:12px;color:var(--t3);text-align:center;margin-top:20px;">
+      We won't confirm whether the email exists for security reasons.
+    </p>
+  </div>
+</body>
+</html>
