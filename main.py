@@ -54,6 +54,7 @@ ADMIN_PASS        = os.getenv("ADMIN_PASSWORD", "password")
 API_KEY           = os.getenv("API_KEY", "default-dev-key")
 SENDGRID_API_KEY  = os.getenv("SENDGRID_API_KEY", "")
 SENDER_EMAIL      = os.getenv("SENDER_EMAIL", "glimpsefilmy@gmail.com")
+SUPER_ADMIN_EMAIL = os.getenv("SUPER_ADMIN_EMAIL", SENDER_EMAIL)
 SESSION_TOKEN     = secrets.token_hex(16)
 DRIVE_FILE_ID     = os.getenv("DRIVE_FILE_ID", "1e-EnPaxiMP0ZFpkL6QpBopJ41QeQMjMM")   # Google Drive file ID for download
 
@@ -142,6 +143,16 @@ def init_db():
                 seats       TEXT NOT NULL DEFAULT '',
                 subject     TEXT NOT NULL DEFAULT '',
                 message     TEXT NOT NULL,
+                created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            CREATE TABLE IF NOT EXISTS enterprise_leads (
+                id          TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
+                company     TEXT NOT NULL,
+                name        TEXT NOT NULL,
+                email       TEXT NOT NULL,
+                seats       TEXT NOT NULL DEFAULT '10',
+                message     TEXT NOT NULL DEFAULT '',
+                status      TEXT NOT NULL DEFAULT 'new',
                 created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );
             CREATE TABLE IF NOT EXISTS licenses (
@@ -1115,6 +1126,10 @@ async def super_dashboard(request: Request, _: bool = Depends(verify_session),
     total_agents = cur.fetchone()["count"]
     cur.execute("SELECT COUNT(*) FROM tenant_alerts WHERE acknowledged=FALSE AND severity='CRITICAL'")
     total_critical = cur.fetchone()["count"]
+    cur.execute("""
+        SELECT * FROM enterprise_leads ORDER BY created_at DESC LIMIT 20
+    """)
+    enterprise_leads_rows = cur.fetchall()
     cur.close(); conn.close()
 
     tenants_ctx = []
@@ -1133,6 +1148,7 @@ async def super_dashboard(request: Request, _: bool = Depends(verify_session),
         "total_critical": total_critical,
         "new_key":        new_key,
         "admin_api_key":  ADMIN_API_KEY,
+        "enterprise_leads":   [dict(r) for r in enterprise_leads_rows],
     })
 
 # ── Form handler for tenant creation from dashboard ───────────────────────────
@@ -1698,6 +1714,58 @@ async def pricing_page(request: Request):
         "pricing":    PRICING_DISPLAY,
     })
 
+def _notify_super_admin_of_lead(company: str, name: str, email: str, seats: str, message: str):
+    """Email the super-admin when a new enterprise inquiry lands."""
+    if not SENDGRID_API_KEY:
+        print(f"[LEAD] New enterprise lead — {company} / {name} / {email} / {seats} seats")
+        return
+    html = f"""
+    <div style="font-family:Arial,sans-serif;max-width:520px;background:#0d1117;color:#e6edf3;
+                padding:28px;border-radius:10px;">
+      <h2 style="color:#2f81f7;margin-top:0">🏢 New Enterprise Lead</h2>
+      <table style="border-collapse:collapse;width:100%;font-size:14px;">
+        <tr><td style="color:#8b949e;padding:6px 0;width:120px;">Company</td>
+            <td style="color:#e6edf3;font-weight:600;">{company}</td></tr>
+        <tr><td style="color:#8b949e;padding:6px 0;">Contact</td>
+            <td style="color:#e6edf3;">{name}</td></tr>
+        <tr><td style="color:#8b949e;padding:6px 0;">Email</td>
+            <td><a href="mailto:{email}" style="color:#2f81f7;">{email}</a></td></tr>
+        <tr><td style="color:#8b949e;padding:6px 0;">Seats</td>
+            <td style="color:#e6edf3;">{seats}</td></tr>
+        <tr><td style="color:#8b949e;padding:6px 0;vertical-align:top;">Message</td>
+            <td style="color:#e6edf3;">{message or "—"}</td></tr>
+      </table>
+      <p style="margin-top:20px;">
+        <a href="{APP_BASE_URL}/super/dashboard" style="background:#2f81f7;color:#fff;
+           padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;">
+          Open Super Dashboard →
+        </a>
+      </p>
+      <p style="color:#484f58;font-size:12px;margin-top:20px;">
+        To convert this lead: create a tenant in the super dashboard using {email} as the contact email.
+        They will automatically receive their API key and welcome email.
+      </p>
+    </div>"""
+    try:
+        import sendgrid
+        from sendgrid.helpers.mail import Mail
+        sg = sendgrid.SendGridAPIClient(api_key=SENDGRID_API_KEY)
+        msg = Mail(
+            from_email=SENDER_EMAIL,
+            to_emails=SUPER_ADMIN_EMAIL,
+            subject=f"[{BRAND['name']}] New Enterprise Lead — {company}",
+            html_content=html
+        )
+        resp = sg.send(msg)
+        print(f"[LEAD] Admin notified — status {resp.status_code}")
+    except Exception as e:
+        print(f"[LEAD] Admin notification failed: {e}")
+
+
+def _send_sales_acknowledgment(email: str, name: str, company: str):
+    """No-op — we do NOT auto-email the lead to prevent spam abuse.
+    The success page already tells them we'll respond within 24 hours."""
+    print(f"[LEAD] Acknowledgment suppressed (anti-flood) for {name} <{email}> / {company}")
 
 @app.get("/enterprise", response_class=HTMLResponse)
 async def enterprise_sales_page(error: str = "", success: bool = False):
@@ -1753,6 +1821,7 @@ async def enterprise_sales_page(error: str = "", success: bool = False):
     </body></html>"""
 
 
+# FIND:
 @app.post("/enterprise")
 async def enterprise_sales_submit(
     company: str = Form(...),
@@ -1761,6 +1830,34 @@ async def enterprise_sales_submit(
     seats: str = Form("10"),
     message: str = Form("")
 ):
+    threading.Thread(target=_notify_super_admin_of_lead,
+                     args=(company, name, email, seats, message), daemon=True).start()
+    threading.Thread(target=_send_sales_acknowledgment,
+                     args=(email, name, company), daemon=True).start()
+    return RedirectResponse("/enterprise?success=1", 302)
+
+# REPLACE WITH:
+@app.post("/enterprise")
+async def enterprise_sales_submit(
+    company: str = Form(...),
+    name: str = Form(...),
+    email: str = Form(...),
+    seats: str = Form("10"),
+    message: str = Form("")
+):
+    # Save to DB
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO enterprise_leads (company, name, email, seats, message)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (company.strip(), name.strip(), email.strip().lower(),
+              seats.strip(), message.strip()))
+        conn.commit(); cur.close(); conn.close()
+    except Exception as e:
+        print(f"[LEAD] DB save failed: {e}")
+
+    # Notify admin (background thread so form returns instantly)
     threading.Thread(target=_notify_super_admin_of_lead,
                      args=(company, name, email, seats, message), daemon=True).start()
     threading.Thread(target=_send_sales_acknowledgment,

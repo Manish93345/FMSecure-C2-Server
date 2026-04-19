@@ -12,6 +12,7 @@
 <div class="sidebar-section" style="margin-top:8px;">Site</div>
 <a href="/" class="sidebar-link" target="_blank"><span class="icon">🌐</span> Product Page</a>
 <a href="/contact" class="sidebar-link" target="_blank"><span class="icon">📬</span> Contact Submissions</a>
+<a href="#enterprise-leads" class="sidebar-link"><span class="icon">🏢</span> Enterprise Leads</a>
 {% endblock %}
 
 {% block sidebar_footer %}
@@ -227,10 +228,75 @@
   </div>
 </div>
 
+<!-- ── Enterprise Leads ──────────────────────────────────────────────────── -->
+<div id="enterprise-leads" style="margin-top:32px;">
+  <div class="panel">
+    <div class="panel-header" style="display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <div class="panel-title">🏢 Enterprise Leads</div>
+        <div class="panel-sub">Organisations that filled the /enterprise inquiry form</div>
+      </div>
+    </div>
+    {% if enterprise_leads %}
+    <div style="overflow-x:auto;">
+      <table class="table" id="leads-table">
+        <thead>
+          <tr>
+            <th>Company</th><th>Contact</th><th>Email</th>
+            <th>Seats</th><th>Message</th><th>Date</th><th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for lead in enterprise_leads %}
+          <tr>
+            <td><strong>{{ lead.company }}</strong></td>
+            <td>{{ lead.name }}</td>
+            <td><a href="mailto:{{ lead.email }}" style="color:var(--blue);">{{ lead.email }}</a></td>
+            <td>{{ lead.seats }}</td>
+            <td style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--t3);font-size:13px;">
+              {{ lead.message or "—" }}
+            </td>
+            <td style="white-space:nowrap;color:var(--t3);font-size:13px;">
+              {{ lead.created_at.strftime("%Y-%m-%d") if lead.created_at else "—" }}
+            </td>
+            <td>
+              <a href="#new-tenant"
+                 onclick="prefillFromLead('{{ lead.company }}','{{ lead.email }}','{{ lead.seats }}')"
+                 class="btn btn-primary btn-sm" style="font-size:11px;">
+                Create Tenant →
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div style="padding:32px;text-align:center;color:var(--t3);">
+      No enterprise inquiries yet — they will appear here when someone fills the /enterprise form.
+    </div>
+    {% endif %}
+  </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
 <script>
+
+// ADD this function BEFORE that line:
+function prefillFromLead(company, email, seats) {
+  const nameInput = document.querySelector('input[name="name"]');
+  const slugInput = document.querySelector('input[name="slug"]');
+  const emailInput = document.querySelector('input[name="contact_email"]');
+  const agentsInput = document.querySelector('input[name="max_agents"]');
+  if (nameInput) nameInput.value = company;
+  if (emailInput) emailInput.value = email;
+  if (agentsInput && seats) agentsInput.value = parseInt(seats) || 10;
+  if (slugInput && company) {
+    slugInput.value = company.toLowerCase().replace(/[^a-z0-9\s-]/g,'').replace(/\s+/g,'-');
+  }
+}
 // Search filter
 const search = document.getElementById('tenant-search');
 if (search) {
@@ -261,6 +327,8 @@ if (nameInput && slugInput) {
 setInterval(() => {
   if (!document.querySelector('#new-tenant input:focus')) location.reload();
 }, 20000);
+
+
 
 // Scroll to new_key if present
 {% if new_key %}
