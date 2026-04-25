@@ -121,7 +121,9 @@
 <body>
 
   <!-- Left info panel -->
-  <div class="split-left">
+<!-- Left info panel -->
+<div class="split-left">
+
   <a href="/" class="split-left-brand">
     <div class="split-left-brand-icon" style="background: transparent;">
       <img src="{{ brand.logo_png }}" alt="{{ brand.name }}" width="28" height="28"
@@ -130,46 +132,46 @@
     </div>
     {{ brand.name }}
   </a>
-</div>
 
-    <div class="split-features">
-      <h2>IT Admin Portal</h2>
-      <p>Manage your organisation's endpoints, respond to alerts, and configure security policies — all from one place.</p>
+  <div class="split-features">
+    <h2>IT Admin Portal</h2>
+    <p>Manage your organisation's endpoints, respond to alerts, and configure security policies — all from one place.</p>
 
-      <div class="feature-item">
-        <div class="feature-item-icon">📡</div>
-        <div class="feature-item-text">
-          <strong>Live endpoint visibility</strong>
-          Real-time agent status across all enrolled machines
-        </div>
-      </div>
-      <div class="feature-item">
-        <div class="feature-item-icon">🚨</div>
-        <div class="feature-item-text">
-          <strong>Scoped alert feed</strong>
-          CRITICAL and HIGH events from your organisation only
-        </div>
-      </div>
-      <div class="feature-item">
-        <div class="feature-item-icon">⚙️</div>
-        <div class="feature-item-text">
-          <strong>Remote policy control</strong>
-          Push scan intervals and vault settings to all agents
-        </div>
-      </div>
-      <div class="feature-item">
-        <div class="feature-item-icon">🔒</div>
-        <div class="feature-item-text">
-          <strong>Isolated data access</strong>
-          You can only see your organisation's data — never others
-        </div>
+    <div class="feature-item">
+      <div class="feature-item-icon">📡</div>
+      <div class="feature-item-text">
+        <strong>Live endpoint visibility</strong>
+        Real-time agent status across all enrolled machines
       </div>
     </div>
-
-    <div class="split-footer">
-      &copy; {{ brand.copyright_year }} {{ brand.company }} · {{ brand.name }}
+    <div class="feature-item">
+      <div class="feature-item-icon">🚨</div>
+      <div class="feature-item-text">
+        <strong>Scoped alert feed</strong>
+        CRITICAL and HIGH events from your organisation only
+      </div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-item-icon">⚙️</div>
+      <div class="feature-item-text">
+        <strong>Remote policy control</strong>
+        Push scan intervals and vault settings to all agents
+      </div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-item-icon">🔒</div>
+      <div class="feature-item-text">
+        <strong>Isolated data access</strong>
+        You can only see your organisation's data — never others
+      </div>
     </div>
   </div>
+
+  <div class="split-footer">
+    &copy; {{ brand.copyright_year }} {{ brand.company }} &middot; {{ brand.name }}
+  </div>
+
+</div>   <!-- ✅ split-left closes HERE, wrapping all three children -->
 
   <!-- Right form panel -->
   <div class="split-right">

@@ -1,12 +1,8 @@
 """
-main.py — FMSecure C2 + License Server (FINAL)
-Fixes in this version:
-  1. Email runs in background thread — no more 3-minute payment delay
-  2. SendGrid HTTP API replaces SMTP — works on Railway free tier
-  3. Falls back to printing key if no SendGrid key set
-  4. Device-based license validation (no email check)
+main.py — FMSecure C2 + License Server
+Hosted on Render.com (free tier) + Neon PostgreSQL
 
-Railway environment variables:
+Environment variables (set in Render dashboard):
   ADMIN_USERNAME      = your admin username
   ADMIN_PASSWORD      = strong password
   API_KEY             = desktop agent API key
@@ -14,16 +10,15 @@ Railway environment variables:
   RAZORPAY_KEY_SECRET = razorpay secret
   LICENSE_HMAC_SECRET = generate: python -c "import secrets;print(secrets.token_hex(32))"
   ADMIN_API_KEY       = any secret for admin endpoints
-  APP_BASE_URL        = https://your-server.railway.app
-  DATABASE_URL        = auto-set by Railway PostgreSQL plugin
-  SENDGRID_API_KEY    = get free at sendgrid.com (100 emails/day free)
-  SENDER_EMAIL        = glimpsefilmy@gmail.com  (the FROM address in emails)
+  APP_BASE_URL        = https://your-app.onrender.com
+  DATABASE_URL        = from Neon PostgreSQL dashboard (postgres://...)
+  GMAIL_USER          = fmsecure.team@gmail.com
+  GMAIL_APP_PASSWORD  = your 16-char Google App Password (no spaces)
+  SENDER_EMAIL        = fmsecure.team@gmail.com
+  SUPER_ADMIN_EMAIL   = fmsecure.team@gmail.com
 
-requirements.txt:
-  razorpay
-  psycopg2-binary
-  slowapi
-  sendgrid
+Email uses Gmail SMTP with App Password (smtplib, no extra packages needed).
+Falls back to printing key/OTP to logs if GMAIL_USER not set.
 """
 import os, secrets, time, hashlib, hmac as _hmac, uuid, threading, random
 from functools import wraps
@@ -52,8 +47,10 @@ APP_BASE_URL      = os.getenv("APP_BASE_URL", "http://localhost:8000")
 ADMIN_USER        = os.getenv("ADMIN_USERNAME", "admin")
 ADMIN_PASS        = os.getenv("ADMIN_PASSWORD", "password")
 API_KEY           = os.getenv("API_KEY", "default-dev-key")
-SENDGRID_API_KEY  = os.getenv("SENDGRID_API_KEY", "")
-SENDER_EMAIL      = os.getenv("SENDER_EMAIL", "glimpsefilmy@gmail.com")
+SENDGRID_API_KEY  = os.getenv("SENDGRID_API_KEY", "")   # legacy fallback, not used
+GMAIL_USER        = os.getenv("GMAIL_USER", "")
+GMAIL_APP_PASSWORD= os.getenv("GMAIL_APP_PASSWORD", "")
+SENDER_EMAIL      = os.getenv("SENDER_EMAIL", "fmsecure.team@gmail.com")
 SUPER_ADMIN_EMAIL = os.getenv("SUPER_ADMIN_EMAIL", SENDER_EMAIL)
 SESSION_TOKEN     = secrets.token_hex(16)
 DRIVE_FILE_ID     = os.getenv("DRIVE_FILE_ID", "1e-EnPaxiMP0ZFpkL6QpBopJ41QeQMjMM")   # Google Drive file ID for download
@@ -445,12 +442,42 @@ async def verify_session(fmsecure_session: str = Cookie(None)):
         raise HTTPException(status_code=302, headers={"Location": "/login"})
     return True
 
+
+# ── Gmail SMTP Helper ──────────────────────────────────────────────────────────
+def _send_gmail(to: str, subject: str, html_body: str) -> bool:
+    """Send an HTML email via Gmail SMTP using App Password. Returns True on success."""
+    import smtplib
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+
+    if not GMAIL_USER or not GMAIL_APP_PASSWORD:
+        print(f"[EMAIL] No GMAIL_USER/GMAIL_APP_PASSWORD set — skipping send to {to}")
+        return False
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"]    = f"FMSecure <{SENDER_EMAIL}>"
+        msg["To"]      = to
+        msg.attach(MIMEText(html_body, "html"))
+
+        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+            server.ehlo()
+            server.starttls()
+            server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
+            server.sendmail(SENDER_EMAIL, to, msg.as_string())
+        print(f"[EMAIL] Sent to {to} via Gmail SMTP")
+        return True
+    except Exception as e:
+        print(f"[EMAIL] Gmail SMTP failed for {to}: {e}")
+        return False
+
+
 def _send_license_email(email: str, license_key: str, tier: str, expires_iso: str):
     tier_label  = PLANS.get(tier, {}).get("label", "PRO")
     expires_str = expires_iso[:10]
 
-    if not SENDGRID_API_KEY:
-        print(f"[EMAIL] No SENDGRID_API_KEY. Key for {email}: {license_key}")
+    if not GMAIL_USER:
+        print(f"[EMAIL] No GMAIL_USER set. Key for {email}: {license_key}")
         return
 
     html = f"""
@@ -490,25 +517,17 @@ def _send_license_email(email: str, license_key: str, tier: str, expires_iso: st
     </div>"""
 
     try:
-        import sendgrid
-        from sendgrid.helpers.mail import Mail
-        sg = sendgrid.SendGridAPIClient(api_key=SENDGRID_API_KEY)
-        message = Mail(
-            from_email=SENDER_EMAIL,
-            to_emails=email,
-            subject=f"Your {BRAND['name']} PRO License Key",
-            html_content=html
-        )
-        resp = sg.send(message)
-        print(f"[EMAIL] Sent to {email} — status {resp.status_code}")
+        ok = _send_gmail(email, f"Your {BRAND['name']} PRO License Key", html)
+        if not ok:
+            print(f"[EMAIL] Key was: {license_key}")
     except Exception as e:
-        print(f"[EMAIL] SendGrid failed for {email}: {e}")
+        print(f"[EMAIL] Failed for {email}: {e}")
         print(f"[EMAIL] Key was: {license_key}")
 
 
 def send_tenant_welcome_email(org_email: str, org_name: str, api_key: str, max_agents: int, plan: str):
-    if not SENDGRID_API_KEY:
-        print(f"[TENANT] No SENDGRID_API_KEY. API key for {org_email}: {api_key}")
+    if not GMAIL_USER:
+        print(f"[TENANT] No GMAIL_USER set. API key for {org_email}: {api_key}")
         return
 
     plan_label = {"business": "Business", "enterprise": "Enterprise", "trial": "Trial"}.get(plan, "Business")
@@ -566,17 +585,11 @@ def send_tenant_welcome_email(org_email: str, org_name: str, api_key: str, max_a
     </div>"""
 
     try:
-        import sendgrid
-        from sendgrid.helpers.mail import Mail
-        sg = sendgrid.SendGridAPIClient(api_key=SENDGRID_API_KEY)
-        message = Mail(
-            from_email=SENDER_EMAIL,
-            to_emails=org_email,
-            subject=f"{BRAND['name']} Enterprise — Your API Key & Setup Instructions",
-            html_content=html
-        )
-        resp = sg.send(message)
-        print(f"[TENANT] Welcome email sent to {org_email} — status {resp.status_code}")
+        ok = _send_gmail(org_email, f"{BRAND['name']} Enterprise — Your API Key & Setup Instructions", html)
+        if ok:
+            print(f"[TENANT] Welcome email sent to {org_email}")
+        else:
+            print(f"[TENANT] API key was: {api_key}")
     except Exception as e:
         print(f"[TENANT] Welcome email failed: {e}")
         print(f"[TENANT] API key was: {api_key}")
@@ -1327,8 +1340,8 @@ async def tenant_logout(request: Request):
 _tenant_reset_otps = {}   # {email: {otp, expires, tenant_id}}
 
 def _send_tenant_reset_otp(email: str, otp: str):
-    if not SENDGRID_API_KEY:
-        print(f"[RESET] No SendGrid key. OTP for {email}: {otp}")
+    if not GMAIL_USER:
+        print(f"[RESET] No GMAIL_USER set. OTP for {email}: {otp}")
         return
     html = f"""
     <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;
@@ -1346,19 +1359,13 @@ def _send_tenant_reset_otp(email: str, otp: str):
     </div>
     """
     try:
-        from sendgrid import SendGridAPIClient
-        from sendgrid.helpers.mail import Mail
-        sg = SendGridAPIClient(api_key=SENDGRID_API_KEY)
-        message = Mail(
-            from_email=SENDER_EMAIL,
-            to_emails=email,
-            subject=f"{BRAND['name']} – IT Admin Password Reset Code",
-            html_content=html
-        )
-        sg.send(message)
-        print(f"[RESET] OTP sent to {email}")
+        ok = _send_gmail(email, f"{BRAND['name']} – IT Admin Password Reset Code", html)
+        if ok:
+            print(f"[RESET] OTP sent to {email}")
+        else:
+            print(f"[RESET] OTP was: {otp}")
     except Exception as e:
-        print(f"[RESET] SendGrid failed: {e}")
+        print(f"[RESET] Email failed: {e}")
 
 
 @app.get("/tenant/forgot-password", response_class=HTMLResponse)
@@ -1747,17 +1754,11 @@ def _notify_super_admin_of_lead(company: str, name: str, email: str, seats: str,
       </p>
     </div>"""
     try:
-        import sendgrid
-        from sendgrid.helpers.mail import Mail
-        sg = sendgrid.SendGridAPIClient(api_key=SENDGRID_API_KEY)
-        msg = Mail(
-            from_email=SENDER_EMAIL,
-            to_emails=SUPER_ADMIN_EMAIL,
-            subject=f"[{BRAND['name']}] New Enterprise Lead — {company}",
-            html_content=html
-        )
-        resp = sg.send(msg)
-        print(f"[LEAD] Admin notified — status {resp.status_code}")
+        ok = _send_gmail(SUPER_ADMIN_EMAIL, f"[{BRAND['name']}] New Enterprise Lead — {company}", html)
+        if ok:
+            print(f"[LEAD] Admin notified")
+        else:
+            print(f"[LEAD] Admin notification skipped (no Gmail config)")
     except Exception as e:
         print(f"[LEAD] Admin notification failed: {e}")
 
@@ -2058,16 +2059,13 @@ async def request_transfer(req: TransferRequestBody):
           </p>
         </div>"""
         try:
-            import sendgrid as sg_mod
-            from sendgrid.helpers.mail import Mail
-            sg = sg_mod.SendGridAPIClient(api_key=SENDGRID_API_KEY)
-            msg = Mail(from_email=SENDER_EMAIL, to_emails=email,
-                       subject=f"{BRAND['name']} — License Transfer Verification Code",
-                       html_content=html)
-            resp = sg.send(msg)
-            print(f"[TRANSFER] OTP sent to {email} — status {resp.status_code}")
+            ok = _send_gmail(email, f"{BRAND['name']} — License Transfer Verification Code", html)
+            if ok:
+                print(f"[TRANSFER] OTP sent to {email}")
+            else:
+                print(f"[TRANSFER] OTP was: {otp}")
         except Exception as e:
-            print(f"[TRANSFER] SendGrid failed for {email}: {e}")
+            print(f"[TRANSFER] Email failed for {email}: {e}")
             print(f"[TRANSFER] OTP was: {otp}")
 
     threading.Thread(target=_send_transfer_otp, daemon=True).start()
@@ -2448,7 +2446,7 @@ async def status_page(request: Request):
         {"name": "C2 API Server",       "icon": "🌐", "description": "FastAPI · Railway · HTTPS",          "status": "operational"},
         {"name": "License Validation",  "icon": "🔑", "description": "HMAC key validation · Device binding", "status": "operational"},
         {"name": "Payment Processing",  "icon": "💳", "description": "Razorpay · INR transactions",          "status": "operational"},
-        {"name": "Email Delivery",      "icon": "📧", "description": "SendGrid · License key emails",         "status": "operational"},
+        {"name": "Email Delivery",      "icon": "📧", "description": "Gmail SMTP · License key emails",         "status": "operational"},
         {"name": "Tenant Fleet API",    "icon": "📡", "description": "Heartbeat · Remote commands",           "status": "operational"},
         {"name": "Cloud Database",      "icon": "🗄",  "description": "PostgreSQL · Railway managed",          "status": "operational"},
     ]

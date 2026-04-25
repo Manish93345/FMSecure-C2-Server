@@ -216,15 +216,23 @@ input, textarea, select { font-family: var(--font-body); }
   gap: 10px;
 }
 
+/* ✅ NEW — looks like a secondary button with a blue tint */
 .nav-portal-link {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--t2);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--blue);
   padding: 6px 14px;
   border-radius: var(--r-sm);
-  transition: color var(--dur-fast), background var(--dur-fast);
+  border: 1px solid rgba(47, 129, 247, 0.35);
+  background: rgba(47, 129, 247, 0.06);
+  transition: color var(--dur-fast), background var(--dur-fast), border-color var(--dur-fast);
+  letter-spacing: 0.01em;
 }
-.nav-portal-link:hover { color: var(--t1); background: var(--bg3); }
+.nav-portal-link:hover {
+  color: #fff;
+  background: rgba(47, 129, 247, 0.18);
+  border-color: rgba(47, 129, 247, 0.7);
+}
 
 /* Mobile nav toggle */
 .nav-hamburger {

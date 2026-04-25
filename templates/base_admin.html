@@ -261,11 +261,11 @@
 
   <!-- ── Sidebar ─────────────────────────────────────────────────────────── -->
   <aside class="admin-sidebar" id="admin-sidebar">
-    <a href="{% block sidebar_home %}/{% endblock %}" class="sidebar-brand">
+    <a href="/" class="sidebar-brand" title="Back to {{ brand.name }} homepage">
       <div class="sidebar-brand-icon" style="background: transparent;">
         <img src="{{ brand.logo_png }}" alt="{{ brand.name }}" width="28" height="28"
             style="display:block;border-radius:4px;"
-            onerror="this.style.display='none';this.parentElement.innerHTML='🛡'">
+            onerror="this.style.display='none';this.parentElement.innerHTML=''">
       </div>
       <div>
         <span class="sidebar-brand-text">{{ brand.name }}</span>

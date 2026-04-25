@@ -1,10 +1,9 @@
 fastapi
-uvicorn
+uvicorn[standard]
 psycopg2-binary
 pydantic
 slowapi
 python-multipart
-sendgrid
 razorpay
 jinja2
 requests
