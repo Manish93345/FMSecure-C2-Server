@@ -77,6 +77,15 @@
               transform var(--dur-med) var(--ease);
   z-index: 9999;
 }
+/* Add this invisible bridge to theme.css */
+.nav-dropdown::before {
+  content: '';
+  position: absolute;
+  top: -10px; /* Reaches up to cover the 8px gap */
+  left: 0;
+  right: 0;
+  height: 10px;
+}
 .nav-item:hover .nav-dropdown {
   opacity: 1;
   pointer-events: auto;
@@ -674,6 +683,8 @@
 /* ══════════════════════════════════════════════════════════════════════════
    ANNOUNCEMENT BANNER (top of page)
    ══════════════════════════════════════════════════════════════════════════ */
+/* Update this in theme.css */
+/* Update this in theme.css */
 .announcement-bar {
   background: linear-gradient(90deg, var(--bg1) 0%, rgba(14,165,233,0.08) 50%, var(--bg1) 100%);
   border-bottom: 1px solid var(--bd);
@@ -682,9 +693,20 @@
   font-size: 13px;
   color: var(--t2);
   position: sticky;
-  top: 0;
+  top: var(--nav-h);
   z-index: 999;
+  
+  /* Add this line to make the fade smooth */
+  transition: opacity 0.3s var(--ease), transform 0.3s var(--ease);
 }
+
+/* Add this new rule right below it */
+.announcement-bar.hidden {
+  opacity: 0;
+  pointer-events: none; /* Prevents clicking links while invisible */
+  transform: translateY(-10px); /* Gives it a nice slight slide-up effect */
+}
+
 .announcement-bar a { color: var(--blue); font-weight: 600; }
 .announcement-bar a:hover { color: var(--cyan); }
 

@@ -4,15 +4,20 @@
  */
 
 /* ── Navigation scroll behaviour ─────────────────────────────────────────── */
+/* Update the top section in fmsecure.js to look like this */
 (function () {
   const nav = document.querySelector('.nav');
+  const banner = document.querySelector('.announcement-bar'); // Find the banner
+  
   if (!nav) return;
 
   const onScroll = () => {
     if (window.scrollY > 20) {
       nav.classList.add('scrolled');
+      if (banner) banner.classList.add('hidden'); // Hide banner when scrolling
     } else {
       nav.classList.remove('scrolled');
+      if (banner) banner.classList.remove('hidden'); // Show banner at the top
     }
   };
 
