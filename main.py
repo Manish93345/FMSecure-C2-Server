@@ -20,7 +20,30 @@ Environment variables (set in Render dashboard):
 Email uses Gmail SMTP with App Password (smtplib, no extra packages needed).
 Falls back to printing key/OTP to logs if GMAIL_USER not set.
 """
-import os, secrets, time, hashlib, hmac as _hmac, uuid, threading, random
+import os, secrets, time
+from dotenv import load_dotenv
+
+load_dotenv()
+
+import secrets, time, hashlib, hmac as _hmac, uuid, threading, random
+try:
+    import bcrypt as _bcrypt
+    _BCRYPT_AVAILABLE = True
+except ImportError:
+    _BCRYPT_AVAILABLE = False
+    print('[AUTH] bcrypt not installed — falling back to SHA-256. Run: pip install bcrypt')
+
+try:
+    import pyotp as _pyotp
+    _PYOTP_AVAILABLE = True
+except ImportError:
+    _PYOTP_AVAILABLE = False
+
+try:
+    from itsdangerous import URLSafeTimedSerializer as _USTS
+    _ISD_AVAILABLE = True
+except ImportError:
+    _ISD_AVAILABLE = False
 from functools import wraps
 from datetime import datetime, timezone, timedelta
 
@@ -78,13 +101,29 @@ PLANS = {
 # CENTRAL CONFIGURATION – CHANGE ONCE, UPDATE EVERYWHERE
 # ══════════════════════════════════════════════════════════════════════════════
 BRAND = {
-    "name": "FMSecure",
-    "tagline": "Enterprise EDR for Windows",
-    "logo_ico": "/static/app_icon.ico",          # Browser tab icon
-    "logo_png": "/static/app_icon.png",          # Navbar logo (fallback to text)
-    "support_email": "support@fmsecure.in",
-    "company": "Manish Lisa Pvt Limited",
-    "copyright_year": datetime.now().year,
+    # ── Identity ──────────────────────────────────────────────────────────
+    "name":            "FMSecure",
+    "tagline":         "Enterprise EDR for Windows",
+    "short_desc":      "Real-time endpoint detection & response — file integrity, ransomware killswitch, AES-256 vault, and cloud C2.",
+    "logo_ico":        "/static/app_icon.ico",
+    "logo_png":        "/static/app_icon.png",
+    "logo_text":       "FM",                       # fallback initials
+    # ── Contact ───────────────────────────────────────────────────────────
+    "support_email":   "support@fmsecure.in",
+    "sales_email":     "sales@fmsecure.in",
+    "security_email":  "security@fmsecure.in",
+    # ── Legal ─────────────────────────────────────────────────────────────
+    "company":         "Manish Lisa Pvt Limited",
+    "company_short":   "FMSecure",
+    "founded":         "2025",
+    "hq":              "India",
+    "copyright_year":  datetime.now().year,
+    # ── Product ───────────────────────────────────────────────────────────
+    "app_version":     "2.5.0",
+    # ── Social ────────────────────────────────────────────────────────────
+    "twitter":         "https://twitter.com/fmsecure",
+    "linkedin":        "https://linkedin.com/company/fmsecure",
+    "github":          "https://github.com/fmsecure",
 }
 
 # Pricing displayed on the pricing page – keep in sync with PLANS dict
@@ -348,11 +387,117 @@ def _check_admin(api_key):
 def _gen_tenant_api_key() -> str:
     return "fms-tenant-" + secrets.token_urlsafe(24)
  
+# ══════════════════════════════════════════════════════════════════════════════
+# PASSWORD HASHING — bcrypt (cost 12) with SHA-256 legacy fallback
+# ══════════════════════════════════════════════════════════════════════════════
 def _hash_password(password: str) -> str:
+    """Hash a new password. Always uses bcrypt when available."""
+    if _BCRYPT_AVAILABLE:
+        return _bcrypt.hashpw(password.encode(), _bcrypt.gensalt(rounds=12)).decode()
     return hashlib.sha256(("fmsecure_salt_v1:" + password).encode()).hexdigest()
- 
+
+def _hash_password_legacy(password: str) -> str:
+    return hashlib.sha256(("fmsecure_salt_v1:" + password).encode()).hexdigest()
+
 def _verify_password(password: str, hashed: str) -> bool:
-    return secrets.compare_digest(_hash_password(password), hashed)
+    if not hashed:
+        return False
+    if _BCRYPT_AVAILABLE and hashed.startswith("$2b$"):
+        try:
+            return _bcrypt.checkpw(password.encode(), hashed.encode())
+        except Exception:
+            return False
+    return secrets.compare_digest(_hash_password_legacy(password), hashed)
+
+def _verify_and_upgrade_password(password: str, hashed: str, update_fn=None) -> bool:
+    if not hashed:
+        return False
+    if _BCRYPT_AVAILABLE and hashed.startswith("$2b$"):
+        try:
+            return _bcrypt.checkpw(password.encode(), hashed.encode())
+        except Exception:
+            return False
+    if secrets.compare_digest(_hash_password_legacy(password), hashed):
+        if _BCRYPT_AVAILABLE and update_fn:
+            try:
+                new_hash = _bcrypt.hashpw(password.encode(), _bcrypt.gensalt(rounds=12)).decode()
+                update_fn(new_hash)
+                print("[AUTH] Password upgraded from SHA-256 to bcrypt")
+            except Exception as e:
+                print(f"[AUTH] bcrypt upgrade failed: {e}")
+        return True
+    return False
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CSRF tokens
+# ══════════════════════════════════════════════════════════════════════════════
+_SECRET_KEY = os.getenv("SECRET_KEY", secrets.token_hex(32))
+
+def _generate_csrf_token() -> str:
+    if _ISD_AVAILABLE:
+        return _USTS(_SECRET_KEY).dumps("csrf")
+    return secrets.token_hex(16)
+
+def _validate_csrf_token(token: str) -> bool:
+    if not token:
+        return False
+    if _ISD_AVAILABLE:
+        try:
+            _USTS(_SECRET_KEY).loads(token, max_age=3600)
+            return True
+        except Exception:
+            return False
+    return True
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ACCOUNT LOCKOUT
+# ══════════════════════════════════════════════════════════════════════════════
+_failed_logins: dict = {}
+_MAX_ATTEMPTS    = 10
+_LOCKOUT_SECONDS = 300
+
+def _record_failed_login(email: str):
+    e = email.lower()
+    rec = _failed_logins.get(e, {"count": 0, "locked_until": 0})
+    rec["count"] += 1
+    if rec["count"] >= _MAX_ATTEMPTS:
+        rec["locked_until"] = time.time() + _LOCKOUT_SECONDS
+        print(f"[AUTH] Account locked: {e}")
+    _failed_logins[e] = rec
+
+def _clear_failed_logins(email: str):
+    _failed_logins.pop(email.lower(), None)
+
+def _is_account_locked(email: str) -> bool:
+    rec = _failed_logins.get(email.lower())
+    if not rec:
+        return False
+    if rec.get("locked_until", 0) > time.time():
+        return True
+    _failed_logins.pop(email.lower(), None)
+    return False
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TOTP 2FA
+# ══════════════════════════════════════════════════════════════════════════════
+def _verify_totp(secret: str, code: str) -> bool:
+    if not _PYOTP_AVAILABLE or not secret or not code:
+        return False
+    try:
+        return _pyotp.TOTP(secret).verify(code.strip(), valid_window=1)
+    except Exception:
+        return False
+
+def _generate_totp_secret() -> str:
+    if _PYOTP_AVAILABLE:
+        return _pyotp.random_base32()
+    return secrets.token_hex(20)
+
+def _get_totp_uri(secret: str, email: str) -> str:
+    if _PYOTP_AVAILABLE:
+        return _pyotp.TOTP(secret).provisioning_uri(name=email, issuer_name="FMSecure")
+    return ""
+
  
 def _get_tenant_by_api_key(api_key: str) -> dict | None:
     if not api_key or not DATABASE_URL:
@@ -1273,54 +1418,113 @@ async def super_tenant_detail_page(
 
 
 @app.get("/tenant/login", response_class=HTMLResponse)
-async def tenant_login_page(request: Request, error: str = ""):
+async def tenant_login_page(request: Request, error: str = "", success: str = ""):
+    import secrets as _secrets
+    csrf = _secrets.token_hex(16)
     return templates.TemplateResponse(request, "tenant_login.html", {
-        "brand":   BRAND,
-        "error":   error,
+        "brand":        BRAND,
+        "error":        error,
+        "success":      success,
+        "csrf_token":   csrf,
+        "show_totp":    False,
+        "prefill_email": "",
     })
 
 @app.post("/tenant/login")
 async def tenant_login_post(
-    email:    str = Form(...),
-    password: str = Form(...)
+    request:    Request,
+    email:      str = Form(...),
+    password:   str = Form(...),
+    totp_code:  str = Form(""),
+    csrf_token: str = Form(""),
 ):
+    # ── CSRF check ──────────────────────────────────────────────────────────
+    # Soft-fail if itsdangerous not installed (logs warning)
+    if not _validate_csrf_token(csrf_token):
+        print(f"[CSRF] Invalid token on login from {request.client.host}")
+        # Don't hard-fail in this phase; just log. Uncomment to enforce:
+        # return RedirectResponse("/tenant/login?error=Invalid+form+token", 302)
+
     if not DATABASE_URL:
+        return RedirectResponse("/tenant/login?error=Server+not+configured", 302)
+
+    clean_email = email.strip().lower()
+
+    # ── Account lockout ──────────────────────────────────────────────────────
+    if _is_account_locked(clean_email):
         return RedirectResponse(
-            "/tenant/login?error=Server+not+configured", status_code=302)
- 
+            "/tenant/login?error=Account+temporarily+locked.+Try+again+in+5+minutes.", 302)
+
+    # ── DB lookup ────────────────────────────────────────────────────────────
     try:
         conn = get_db(); cur = conn.cursor()
         cur.execute("""
-            SELECT u.*, t.id as tenant_id, t.name as tenant_name, t.active as tenant_active
+            SELECT u.*, t.id as tenant_id, t.name as tenant_name,
+                   t.active as tenant_active
             FROM tenant_users u
             JOIN tenants t ON t.id = u.tenant_id
             WHERE u.email = %s
-        """, (email.strip().lower(),))
+        """, (clean_email,))
         user = cur.fetchone()
         cur.close(); conn.close()
     except Exception as e:
         print(f"[TENANT LOGIN] DB error: {e}")
-        return RedirectResponse(
-            "/tenant/login?error=Server+error", status_code=302)
- 
+        return RedirectResponse("/tenant/login?error=Server+error", 302)
+
     if not user:
-        return RedirectResponse(
-            "/tenant/login?error=Invalid+credentials", status_code=302)
+        _record_failed_login(clean_email)
+        return RedirectResponse("/tenant/login?error=Invalid+credentials", 302)
+
     if not user["tenant_active"]:
         return RedirectResponse(
-            "/tenant/login?error=Your+organisation+account+is+suspended",
-            status_code=302)
-    if not _verify_password(password, user["password_hash"]):
-        return RedirectResponse(
-            "/tenant/login?error=Invalid+credentials", status_code=302)
- 
-    token = _create_tenant_session(
-        user["tenant_id"], user["email"], user["role"])
- 
+            "/tenant/login?error=Your+organisation+account+is+suspended", 302)
+
+    # ── Password verify + bcrypt auto-upgrade ─────────────────────────────────
+    def _upgrade_pw(new_hash: str):
+        try:
+            uc = get_db(); ucur = uc.cursor()
+            ucur.execute(
+                "UPDATE tenant_users SET password_hash=%s WHERE email=%s",
+                (new_hash, clean_email))
+            uc.commit(); ucur.close(); uc.close()
+        except Exception as ue:
+            print(f"[AUTH] pw upgrade DB error: {ue}")
+
+    if not _verify_and_upgrade_password(password, user["password_hash"], _upgrade_pw):
+        _record_failed_login(clean_email)
+        return RedirectResponse("/tenant/login?error=Invalid+credentials", 302)
+
+    # ── TOTP 2FA (if user has it enabled) ────────────────────────────────────
+    totp_secret = user.get("totp_secret", "")
+    if totp_secret:
+        if not totp_code:
+            # Correct password but 2FA not submitted — show 2FA field
+            import secrets as _s
+            csrf = _s.token_hex(16)
+            return templates.TemplateResponse(request, "tenant_login.html", {
+                "brand":         BRAND,
+                "error":         "",
+                "success":       "",
+                "csrf_token":    csrf,
+                "show_totp":     True,
+                "prefill_email": clean_email,
+            })
+        if not _verify_totp(totp_secret, totp_code):
+            _record_failed_login(clean_email)
+            return RedirectResponse("/tenant/login?error=Invalid+2FA+code", 302)
+
+    # ── Success ───────────────────────────────────────────────────────────────
+    _clear_failed_logins(clean_email)
+    token = _create_tenant_session(user["tenant_id"], user["email"], user["role"])
+
     resp = RedirectResponse("/tenant/dashboard", status_code=302)
     resp.set_cookie(
         "fms_tenant_session", token,
-        httponly=True, max_age=_TENANT_SESSION_TTL)
+        httponly=True,
+        secure=True,          # requires HTTPS (Render provides this)
+        samesite="strict",
+        max_age=_TENANT_SESSION_TTL,
+    )
     return resp
  
 # ── Tenant Admin: Logout ──────────────────────────────────────────────────────
@@ -2481,3 +2685,213 @@ async def status_page(request: Request):
         "uptime_days": uptime_days,
         "checked_at":  checked_at,
     })
+
+# ══════════════════════════════════════════════════════════════════════════════
+# NEW PAGES — Phase 1 additions (config-driven, all use BRAND from config.py)
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/about", response_class=HTMLResponse)
+async def about_page(request: Request):
+    return templates.TemplateResponse(request, "about.html", {"brand": BRAND})
+
+@app.get("/careers", response_class=HTMLResponse)
+async def careers_page(request: Request):
+    return templates.TemplateResponse(request, "careers.html", {"brand": BRAND})
+
+@app.get("/security", response_class=HTMLResponse)
+async def security_page(request: Request):
+    return templates.TemplateResponse(request, "security.html", {"brand": BRAND})
+
+@app.get("/blog", response_class=HTMLResponse)
+async def blog_page(request: Request):
+    return templates.TemplateResponse(request, "blog.html", {"brand": BRAND})
+
+@app.get("/blog/{slug}", response_class=HTMLResponse)
+async def blog_post(request: Request, slug: str):
+    # Future: look up post by slug from DB; for now redirect to blog index
+    return RedirectResponse("/blog", status_code=302)
+
+@app.get("/case-studies", response_class=HTMLResponse)
+async def case_studies_page(request: Request):
+    return templates.TemplateResponse(request, "case_studies.html", {"brand": BRAND})
+
+@app.get("/partners", response_class=HTMLResponse)
+async def partners_page(request: Request):
+    return templates.TemplateResponse(request, "partners.html", {"brand": BRAND})
+
+@app.get("/integrations", response_class=HTMLResponse)
+async def integrations_page(request: Request):
+    return templates.TemplateResponse(request, "integrations.html", {"brand": BRAND})
+
+@app.get("/roadmap", response_class=HTMLResponse)
+async def roadmap_page(request: Request):
+    return templates.TemplateResponse(request, "roadmap.html", {"brand": BRAND})
+
+@app.get("/help", response_class=HTMLResponse)
+async def help_page(request: Request):
+    return templates.TemplateResponse(request, "help.html", {"brand": BRAND})
+
+@app.get("/cookie-policy", response_class=HTMLResponse)
+async def cookie_policy_page(request: Request):
+    return templates.TemplateResponse(request, "cookie_policy.html", {"brand": BRAND})
+
+@app.get("/enterprise", response_class=HTMLResponse)
+async def enterprise_page_get(request: Request):
+    return templates.TemplateResponse(request, "features.html", {
+        "brand": BRAND,
+        "_section": "enterprise",
+    })
+
+# ── Error handlers ─────────────────────────────────────────────────────────
+@app.exception_handler(404)
+async def not_found_handler(request: Request, exc):
+    return templates.TemplateResponse(request, "404.html", {"brand": BRAND}, status_code=404)
+
+@app.exception_handler(500)
+async def server_error_handler(request: Request, exc):
+    return templates.TemplateResponse(request, "500.html", {"brand": BRAND}, status_code=500)
+
+@app.get("/tenant/forgot", response_class=HTMLResponse)
+async def tenant_forgot_alias(request: Request, error: str = "", success: str = ""):
+    import secrets as _sec
+    return templates.TemplateResponse(request, "tenant_forgot.html", {
+        "brand":      BRAND,
+        "error":      error,
+        "success":    success,
+        "csrf_token": _sec.token_hex(16),
+    })
+
+@app.post("/tenant/forgot", response_class=HTMLResponse)
+async def tenant_forgot_post(request: Request, email: str = Form(...)):
+    return RedirectResponse("/tenant/forgot-password?email=" + email, 302)
+
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TOTP 2FA SETUP — tenant users
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/tenant/setup-2fa", response_class=HTMLResponse)
+async def tenant_setup_2fa_get(request: Request):
+    session = _get_tenant_session(request)
+    if not session:
+        return RedirectResponse("/tenant/login", 302)
+
+    import secrets as _s
+    csrf = _s.token_hex(16)
+
+    # Check if user already has 2FA enabled
+    already_enabled = False
+    totp_secret = ""
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("SELECT totp_secret FROM tenant_users WHERE email=%s",
+                    (session["email"],))
+        row = cur.fetchone()
+        cur.close(); conn.close()
+        if row and row.get("totp_secret"):
+            already_enabled = True
+        else:
+            totp_secret = _generate_totp_secret()
+    except Exception as e:
+        print(f"[2FA] DB error: {e}")
+        totp_secret = _generate_totp_secret()
+
+    # Generate QR code
+    qr_b64 = ""
+    if not already_enabled:
+        try:
+            import qrcode, io, base64
+            uri = _get_totp_uri(totp_secret, session["email"])
+            img = qrcode.make(uri)
+            buf = io.BytesIO()
+            img.save(buf, format="PNG")
+            qr_b64 = base64.b64encode(buf.getvalue()).decode()
+        except Exception as e:
+            print(f"[2FA] QR generation error: {e}")
+
+    return templates.TemplateResponse(request, "tenant_setup_2fa.html", {
+        "brand":           BRAND,
+        "csrf_token":      csrf,
+        "secret":          totp_secret,
+        "qr_b64":          qr_b64,
+        "already_enabled": already_enabled,
+        "error":           "",
+    })
+
+
+@app.post("/tenant/setup-2fa", response_class=HTMLResponse)
+async def tenant_setup_2fa_post(
+    request:    Request,
+    secret:     str = Form(...),
+    totp_code:  str = Form(...),
+    csrf_token: str = Form(""),
+):
+    session = _get_tenant_session(request)
+    if not session:
+        return RedirectResponse("/tenant/login", 302)
+
+    # Verify the code before saving
+    if not _verify_totp(secret, totp_code):
+        import secrets as _s
+        # Re-generate QR for retry
+        qr_b64 = ""
+        try:
+            import qrcode, io, base64
+            uri = _get_totp_uri(secret, session["email"])
+            img = qrcode.make(uri)
+            buf = io.BytesIO()
+            img.save(buf, format="PNG")
+            qr_b64 = base64.b64encode(buf.getvalue()).decode()
+        except Exception:
+            pass
+        return templates.TemplateResponse(request, "tenant_setup_2fa.html", {
+            "brand": BRAND, "csrf_token": _s.token_hex(16),
+            "secret": secret, "qr_b64": qr_b64,
+            "already_enabled": False,
+            "error": "Invalid code — please try again.",
+        })
+
+    # Save secret to DB
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("UPDATE tenant_users SET totp_secret=%s WHERE email=%s",
+                    (secret, session["email"]))
+        conn.commit(); cur.close(); conn.close()
+        print(f"[2FA] Enabled for {session['email']}")
+    except Exception as e:
+        print(f"[2FA] DB save error: {e}")
+
+    return RedirectResponse("/tenant/dashboard?msg=2fa_enabled", 302)
+
+
+@app.post("/tenant/disable-2fa")
+async def tenant_disable_2fa(request: Request, csrf_token: str = Form("")):
+    session = _get_tenant_session(request)
+    if not session:
+        return RedirectResponse("/tenant/login", 302)
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("UPDATE tenant_users SET totp_secret=NULL WHERE email=%s",
+                    (session["email"],))
+        conn.commit(); cur.close(); conn.close()
+    except Exception as e:
+        print(f"[2FA] Disable error: {e}")
+    return RedirectResponse("/tenant/setup-2fa", 302)
+
+
+# ── Alert acknowledge route ───────────────────────────────────────────────────
+@app.post("/tenant/alerts/{alert_id}/ack")
+async def tenant_ack_alert(request: Request, alert_id: str):
+    session = _get_tenant_session(request)
+    if not session:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute(
+            "UPDATE tenant_alerts SET acknowledged=TRUE WHERE id=%s AND tenant_id=%s",
+            (alert_id, session["tenant_id"]))
+        conn.commit(); cur.close(); conn.close()
+        return JSONResponse({"ok": True})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

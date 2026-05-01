@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Enterprise{% endblock %}
+{% block description %}FMSecure Enterprise — multi-tenant EDR for large organizations and MSPs. Custom pricing, SLA, and dedicated support.{% endblock %}
+
+{% block content %}
+<section style="padding:calc(var(--nav-h) + 60px) 0 0;background:var(--grad-hero);">
+  <div class="container">
+    <div class="hero-inner-page" style="text-align:left;padding-top:0;">
+      <div class="hero-eyebrow">Enterprise</div>
+      <h1 style="font-family:var(--font-display);font-size:clamp(36px,5vw,62px);font-weight:800;letter-spacing:-2.5px;line-height:1.05;margin-bottom:20px;">
+        EDR at enterprise scale.<br><span class="grad-text">Without enterprise friction.</span>
+      </h1>
+      <p style="font-size:18px;color:var(--t2);max-width:540px;line-height:1.65;">Multi-tenant architecture, unlimited seats, custom SLA, dedicated support, and on-premise deployment options. Built for organizations that can't afford downtime.</p>
+      <div style="display:flex;gap:12px;margin-top:28px;flex-wrap:wrap;">
+        <a href="/contact?type=enterprise" class="btn btn-primary btn-xl">Talk to Sales →</a>
+        <a href="/security" class="btn btn-secondary btn-xl">Security & Compliance</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section section-alt">
+  <div class="container" style="max-width:960px;">
+    <div class="section-header center">
+      <div class="section-label">Enterprise Features</div>
+      <h2 class="section-title">Everything in PRO, plus:</h2>
+    </div>
+    <div class="card-grid card-grid-3">
+      {% for icon, title, desc in [
+        ("♾️", "Unlimited Seats", "No per-seat caps. Deploy to every endpoint in your organization without counting licenses."),
+        ("🏢", "Multi-Tenant Mgmt", "Manage multiple business units or client organizations from a single admin pane."),
+        ("📋", "Custom SLA", "99.9% uptime SLA with dedicated incident response and escalation paths."),
+        ("🔒", "On-Premise Option", "Deploy the C2 server on your own infrastructure — air-gapped environments supported."),
+        ("🤝", "Dedicated CSM", "A customer success manager who knows your environment and escalation contacts."),
+        ("🔑", "SSO / SAML", "Integrate with your existing identity provider — Okta, Azure AD, Google Workspace."),
+        ("📊", "Custom Reporting", "Branded PDF reports on demand. Weekly executive summaries. Compliance exports."),
+        ("🛡", "Priority Threat Intel", "First access to new threat intelligence feeds and detection signatures."),
+        ("🔗", "Custom Integrations", "We build the SIEM/SOAR/ticketing integration you need — included in Enterprise."),
+      ] %}
+      <div class="card" style="padding:24px;">
+        <div class="card-icon">{{ icon }}</div>
+        <div class="card-title">{{ title }}</div>
+        <div class="card-desc">{{ desc }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="cta-band">
+      <h2>Let's build your deployment plan.</h2>
+      <p>Tell us about your environment — we'll scope a custom proposal within 48 hours.</p>
+      <div class="cta-actions">
+        <a href="/contact?type=enterprise" class="btn btn-primary btn-xl">Talk to Sales</a>
+        <a href="mailto:sales@fmsecure.in" class="btn btn-secondary btn-xl">📧 sales@fmsecure.in</a>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

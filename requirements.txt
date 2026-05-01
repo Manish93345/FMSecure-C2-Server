@@ -1,9 +1,36 @@
+# Core server
 fastapi
 uvicorn[standard]
 psycopg2-binary
 pydantic
-slowapi
-python-multipart
-razorpay
 jinja2
+python-multipart
+
+# Rate limiting
+slowapi
+
+# Payments
+razorpay
+
+# HTTP client
 requests
+
+# ── Phase 7: Auth hardening ───────────────────────────────────────────────
+# Replace SHA-256 password storage with bcrypt
+bcrypt>=4.0.0
+
+# TOTP two-factor authentication
+pyotp>=2.9.0
+
+# QR code generation for 2FA setup
+qrcode[pil]>=7.4.0
+Pillow>=10.0.0
+
+# Secure token / CSRF
+itsdangerous>=2.0.0
+
+# ── Optional: email ───────────────────────────────────────────────────────
+# (already using smtplib which is stdlib — no extra dep needed)
+
+# ── Dev / test ────────────────────────────────────────────────────────────
+# pip install -r requirements.txt

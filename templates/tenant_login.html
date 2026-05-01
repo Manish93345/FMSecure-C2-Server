@@ -1,219 +1,138 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Organisation Portal | {{ brand.name }}</title>
-  <link rel="icon" type="image/x-icon" href="{{ brand.logo_ico }}">
-  <link rel="stylesheet" href="/static/css/fmsecure.css">
-  <style>
-    body {
-      min-height: 100vh;
-      display: flex;
-      background: var(--bg);
-      overflow: hidden;
-    }
-    /* Left panel */
-    .split-left {
-      width: 420px;
-      flex-shrink: 0;
-      background: var(--bg1);
-      border-right: 1px solid var(--bd);
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      padding: 40px;
-      position: relative;
-      overflow: hidden;
-    }
-    .split-left::before {
-      content: '';
-      position: absolute;
-      bottom: -60px; right: -60px;
-      width: 300px; height: 300px;
-      background: radial-gradient(circle, rgba(14,165,233,0.08) 0%, transparent 70%);
-      pointer-events: none;
-    }
-    .split-left-brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-family: var(--font-display);
-      font-weight: 700;
-      font-size: 17px;
-      color: var(--t1);
-      text-decoration: none;
-    }
-    .split-left-brand-icon {
-      width: 36px; height: 36px;
-      background: linear-gradient(135deg, var(--blue), var(--cyan));
-      border-radius: var(--r-sm);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 18px;
-    }
-    .split-features { margin: auto 0; padding: 48px 0 32px; }
-    .split-features h2 {
-      font-family: var(--font-display);
-      font-size: 26px;
-      font-weight: 800;
-      letter-spacing: -0.5px;
-      margin-bottom: 10px;
-    }
-    .split-features p { font-size: 14px; color: var(--t2); margin-bottom: 28px; line-height: 1.65; }
-    .feature-item {
-      display: flex;
-      align-items: flex-start;
-      gap: 12px;
-      margin-bottom: 14px;
-    }
-    .feature-item-icon {
-      width: 32px; height: 32px;
-      border-radius: var(--r-sm);
-      background: var(--blue-dim);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 15px;
-      flex-shrink: 0;
-    }
-    .feature-item-text { font-size: 13px; color: var(--t2); line-height: 1.5; padding-top: 6px; }
-    .feature-item-text strong { color: var(--t1); display: block; font-size: 13.5px; margin-bottom: 1px; }
-    .split-footer { font-size: 12px; color: var(--t3); }
-    /* Right panel — form */
-    .split-right {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 40px 24px;
-      position: relative;
-    }
-    .split-right::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background-image:
-        linear-gradient(rgba(30,38,64,0.3) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(30,38,64,0.3) 1px, transparent 1px);
-      background-size: 48px 48px;
-      mask-image: radial-gradient(ellipse at center, black 20%, transparent 75%);
-    }
-    .form-panel {
-      position: relative;
-      z-index: 1;
-      width: 100%;
-      max-width: 380px;
-      animation: fadeUp 0.5s var(--ease-out) both;
-    }
-    .form-panel h2 {
-      font-family: var(--font-display);
-      font-size: 26px;
-      font-weight: 800;
-      letter-spacing: -0.5px;
-      margin-bottom: 6px;
-    }
-    .form-panel p { font-size: 14px; color: var(--t2); margin-bottom: 28px; }
-    @media(max-width: 800px) {
-      .split-left { display: none; }
-      body { display: block; }
-      .split-right { min-height: 100vh; padding: 40px 20px; }
-    }
-  </style>
-</head>
-<body>
+{% extends "base.html" %}
+{% block title %}IT Admin Login{% endblock %}
+{% block description %}Sign in to the FMSecure IT Admin portal to manage your endpoints, view alerts, and configure security policy.{% endblock %}
 
-  <!-- Left info panel -->
-<!-- Left info panel -->
-<div class="split-left">
+{% block content %}
+<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px 20px;background:var(--grad-hero);">
+  <div style="width:100%;max-width:420px;">
 
-  <a href="/" class="split-left-brand">
-    <div class="split-left-brand-icon" style="background: transparent;">
-      <img src="{{ brand.logo_png }}" alt="{{ brand.name }}" width="28" height="28"
-           style="display:block;border-radius:4px;"
-           onerror="this.style.display='none';this.parentElement.innerHTML='🛡'">
+    <!-- Logo + brand -->
+    <div style="text-align:center;margin-bottom:32px;">
+      <a href="/" style="display:inline-flex;align-items:center;gap:10px;text-decoration:none;margin-bottom:24px;">
+        <div style="width:40px;height:40px;border-radius:var(--r-md);background:var(--blue-dim);border:1px solid rgba(14,165,233,0.2);display:flex;align-items:center;justify-content:center;">
+          <img src="{{ brand.logo_png }}" alt="{{ brand.name }}" width="24" height="24"
+               style="display:block;object-fit:contain;"
+               onerror="this.style.display='none';this.parentElement.innerHTML='<span style=\'font-size:16px;font-weight:800;color:var(--blue);\'>FM</span>'">
+        </div>
+        <span style="font-size:20px;font-weight:800;color:var(--t1);">{{ brand.name }}</span>
+      </a>
+      <h1 style="font-size:24px;font-weight:800;letter-spacing:-0.8px;margin-bottom:6px;">IT Admin Login</h1>
+      <p style="font-size:14px;color:var(--t2);">Secure tenant portal access</p>
     </div>
-    {{ brand.name }}
-  </a>
 
-  <div class="split-features">
-    <h2>IT Admin Portal</h2>
-    <p>Manage your organisation's endpoints, respond to alerts, and configure security policies — all from one place.</p>
-
-    <div class="feature-item">
-      <div class="feature-item-icon">📡</div>
-      <div class="feature-item-text">
-        <strong>Live endpoint visibility</strong>
-        Real-time agent status across all enrolled machines
-      </div>
-    </div>
-    <div class="feature-item">
-      <div class="feature-item-icon">🚨</div>
-      <div class="feature-item-text">
-        <strong>Scoped alert feed</strong>
-        CRITICAL and HIGH events from your organisation only
-      </div>
-    </div>
-    <div class="feature-item">
-      <div class="feature-item-icon">⚙️</div>
-      <div class="feature-item-text">
-        <strong>Remote policy control</strong>
-        Push scan intervals and vault settings to all agents
-      </div>
-    </div>
-    <div class="feature-item">
-      <div class="feature-item-icon">🔒</div>
-      <div class="feature-item-text">
-        <strong>Isolated data access</strong>
-        You can only see your organisation's data — never others
-      </div>
-    </div>
-  </div>
-
-  <div class="split-footer">
-    &copy; {{ brand.copyright_year }} {{ brand.company }} &middot; {{ brand.name }}
-  </div>
-
-</div>   <!-- ✅ split-left closes HERE, wrapping all three children -->
-
-  <!-- Right form panel -->
-  <div class="split-right">
-    <div class="form-panel">
-      <h2>Sign in</h2>
-      <p>Access your organisation's security dashboard</p>
+    <!-- Card -->
+    <div class="card" style="padding:32px;">
 
       {% if error %}
-      <div class="alert alert-error" style="margin-bottom:18px;">
-        <span>⚠</span> {{ error }}
+      <div style="background:var(--red-dim);border:1px solid rgba(244,63,94,0.2);border-radius:var(--r-md);padding:12px 16px;margin-bottom:20px;display:flex;align-items:center;gap:10px;">
+        <span style="font-size:16px;">❌</span>
+        <span style="font-size:13.5px;color:var(--red);font-weight:600;">{{ error }}</span>
       </div>
       {% endif %}
 
-      <form method="POST" action="/tenant/login">
+      {% if success %}
+      <div style="background:var(--green-dim);border:1px solid rgba(16,185,129,0.2);border-radius:var(--r-md);padding:12px 16px;margin-bottom:20px;display:flex;align-items:center;gap:10px;">
+        <span style="font-size:16px;">✅</span>
+        <span style="font-size:13.5px;color:var(--green);font-weight:600;">{{ success }}</span>
+      </div>
+      {% endif %}
+
+      <form method="POST" action="/tenant/login" id="login-form" autocomplete="on">
+        <!-- CSRF token -->
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
         <div class="form-group">
           <label class="form-label">Email Address</label>
-          <input type="email" name="email" class="form-input" required autofocus
-                 placeholder="admin@yourcompany.com" autocomplete="email">
+          <input name="email" type="email" class="form-input" required autofocus
+                 autocomplete="email" placeholder="admin@yourcompany.com"
+                 value="{{ prefill_email or '' }}">
         </div>
+
         <div class="form-group">
-          <label class="form-label">Password</label>
-          <input type="password" name="password" class="form-input" required
-                 placeholder="••••••••" autocomplete="current-password">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+            <label class="form-label" style="margin-bottom:0;">Password</label>
+            <a href="/tenant/forgot" style="font-size:12px;color:var(--blue);">Forgot password?</a>
+          </div>
+          <div style="position:relative;">
+            <input name="password" type="password" class="form-input" required
+                   autocomplete="current-password" placeholder="••••••••"
+                   id="password-input" style="padding-right:44px;">
+            <button type="button" onclick="togglePwd()"
+                    style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--t3);font-size:16px;padding:0;line-height:1;"
+                    id="pwd-toggle">👁</button>
+          </div>
         </div>
 
-        <div style="text-align:right;margin-top:-8px;margin-bottom:20px;">
-          <a href="/tenant/forgot-password" style="font-size:12.5px;color:var(--t3);">Forgot password?</a>
+        <!-- 2FA TOTP field (shown only if enabled / step 2) -->
+        <div class="form-group" id="totp-group" style="display:{% if show_totp %}block{% else %}none{% endif %};">
+          <label class="form-label">Two-Factor Code</label>
+          <input name="totp_code" type="text" class="form-input"
+                 inputmode="numeric" pattern="[0-9]{6}"
+                 autocomplete="one-time-code" placeholder="6-digit code"
+                 maxlength="6" style="letter-spacing:4px;font-size:20px;text-align:center;font-family:var(--font-mono);">
+          <div class="form-hint">Enter the code from your authenticator app (Google Authenticator, Authy, etc.)</div>
         </div>
 
-        <button type="submit" class="btn btn-primary btn-full btn-lg">Sign In →</button>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
+          <input type="checkbox" id="remember-me" name="remember_me" style="width:15px;height:15px;accent-color:var(--blue);cursor:pointer;">
+          <label for="remember-me" style="font-size:13px;color:var(--t2);cursor:pointer;">Remember this device for 30 days</label>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-full" id="submit-btn"
+                style="display:flex;justify-content:center;align-items:center;gap:8px;">
+          <span id="btn-text">Sign In →</span>
+          <span id="btn-spinner" style="display:none;width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.8s linear infinite;"></span>
+        </button>
       </form>
 
-      <p style="font-size:12.5px;color:var(--t3);text-align:center;margin-top:24px;line-height:1.7;">
-        Lost your API key? Contact
-        <a href="mailto:{{ brand.support_email }}" style="color:var(--blue);">{{ brand.support_email }}</a>
-      </p>
-
-      <div style="padding-top:20px;margin-top:20px;border-top:1px solid var(--bd);text-align:center;">
-        <a href="/" style="font-size:12.5px;color:var(--t3);">← Back to {{ brand.name }}</a>
+      <!-- Security indicators -->
+      <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--bd);display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t3);">
+          <span style="color:var(--green);">🔒</span> Session encrypted with TLS 1.3 + HttpOnly cookies
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t3);">
+          <span style="color:var(--green);">🛡</span> Rate-limited · CSRF-protected · bcrypt password hashing
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t3);">
+          <span style="color:var(--amber);">⚠</span> 5 failed attempts will temporarily lock this account
+        </div>
       </div>
     </div>
-  </div>
 
-</body>
-</html>
+    <!-- Footer links -->
+    <div style="text-align:center;margin-top:20px;font-size:13px;color:var(--t2);">
+      Not an IT Admin?
+      <a href="/download" style="color:var(--blue);font-weight:600;">Download the agent →</a>
+    </div>
+    <div style="text-align:center;margin-top:8px;font-size:12px;color:var(--t3);">
+      <a href="/privacy">Privacy Policy</a> · <a href="/terms">Terms of Service</a> · <a href="/security">Security</a>
+    </div>
+
+  </div>
+</div>
+
+<style>
+@keyframes spin { to { transform: rotate(360deg); } }
+.btn-full { width: 100%; box-sizing: border-box; }
+</style>
+
+<script>
+function togglePwd() {
+  const inp = document.getElementById('password-input');
+  const btn = document.getElementById('pwd-toggle');
+  if (inp.type === 'password') { inp.type = 'text'; btn.textContent = '🙈'; }
+  else { inp.type = 'password'; btn.textContent = '👁'; }
+}
+
+document.getElementById('login-form').addEventListener('submit', function() {
+  document.getElementById('btn-text').style.display = 'none';
+  document.getElementById('btn-spinner').style.display = 'block';
+  document.getElementById('submit-btn').disabled = true;
+  setTimeout(() => {
+    document.getElementById('btn-text').style.display = 'inline';
+    document.getElementById('btn-spinner').style.display = 'none';
+    document.getElementById('submit-btn').disabled = false;
+  }, 6000);
+});
+</script>
+{% endblock %}

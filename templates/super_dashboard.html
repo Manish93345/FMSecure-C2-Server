@@ -1,338 +1,320 @@
 {% extends "base_admin.html" %}
-
-{% block title %}Super Admin — Tenants{% endblock %}
+{% block title %}Super Admin — Tenant Management{% endblock %}
 {% block sidebar_home %}/super/dashboard{% endblock %}
 {% block sidebar_context %}Super Admin{% endblock %}
 
 {% block sidebar_nav %}
 <div class="sidebar-section">Administration</div>
-<a href="/dashboard" class="sidebar-link"><span class="icon">🖥</span> C2 Endpoints</a>
-<a href="/super/dashboard" class="sidebar-link"><span class="icon">🏢</span> Tenants</a>
-<a href="/licenses" class="sidebar-link"><span class="icon">🔑</span> Licenses</a>
+<a href="/super/dashboard" class="sidebar-link active"><span class="icon">🏢</span> Tenants</a>
+<a href="/dashboard"       class="sidebar-link"><span class="icon">🖥</span> C2 Endpoints</a>
+<a href="/licenses"        class="sidebar-link"><span class="icon">🔑</span> Licenses</a>
 <div class="sidebar-section" style="margin-top:8px;">Site</div>
-<a href="/" class="sidebar-link" target="_blank"><span class="icon">🌐</span> Product Page</a>
-<a href="/contact" class="sidebar-link" target="_blank"><span class="icon">📬</span> Contact Submissions</a>
-<a href="#enterprise-leads" class="sidebar-link"><span class="icon">🏢</span> Enterprise Leads</a>
+<a href="/"        class="sidebar-link" target="_blank"><span class="icon">🌐</span> Product Page</a>
+<a href="/contact" class="sidebar-link" target="_blank"><span class="icon">📬</span> Contact Forms</a>
+<a href="/status"  class="sidebar-link" target="_blank"><span class="icon">📡</span> System Status</a>
+<div class="sidebar-section" style="margin-top:8px;">Danger Zone</div>
+<a href="/super/db-migrate" class="sidebar-link" style="color:var(--amber);" target="_blank"><span class="icon">⚙️</span> DB Migrate</a>
 {% endblock %}
 
 {% block sidebar_footer %}
-<strong>Super Admin</strong>
-<a href="/logout">Sign out →</a>
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+  <div style="width:28px;height:28px;border-radius:50%;background:var(--purple-dim);border:1px solid rgba(167,139,250,0.2);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--purple);">S</div>
+  <div><div style="font-size:12.5px;font-weight:700;color:var(--t1);">Super Admin</div><div style="font-size:10.5px;color:var(--t3);">Full access</div></div>
+</div>
+<a href="/logout" style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--t3);margin-top:6px;padding:4px 0;" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--t3)'"><span>⎋</span> Sign out</a>
 {% endblock %}
 
 {% block topbar_title %}Tenant Management{% endblock %}
-{% block topbar_sub %}{{ total_tenants }} organisations · {{ total_online }} agents online{% endblock %}
+{% block topbar_sub %}{{ total_tenants }} organisations · {{ total_online }} agents online now{% endblock %}
 
 {% block topbar_actions %}
-<a href="/dashboard" class="btn btn-secondary btn-sm">C2 →</a>
-<a href="#new-tenant" class="btn btn-primary btn-sm">+ New Tenant</a>
-<a href="/logout" class="btn btn-danger btn-sm">Sign Out</a>
+<div style="display:flex;gap:8px;align-items:center;">
+  <a href="/dashboard" class="btn btn-secondary btn-sm">C2 Dashboard →</a>
+  <button onclick="document.getElementById('new-tenant-modal').style.display='flex'" class="btn btn-primary btn-sm">+ New Tenant</button>
+  <a href="/logout" class="btn btn-secondary btn-sm" style="color:var(--red);border-color:rgba(244,63,94,0.2);">Sign Out</a>
+</div>
 {% endblock %}
 
 {% block extra_css %}
 <style>
-.tenant-row td { vertical-align: middle; }
-.plan-badge {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: var(--r-full);
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-.plan-enterprise { background: var(--purple-dim); color: var(--purple); border: 1px solid rgba(167,139,250,0.25); }
-.plan-business   { background: var(--blue-dim);   color: var(--blue);   border: 1px solid rgba(14,165,233,0.25); }
-.plan-trial      { background: var(--amber-dim);  color: var(--amber);  border: 1px solid rgba(245,158,11,0.25); }
-.seat-bar-wrap { display:flex; align-items:center; gap:8px; }
-.seat-bar { flex:1; height:5px; background:var(--bg3); border-radius:3px; overflow:hidden; }
-.seat-bar-fill { height:100%; border-radius:3px; transition:width 0.4s; }
+.plan-badge { font-family:var(--font-mono);font-size:9px;font-weight:700;padding:2px 8px;border-radius:var(--r-full);text-transform:uppercase;letter-spacing:1px; }
+.plan-enterprise { background:var(--purple-dim);color:var(--purple);border:1px solid rgba(167,139,250,0.25); }
+.plan-pro        { background:var(--blue-dim);color:var(--blue);border:1px solid rgba(14,165,233,0.25); }
+.plan-trial      { background:var(--amber-dim);color:var(--amber);border:1px solid rgba(245,158,11,0.25); }
+.plan-free       { background:var(--bg3);color:var(--t3);border:1px solid var(--bd); }
+.seat-bar-wrap   { display:flex;align-items:center;gap:8px;min-width:120px; }
+.seat-bar        { flex:1;height:5px;background:var(--bg3);border-radius:3px;overflow:hidden; }
+.seat-bar-fill   { height:100%;border-radius:3px;transition:width 0.4s; }
+/* Modal */
+.modal-overlay { position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:9000;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px); }
+.modal-box     { background:var(--bg1);border:1px solid var(--bd);border-radius:var(--r-xl);padding:32px;width:100%;max-width:500px;box-shadow:var(--shadow-xl);max-height:90vh;overflow-y:auto; }
+.modal-title   { font-size:18px;font-weight:800;color:var(--t1);margin-bottom:20px;display:flex;align-items:center;justify-content:space-between; }
 </style>
 {% endblock %}
 
 {% block content %}
 
-<!-- ── Global stats ───────────────────────────────────────────────────────── -->
-<div class="stats-row" style="margin-bottom:24px;">
+<!-- KPI row -->
+<div class="stats-row" style="margin-bottom:20px;">
   <div class="stat-card">
     <div class="stat-value" style="color:var(--blue);">{{ total_tenants }}</div>
     <div class="stat-label">Active Orgs</div>
+    <div style="font-size:11px;color:var(--t3);margin-top:4px;">{{ suspended_tenants or 0 }} suspended</div>
   </div>
   <div class="stat-card">
     <div class="stat-value" style="color:var(--green);">{{ total_online }}</div>
     <div class="stat-label">Agents Online</div>
+    <div style="font-size:11px;color:var(--t3);margin-top:4px;">{{ total_agents }} total enrolled</div>
   </div>
   <div class="stat-card">
-    <div class="stat-value" style="color:{% if total_critical > 0 %}var(--red){% else %}var(--green){% endif %};">
-      {{ total_critical }}
-    </div>
-    <div class="stat-label">Unacked Critical Alerts</div>
+    <div class="stat-value" style="color:var(--amber);">{{ total_alerts or 0 }}</div>
+    <div class="stat-label">Unacked Alerts</div>
+    <div style="font-size:11px;color:var(--t3);margin-top:4px;">Across all orgs</div>
   </div>
   <div class="stat-card">
-    <div class="stat-value" style="color:var(--t1);">{{ total_agents }}</div>
-    <div class="stat-label">Total Enrolled Agents</div>
+    <div class="stat-value" style="color:var(--purple);">{{ pro_tenants or 0 }}</div>
+    <div class="stat-label">PRO Orgs</div>
+    <div style="font-size:11px;color:var(--t3);margin-top:4px;">{{ free_tenants or 0 }} on free tier</div>
   </div>
 </div>
 
-<!-- ── Tenant table ───────────────────────────────────────────────────────── -->
-<div class="panel" style="margin-bottom:28px;">
+<!-- Search + filter bar -->
+<div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap;">
+  <input type="text" id="tenant-search" class="filter-input" style="max-width:280px;" placeholder="Search org name or email…" oninput="filterTenants()">
+  <select id="plan-filter" class="filter-select" onchange="filterTenants()">
+    <option value="all">All plans</option>
+    <option value="enterprise">Enterprise</option>
+    <option value="pro">PRO</option>
+    <option value="free">Free</option>
+    <option value="trial">Trial</option>
+  </select>
+  <select id="status-filter" class="filter-select" onchange="filterTenants()">
+    <option value="all">All status</option>
+    <option value="active">Active</option>
+    <option value="suspended">Suspended</option>
+  </select>
+  <span style="margin-left:auto;font-size:12.5px;color:var(--t3);" id="tenant-count">{{ tenants|length }} organisations</span>
+</div>
+
+<!-- Tenants table -->
+<div class="panel" style="margin-bottom:20px;">
   <div class="panel-header">
-    <div class="panel-title">All Organisations</div>
-    <input type="text" id="tenant-search" class="form-input"
-           style="width:200px;padding:6px 10px;font-size:12px;" placeholder="Search tenant…">
+    <div class="panel-title">Organisations</div>
+    <div style="display:flex;gap:8px;">
+      <button onclick="exportTenants()" class="btn btn-secondary btn-sm">⬇ Export CSV</button>
+    </div>
   </div>
   <div class="panel-table">
-    <div class="table-wrap" style="border:none;border-radius:0;">
-      <table class="data-table" id="tenant-table">
-        <thead>
-          <tr>
-            <th>Organisation</th>
-            <th>Plan</th>
-            <th>Contact</th>
-            <th>Agents (Online / Total / Max)</th>
-            <th>Alerts</th>
-            <th>Status</th>
-            <th>Created</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for t in tenants %}
-          <tr class="tenant-row">
-            <td>
-              <div style="font-weight:600;font-size:14px;color:var(--t1);">{{ t.name }}</div>
-              <div class="mono" style="font-size:11px;color:var(--t3);">{{ t.slug }}</div>
-            </td>
-            <td>
-              <span class="plan-badge plan-{{ t.plan }}">{{ t.plan }}</span>
-            </td>
-            <td style="font-size:12.5px;">{{ t.contact_email }}</td>
-            <td>
-              <div class="seat-bar-wrap">
-                <div class="seat-bar">
-                  <div class="seat-bar-fill" style="width:{{ [((t.agent_count / t.max_agents * 100) if t.max_agents else 0)|int, 100]|min }}%;background:{% if t.agent_count >= t.max_agents %}var(--red){% elif t.agent_count > t.max_agents * 0.8 %}var(--amber){% else %}var(--green){% endif %};"></div>
-                </div>
-                <span style="font-size:12px;color:var(--t2);white-space:nowrap;">
-                  <span style="color:var(--green);font-weight:600;">{{ t.online_count }}</span>
-                  / {{ t.agent_count }} / {{ t.max_agents }}
-                </span>
+    <table class="data-table" id="tenant-table">
+      <thead>
+        <tr>
+          <th>Organisation</th>
+          <th>Plan</th>
+          <th>Seats</th>
+          <th>Agents Online</th>
+          <th>Alerts</th>
+          <th>Status</th>
+          <th>Created</th>
+          <th style="text-align:right;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in tenants %}
+        <tr data-plan="{{ t.plan|lower }}" data-status="{{ 'active' if t.active else 'suspended' }}" data-name="{{ t.name|lower }}">
+          <td>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div style="width:32px;height:32px;border-radius:var(--r-sm);background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:var(--t2);flex-shrink:0;border:1px solid var(--bd);">
+                {{ t.name[0]|upper }}
               </div>
-            </td>
-            <td>
-              {% if t.unacked_alerts %}
-              <span class="badge badge-critical">⚠ {{ t.unacked_alerts }}</span>
-              {% else %}
-              <span style="color:var(--t4);font-size:12px;">—</span>
-              {% endif %}
-            </td>
-            <td>
-              {% if t.active %}
-              <span class="badge badge-online">Active</span>
-              {% else %}
-              <span class="badge badge-offline">Suspended</span>
-              {% endif %}
-            </td>
-            <td class="mono" style="font-size:11px;color:var(--t3);">{{ t.created_fmt }}</td>
-            <td>
-              <a href="/super/tenant-detail?id={{ t.id }}"
-                 class="btn btn-secondary btn-sm" style="font-size:12px;">View →</a>
-            </td>
-          </tr>
-          {% else %}
-          <tr>
-            <td colspan="8" style="text-align:center;color:var(--t4);padding:48px;">
-              No tenants yet. Create your first one below.
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+              <div>
+                <a href="/super/tenant-detail?id={{ t.id }}" style="font-size:13.5px;font-weight:700;color:var(--blue);">{{ t.name }}</a>
+                <div style="font-size:11px;color:var(--t3);margin-top:1px;">{{ t.contact_email or '—' }}</div>
+              </div>
+            </div>
+          </td>
+          <td>
+            <span class="plan-badge plan-{{ t.plan|lower }}">{{ t.plan|upper }}</span>
+          </td>
+          <td>
+            <div class="seat-bar-wrap">
+              <span style="font-size:12.5px;color:var(--t2);min-width:36px;">{{ t.agent_count }}/{{ t.max_agents }}</span>
+              <div class="seat-bar">
+                {% set pct = ([((t.agent_count / t.max_agents * 100)|int if t.max_agents else 0), 100]|min) %}
+                <div class="seat-bar-fill" style="width:{{ pct }}%;background:{% if pct >= 100 %}var(--red){% elif pct > 75 %}var(--amber){% else %}var(--green){% endif %};"></div>
+              </div>
+            </div>
+          </td>
+          <td>
+            <span style="font-size:13.5px;color:{% if t.online_count > 0 %}var(--green){% else %}var(--t3){% endif %};font-weight:600;">
+              {{ t.online_count or 0 }}
+            </span>
+          </td>
+          <td>
+            {% if t.alert_count and t.alert_count > 0 %}
+            <span class="badge badge-critical">{{ t.alert_count }} alerts</span>
+            {% else %}
+            <span style="color:var(--green);font-size:12px;">✓ Clear</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if t.active %}
+            <span class="badge badge-online badge-dot">Active</span>
+            {% else %}
+            <span class="badge badge-offline">Suspended</span>
+            {% endif %}
+          </td>
+          <td style="font-size:11.5px;color:var(--t3);">{{ t.created_fmt or '—' }}</td>
+          <td style="text-align:right;">
+            <div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap;">
+              <a href="/super/tenant-detail?id={{ t.id }}" class="btn btn-secondary btn-sm">View</a>
+              <form method="POST" action="/super/tenants/{{ t.id }}/reset-key" style="margin:0;" onsubmit="return confirm('Reset API key for {{ t.name }}? This will disconnect all agents.')">
+                <button type="submit" class="btn btn-secondary btn-sm" style="color:var(--amber);">Reset Key</button>
+              </form>
+              <form method="POST" action="/super/tenants/{{ t.id }}/suspend" style="margin:0;" onsubmit="return confirm('{% if t.active %}Suspend{% else %}Reactivate{% endif %} {{ t.name }}?')">
+                <button type="submit" class="btn btn-secondary btn-sm" style="color:var(--red);">
+                  {% if t.active %}Suspend{% else %}Activate{% endif %}
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="8">
+            <div class="empty-state">
+              <div class="empty-state-icon">🏢</div>
+              <div class="empty-state-title">No tenants yet</div>
+              <div class="empty-state-desc">Create the first organisation using the button above.</div>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Revenue overview panel -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+  <div class="panel">
+    <div class="panel-header"><div class="panel-title">💳 Plan Distribution</div></div>
+    <div class="panel-body" style="padding:0;">
+      {% for plan, count, color in [
+        ("Enterprise", enterprise_tenants or 0, "var(--purple)"),
+        ("PRO",        pro_tenants or 0,        "var(--blue)"),
+        ("Free",       free_tenants or 0,        "var(--t3)"),
+        ("Trial",      trial_tenants or 0,       "var(--amber)"),
+      ] %}
+      <div style="display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--bd);">
+        <span style="font-size:12px;font-weight:700;color:{{ color }};min-width:80px;">{{ plan }}</span>
+        <div style="flex:1;height:6px;background:var(--bg3);border-radius:3px;">
+          {% set max_t = [total_tenants, 1]|max %}
+          <div style="height:100%;border-radius:3px;width:{{ [(count / max_t * 100)|int, 100]|min }}%;background:{{ color }};"></div>
+        </div>
+        <span style="font-size:13px;color:var(--t2);font-weight:700;min-width:20px;text-align:right;">{{ count }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-header"><div class="panel-title">⚡ Quick Actions</div></div>
+    <div class="panel-body">
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <button onclick="document.getElementById('new-tenant-modal').style.display='flex'" class="btn btn-primary" style="justify-content:center;display:flex;">+ Create New Organisation</button>
+        <a href="/super/db-migrate" target="_blank" class="btn btn-secondary" style="display:flex;justify-content:center;color:var(--amber);">⚙ Run DB Migration</a>
+        <a href="/licenses" class="btn btn-secondary" style="display:flex;justify-content:center;">🔑 Manage Licenses</a>
+        <a href="/dashboard" class="btn btn-secondary" style="display:flex;justify-content:center;">🖥 C2 Dashboard</a>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- ── Create Tenant Form ─────────────────────────────────────────────────── -->
-<div class="panel" id="new-tenant">
-  <div class="panel-header">
-    <div class="panel-title">Create New Organisation</div>
-    <span class="badge badge-info" style="font-size:10px;">API key shown once</span>
-  </div>
-  <div class="panel-body">
-    {% if new_key %}
-    <div class="admin-success-banner" style="margin-bottom:20px;flex-direction:column;align-items:flex-start;gap:8px;">
-      <div style="font-weight:700;">✅ Tenant created! API key (copy now — shown once only):</div>
-      <code style="font-family:var(--font-mono);font-size:14px;color:var(--cyan);background:var(--bg2);padding:8px 16px;border-radius:var(--r-md);display:block;word-break:break-all;">{{ new_key }}</code>
-      <button onclick="navigator.clipboard.writeText('{{ new_key }}');this.textContent='✓ Copied!'" class="btn btn-sm" style="background:var(--green-dim);color:var(--green);border:1px solid rgba(16,185,129,0.3);">Copy Key</button>
-    </div>
-    {% endif %}
 
+<!-- ── New Tenant Modal ──────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="new-tenant-modal" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal-box">
+    <div class="modal-title">
+      Create New Organisation
+      <button onclick="document.getElementById('new-tenant-modal').style.display='none'"
+              style="background:none;border:none;color:var(--t3);cursor:pointer;font-size:20px;line-height:1;padding:0;">×</button>
+    </div>
     <form method="POST" action="/super/tenants-form">
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">
-        <div class="form-group" style="margin-bottom:0;">
-          <label class="form-label">Organisation Name *</label>
-          <input name="name" class="form-input" required placeholder="Acme Corp">
-        </div>
-        <div class="form-group" style="margin-bottom:0;">
-          <label class="form-label">Slug (URL-safe) *</label>
-          <input name="slug" class="form-input" required placeholder="acme-corp"
-                 pattern="[a-z0-9\-]+" title="lowercase letters, numbers, hyphens only">
-        </div>
-        <div class="form-group" style="margin-bottom:0;">
-          <label class="form-label">Contact Email *</label>
-          <input name="contact_email" type="email" class="form-input" required placeholder="it@acmecorp.com">
-        </div>
+      <div class="form-group">
+        <label class="form-label">Organisation Name *</label>
+        <input name="name" class="form-input" required placeholder="Acme Corp">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Contact Email *</label>
+        <input name="contact_email" type="email" class="form-input" required placeholder="admin@acme.com">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Admin Password *</label>
+        <input name="password" type="password" class="form-input" required placeholder="min 8 characters">
+        <div class="form-hint">Will be hashed with bcrypt before storage.</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
         <div class="form-group" style="margin-bottom:0;">
           <label class="form-label">Plan</label>
-          <select name="plan" class="form-select">
-            <option value="business">Business</option>
+          <select name="plan" class="form-select form-input">
+            <option value="free">Free</option>
+            <option value="pro" selected>PRO</option>
             <option value="enterprise">Enterprise</option>
             <option value="trial">Trial</option>
           </select>
         </div>
         <div class="form-group" style="margin-bottom:0;">
           <label class="form-label">Max Agents (seats)</label>
-          <input name="max_agents" type="number" class="form-input" value="10" min="1" max="10000">
+          <input name="max_agents" type="number" class="form-input" value="5" min="1" max="10000">
         </div>
-        <div class="form-group" style="margin-bottom:0;">
-          <label class="form-label">Notes (internal)</label>
-          <input name="notes" class="form-input" placeholder="Optional internal note">
-        </div>
-
-        <div style="grid-column:1/-1;border-top:1px solid var(--bd);padding-top:14px;margin-top:4px;">
-          <div style="font-family:var(--font-mono);font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;">IT Admin Credentials (optional — creates first admin user)</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
-            <div class="form-group" style="margin-bottom:0;">
-              <label class="form-label">Admin Email</label>
-              <input name="admin_email" type="email" class="form-input" placeholder="admin@acmecorp.com">
-            </div>
-            <div class="form-group" style="margin-bottom:0;">
-              <label class="form-label">Admin Password</label>
-              <input name="admin_password" type="password" class="form-input" placeholder="Strong password (min 8 chars)">
-            </div>
-          </div>
-        </div>
-
-        <div style="grid-column:1/-1;">
-          <div style="display:flex;align-items:center;gap:12px;">
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--t2);">
-              <input type="checkbox" name="send_welcome" value="1" checked style="width:auto;">
-              Send welcome email to contact (requires SendGrid)
-            </label>
-          </div>
-          <button type="submit" class="btn btn-primary" style="margin-top:14px;">
-            Create Tenant & Generate API Key →
-          </button>
-        </div>
+      </div>
+      <div style="margin-top:20px;display:flex;gap:10px;justify-content:flex-end;">
+        <button type="button" onclick="document.getElementById('new-tenant-modal').style.display='none'" class="btn btn-secondary">Cancel</button>
+        <button type="submit" class="btn btn-primary">Create Organisation →</button>
       </div>
     </form>
   </div>
 </div>
 
-<!-- ── Enterprise Leads ──────────────────────────────────────────────────── -->
-<div id="enterprise-leads" style="margin-top:32px;">
-  <div class="panel">
-    <div class="panel-header" style="display:flex;align-items:center;justify-content:space-between;">
-      <div>
-        <div class="panel-title">🏢 Enterprise Leads</div>
-        <div class="panel-sub">Organisations that filled the /enterprise inquiry form</div>
-      </div>
-    </div>
-    {% if enterprise_leads %}
-    <div style="overflow-x:auto;">
-      <table class="table" id="leads-table">
-        <thead>
-          <tr>
-            <th>Company</th><th>Contact</th><th>Email</th>
-            <th>Seats</th><th>Message</th><th>Date</th><th>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for lead in enterprise_leads %}
-          <tr>
-            <td><strong>{{ lead.company }}</strong></td>
-            <td>{{ lead.name }}</td>
-            <td><a href="mailto:{{ lead.email }}" style="color:var(--blue);">{{ lead.email }}</a></td>
-            <td>{{ lead.seats }}</td>
-            <td style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--t3);font-size:13px;">
-              {{ lead.message or "—" }}
-            </td>
-            <td style="white-space:nowrap;color:var(--t3);font-size:13px;">
-              {{ lead.created_at.strftime("%Y-%m-%d") if lead.created_at else "—" }}
-            </td>
-            <td>
-              <a href="#new-tenant"
-                 onclick="prefillFromLead('{{ lead.company }}','{{ lead.email }}','{{ lead.seats }}')"
-                 class="btn btn-primary btn-sm" style="font-size:11px;">
-                Create Tenant →
-              </a>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    {% else %}
-    <div style="padding:32px;text-align:center;color:var(--t3);">
-      No enterprise inquiries yet — they will appear here when someone fills the /enterprise form.
-    </div>
-    {% endif %}
-  </div>
-</div>
 
 {% endblock %}
 
 {% block extra_js %}
 <script>
-
-// ADD this function BEFORE that line:
-function prefillFromLead(company, email, seats) {
-  const nameInput = document.querySelector('input[name="name"]');
-  const slugInput = document.querySelector('input[name="slug"]');
-  const emailInput = document.querySelector('input[name="contact_email"]');
-  const agentsInput = document.querySelector('input[name="max_agents"]');
-  if (nameInput) nameInput.value = company;
-  if (emailInput) emailInput.value = email;
-  if (agentsInput && seats) agentsInput.value = parseInt(seats) || 10;
-  if (slugInput && company) {
-    slugInput.value = company.toLowerCase().replace(/[^a-z0-9\s-]/g,'').replace(/\s+/g,'-');
-  }
-}
-// Search filter
-const search = document.getElementById('tenant-search');
-if (search) {
-  search.addEventListener('input', () => {
-    const q = search.value.toLowerCase();
-    document.querySelectorAll('#tenant-table tbody tr').forEach(row => {
-      row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
-    });
+function filterTenants() {
+  const q    = document.getElementById('tenant-search').value.toLowerCase();
+  const plan = document.getElementById('plan-filter').value;
+  const st   = document.getElementById('status-filter').value;
+  let count  = 0;
+  document.querySelectorAll('#tenant-table tbody tr[data-plan]').forEach(row => {
+    const match = (!q    || row.dataset.name?.includes(q) || row.textContent.toLowerCase().includes(q))
+               && (plan === 'all' || row.dataset.plan === plan)
+               && (st   === 'all' || row.dataset.status === st);
+    row.style.display = match ? '' : 'none';
+    if (match) count++;
   });
+  document.getElementById('tenant-count').textContent = count + ' organisations';
 }
 
-// Auto-slug from name
-const nameInput = document.querySelector('input[name="name"]');
-const slugInput = document.querySelector('input[name="slug"]');
-if (nameInput && slugInput) {
-  nameInput.addEventListener('input', () => {
-    if (!slugInput.dataset.touched) {
-      slugInput.value = nameInput.value.toLowerCase()
-        .replace(/[^a-z0-9\s-]/g, '')
-        .replace(/\s+/g, '-')
-        .replace(/-+/g, '-');
-    }
+function exportTenants() {
+  const rows = [['Name','Plan','Seats','Online','Alerts','Status','Created']];
+  document.querySelectorAll('#tenant-table tbody tr[data-plan]').forEach(r => {
+    if (r.style.display === 'none') return;
+    const cells = r.querySelectorAll('td');
+    rows.push([
+      cells[0]?.querySelector('a')?.textContent?.trim() || '',
+      cells[1]?.textContent?.trim() || '',
+      cells[2]?.textContent?.trim() || '',
+      cells[3]?.textContent?.trim() || '',
+      cells[4]?.textContent?.trim() || '',
+      cells[5]?.textContent?.trim() || '',
+      cells[6]?.textContent?.trim() || '',
+    ]);
   });
-  slugInput.addEventListener('input', () => { slugInput.dataset.touched = '1'; });
+  const csv = rows.map(r => r.map(c => '"' + c.replace(/"/g,'""') + '"').join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = 'fmsecure_tenants_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
 }
-
-// Auto-refresh (only when not in create form area)
-setInterval(() => {
-  if (!document.querySelector('#new-tenant input:focus')) location.reload();
-}, 20000);
-
-
-
-// Scroll to new_key if present
-{% if new_key %}
-document.getElementById('new-tenant').scrollIntoView({ behavior: 'smooth' });
-{% endif %}
 </script>
 {% endblock %}

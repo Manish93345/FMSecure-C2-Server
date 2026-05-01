@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}Blog & Insights{% endblock %}
+{% block description %}Security insights, technical deep-dives, and product updates from the FMSecure team.{% endblock %}
+
+{% block content %}
+<section style="padding:calc(var(--nav-h) + 60px) 0 0;background:var(--grad-hero);">
+  <div class="container">
+    <div class="hero-inner-page" style="text-align:left;padding-top:0;">
+      <div class="hero-eyebrow">Blog & Insights</div>
+      <h1 style="font-family:var(--font-display);font-size:clamp(36px,5vw,62px);font-weight:800;letter-spacing:-2.5px;line-height:1.05;margin-bottom:20px;">
+        Security knowledge,<br><span class="grad-text">no fluff.</span>
+      </h1>
+      <p style="font-size:18px;color:var(--t2);max-width:520px;line-height:1.65;">Technical deep-dives, threat analysis, product updates, and practical security guidance — written by practitioners for practitioners.</p>
+    </div>
+  </div>
+</section>
+
+<!-- Featured post -->
+<section class="section">
+  <div class="container" style="max-width:1000px;">
+    <div class="section-header"><div class="section-label">Featured</div></div>
+    <a href="/blog/how-edr-detects-ransomware" style="text-decoration:none;">
+      <div class="card" style="display:grid;grid-template-columns:1fr 1fr;gap:0;overflow:hidden;padding:0;transition:all 0.2s;">
+        <div style="background:linear-gradient(135deg,var(--bg3) 0%,var(--bg2) 100%);min-height:280px;display:flex;align-items:center;justify-content:center;font-size:80px;">🛡</div>
+        <div style="padding:36px;">
+          <div class="blog-meta"><span class="blog-tag">EDR</span><span>April 28, 2026</span><span>8 min read</span></div>
+          <div class="blog-title" style="font-size:22px;font-weight:800;letter-spacing:-0.5px;margin-bottom:12px;color:var(--t1);">How FMSecure's Ransomware Killswitch Actually Works</div>
+          <div class="blog-excerpt" style="font-size:15px;">A technical deep-dive into the behavioral detection engine that identifies ransomware patterns before encryption begins — and kills the process in under 200ms.</div>
+          <div class="blog-read-more" style="margin-top:20px;">Read article →</div>
+        </div>
+      </div>
+    </a>
+  </div>
+</section>
+
+<!-- Posts grid -->
+<section class="section section-alt">
+  <div class="container" style="max-width:1000px;">
+    <div class="section-header">
+      <div class="section-label">Latest</div>
+      <h2 class="section-title">Recent articles.</h2>
+    </div>
+
+    <!-- Category filter -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:32px;">
+      {% for cat, active in [("All", True), ("EDR & Detection", False), ("Threat Intel", False), ("Windows Security", False), ("Product Updates", False), ("Engineering", False)] %}
+      <button onclick="filterBlog(this, '{{ cat }}')"
+              style="padding:7px 16px;border-radius:var(--r-full);font-size:13px;font-weight:600;cursor:pointer;transition:all 0.15s;border:1px solid {% if active %}var(--blue){% else %}var(--bd){% endif %};background:{% if active %}var(--blue-dim){% else %}transparent{% endif %};color:{% if active %}var(--blue){% else %}var(--t2){% endif %};">
+        {{ cat }}
+      </button>
+      {% endfor %}
+    </div>
+
+    <div class="card-grid card-grid-3" id="blog-grid">
+      {% set posts = [
+        ("🔍", "Process Attribution: How We Know Which App Touched Your File", "Engineering", "April 20, 2026", "6 min", "Using Windows kernel APIs to trace every file modification to its responsible process — even when malware tries to hide."),
+        ("🔑", "Registry Persistence: The 14 Keys Every Malware Family Uses", "Threat Intel", "April 15, 2026", "10 min", "A breakdown of the Windows Registry keys monitored by FMSecure's registry persistence detector, with real malware examples."),
+        ("🏗", "Building AES-256 Encrypted Logs in Python", "Engineering", "April 8, 2026", "7 min", "How we implemented Fernet-based log encryption that's machine-bound and tamper-evident — with full code walkthrough."),
+        ("⚡", "Multithreaded SHA-256 Hashing: From 2m18s to 1m5s on 119GB", "Engineering", "March 30, 2026", "5 min", "Why 16 threads didn't give us 16x speedup — and the real hardware bottleneck that caps Python file hashing performance."),
+        ("🦠", "MalwareBazaar Integration: Real-Time Threat Intelligence for Free", "Threat Intel", "March 22, 2026", "8 min", "How we integrated abuse.ch's MalwareBazaar API to check every new or modified file against 300k+ malware samples."),
+        ("🚨", "HMAC Tamper Detection: Why Hash Records Need Their Own Hash", "EDR & Detection", "March 15, 2026", "6 min", "The attack scenario that HMAC signing prevents — and why just storing SHA-256 hashes is not enough for a real FIM."),
+      ] %}
+      {% for emoji, title, cat, date, read, excerpt in posts %}
+      <div class="card blog-card" data-cat="{{ cat }}">
+        <div class="blog-card-image">{{ emoji }}</div>
+        <div class="blog-meta"><span class="blog-tag">{{ cat }}</span><span>{{ date }}</span><span>{{ read }}</span></div>
+        <div class="blog-title">{{ title }}</div>
+        <div class="blog-excerpt">{{ excerpt }}</div>
+        <a href="#" class="blog-read-more">Read article →</a>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div style="text-align:center;margin-top:40px;">
+      <button class="btn btn-secondary">Load More Articles</button>
+    </div>
+  </div>
+</section>
+
+<!-- Newsletter -->
+<section class="section">
+  <div class="container">
+    <div class="cta-band" style="max-width:600px;">
+      <div style="font-size:32px;margin-bottom:12px;">📬</div>
+      <h2 style="font-size:28px;">Security insights, monthly.</h2>
+      <p>No spam. Practical security knowledge and FMSecure updates — once a month.</p>
+      <form onsubmit="subscribeNewsletter(event)" style="display:flex;gap:8px;max-width:380px;margin:0 auto;position:relative;z-index:1;">
+        <input type="email" placeholder="your@email.com" required
+               style="flex:1;background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r-md);padding:11px 16px;color:var(--t1);font-size:14px;outline:none;transition:border-color 0.15s;"
+               onfocus="this.style.borderColor='var(--blue)'" onblur="this.style.borderColor='var(--bd)'">
+        <button type="submit" class="btn btn-primary">Subscribe</button>
+      </form>
+    </div>
+  </div>
+</section>
+
+<script>
+function filterBlog(btn, cat) {
+  document.querySelectorAll('.card-grid button, [onclick*="filterBlog"]').forEach(b => {
+    b.style.background = 'transparent'; b.style.color = 'var(--t2)'; b.style.borderColor = 'var(--bd)';
+  });
+  btn.style.background = 'var(--blue-dim)'; btn.style.color = 'var(--blue)'; btn.style.borderColor = 'var(--blue)';
+  document.querySelectorAll('#blog-grid .blog-card').forEach(card => {
+    card.style.display = (cat === 'All' || card.dataset.cat === cat) ? '' : 'none';
+  });
+}
+function subscribeNewsletter(e) {
+  e.preventDefault();
+  e.target.innerHTML = '<span style="color:var(--green);font-weight:600;padding:11px 0;display:block;">✓ You\'re subscribed!</span>';
+}
+</script>
+{% endblock %}

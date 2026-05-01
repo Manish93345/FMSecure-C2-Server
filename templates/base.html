@@ -6,141 +6,225 @@
   <title>{% block title %}{{ brand.name }}{% endblock %} | {{ brand.name }}</title>
   <meta name="description" content="{% block description %}{{ brand.name }} — {{ brand.tagline }}. Enterprise-grade EDR with real-time file integrity monitoring, ransomware protection, and cloud C2 command & control.{% endblock %}">
   <meta name="theme-color" content="#07080C">
-
-  <!-- Favicon -->
+  <meta name="robots" content="index, follow">
+  <link rel="icon" type="image/png" href="{{ brand.logo_png }}">
   <link rel="icon" type="image/x-icon" href="{{ brand.logo_ico }}">
   <link rel="shortcut icon" href="{{ brand.logo_ico }}">
-
-  <!-- Open Graph -->
+  <link rel="apple-touch-icon" href="{{ brand.logo_png }}">
   <meta property="og:title" content="{% block og_title %}{{ brand.name }} — {{ brand.tagline }}{% endblock %}">
-  <meta property="og:description" content="{% block og_desc %}Enterprise EDR built for Windows. Real-time monitoring, AES-256 encryption, ransomware killswitch, and cloud C2 command & control.{% endblock %}">
+  <meta property="og:description" content="{% block og_desc %}Enterprise EDR. Real-time monitoring, AES-256 encryption, ransomware killswitch, cloud C2.{% endblock %}">
   <meta property="og:type" content="website">
-
-  <!-- CSS -->
+  <meta property="og:image" content="{{ brand.logo_png }}">
   <link rel="stylesheet" href="/static/css/fmsecure.css">
+  <link rel="stylesheet" href="/static/css/theme.css">
   {% block extra_css %}{% endblock %}
 </head>
 <body>
 
-<!-- ── Navigation ─────────────────────────────────────────────────────────── -->
+<div class="announcement-bar" id="announcement-bar">
+  🎉 <strong>v2.5.0 is live</strong> — EDR Engine + Process Attribution + Registry Monitor.
+  <a href="/roadmap#changelog">See what's new →</a>
+  <button onclick="document.getElementById('announcement-bar').style.display='none'" style="margin-left:12px;background:none;border:none;color:var(--t3);cursor:pointer;font-size:16px;line-height:1;">×</button>
+</div>
+
 <nav class="nav" id="nav">
   <div class="nav-inner">
-    <a href="/" class="nav-logo">
-      <div class="nav-logo-icon">
-        <img src="{{ brand.logo_png }}" alt="{{ brand.name }}" width="28" height="28"
-            style="display:block;border-radius:4px;"
-            onerror="this.style.display='none';this.parentElement.innerHTML=''">
+    <a href="/" class="nav-logo" style="text-decoration:none;">
+      <div class="nav-logo-icon" style="background:var(--blue-dim);border:1px solid rgba(14,165,233,0.2);">
+        <img src="{{ brand.logo_png }}" alt="{{ brand.name }}" width="22" height="22"
+             style="display:block;border-radius:3px;object-fit:contain;"
+             onerror="this.style.display='none';this.parentElement.innerHTML='<span style=\'font-size:13px;font-weight:800;color:var(--blue);\'>FM</span>'">
       </div>
       <div>
-        <span>{{ brand.name }}</span>
+        <span style="font-size:17px;font-weight:800;letter-spacing:-0.4px;color:var(--t1);">{{ brand.name }}</span>
         <span class="nav-logo-tagline">{{ brand.tagline }}</span>
       </div>
     </a>
 
-    <ul class="nav-links">
-      <li><a href="/#features">Features</a></li>
-      <li><a href="/features">Capabilities</a></li>
-      <li><a href="/pricing">Pricing</a></li>
-      <li><a href="/documentation">Docs</a></li>
-      <li><a href="/contact">Contact</a></li>
-      <li><a href="/enterprise" style="color:#2f81f7;font-weight:600;">Enterprise</a></li>
+    <ul class="nav-links" style="display:flex;align-items:center;gap:2px;list-style:none;">
+      <li class="nav-item">
+        <div class="nav-dropdown-trigger">Product<svg width="12" height="12" viewBox="0 0 12 12" fill="none" style="margin-left:2px;"><path d="M2 4L6 8L10 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+        <div class="nav-dropdown">
+          <a href="/features"><span class="dd-icon">🛡</span> Features</a>
+          <a href="/integrations"><span class="dd-icon">🔗</span> Integrations</a>
+          <a href="/roadmap"><span class="dd-icon">🗺</span> Roadmap</a>
+          <div class="nav-dropdown-divider"></div>
+          <a href="/download"><span class="dd-icon">⬇️</span> Download Agent</a>
+        </div>
+      </li>
+      <li class="nav-item">
+        <div class="nav-dropdown-trigger">Solutions<svg width="12" height="12" viewBox="0 0 12 12" fill="none" style="margin-left:2px;"><path d="M2 4L6 8L10 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+        <div class="nav-dropdown">
+          <a href="/enterprise"><span class="dd-icon">🏢</span> Enterprise</a>
+          <a href="/partners"><span class="dd-icon">🤝</span> Partners & MSPs</a>
+          <a href="/case-studies"><span class="dd-icon">📋</span> Case Studies</a>
+          <a href="/security"><span class="dd-icon">🔒</span> Security & Compliance</a>
+        </div>
+      </li>
+      <li class="nav-item">
+        <div class="nav-dropdown-trigger">Resources<svg width="12" height="12" viewBox="0 0 12 12" fill="none" style="margin-left:2px;"><path d="M2 4L6 8L10 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+        <div class="nav-dropdown">
+          <a href="/documentation"><span class="dd-icon">📖</span> Documentation</a>
+          <a href="/help"><span class="dd-icon">💬</span> Help Center</a>
+          <a href="/blog"><span class="dd-icon">📰</span> Blog & Insights</a>
+          <a href="/status"><span class="dd-icon">📡</span> System Status</a>
+        </div>
+      </li>
+      <li class="nav-item">
+        <div class="nav-dropdown-trigger">Company<svg width="12" height="12" viewBox="0 0 12 12" fill="none" style="margin-left:2px;"><path d="M2 4L6 8L10 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+        <div class="nav-dropdown">
+          <a href="/about"><span class="dd-icon">ℹ️</span> About Us</a>
+          <a href="/careers"><span class="dd-icon">💼</span> Careers</a>
+          <a href="/contact"><span class="dd-icon">📬</span> Contact</a>
+        </div>
+      </li>
+      <li><a href="/pricing" style="padding:6px 14px;font-size:14px;font-weight:500;color:var(--t2);border-radius:var(--r-md);display:block;" onmouseover="this.style.color='var(--t1)';this.style.background='var(--bg1)'" onmouseout="this.style.color='var(--t2)';this.style.background='transparent'">Pricing</a></li>
     </ul>
 
-    <div class="nav-actions">
-      <a href="/tenant/login" class="nav-portal-link">🏢 IT Admin Login</a>
+    <div class="nav-actions" style="display:flex;align-items:center;gap:10px;">
+      <a href="/tenant/login" style="font-size:13px;font-weight:600;color:var(--t2);padding:6px 12px;border-radius:var(--r-md);border:1px solid var(--bd);transition:all 0.15s;" onmouseover="this.style.color='var(--t1)';this.style.borderColor='var(--bdh)'" onmouseout="this.style.color='var(--t2)';this.style.borderColor='var(--bd)'">🏢 IT Admin</a>
       <a href="/download" class="btn btn-primary btn-sm">Download</a>
     </div>
-
-    <button class="nav-hamburger" aria-label="Menu">
-      <span></span><span></span><span></span>
-    </button>
+    <button class="nav-hamburger" aria-label="Toggle menu"><span></span><span></span><span></span></button>
   </div>
 </nav>
 
-<!-- Mobile drawer -->
 <nav class="nav-drawer">
-  <a href="/#features">Features</a>
-  <a href="/features">All Capabilities</a>
-  <a href="/pricing">Pricing</a>
-  <a href="/documentation">Documentation</a>
-  <a href="/contact">Contact</a>
-  <a href="/enterprise" style="color:#2f81f7;font-weight:600;">Enterprise</a>
-  <a href="/tenant/login" style="color:var(--blue);font-weight:600;">🏢 IT Admin Login →</a>
-  <div style="padding-top:12px;border-top:1px solid var(--bd);margin-top:4px">
-    <a href="/download" class="btn btn-primary btn-full" style="display:flex;justify-content:center;">Download Agent</a>
+  <div style="padding:8px 0;border-bottom:1px solid var(--bd);margin-bottom:8px;">
+    <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);padding:0 4px;margin-bottom:8px;">Product</div>
+    <a href="/features">Features</a>
+    <a href="/integrations">Integrations</a>
+    <a href="/pricing">Pricing</a>
+    <a href="/roadmap">Roadmap</a>
+    <a href="/download">Download Agent</a>
+  </div>
+  <div style="padding:8px 0;border-bottom:1px solid var(--bd);margin-bottom:8px;">
+    <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);padding:0 4px;margin-bottom:8px;">Solutions</div>
+    <a href="/enterprise">Enterprise</a>
+    <a href="/partners">Partners & MSPs</a>
+    <a href="/case-studies">Case Studies</a>
+    <a href="/security">Security & Compliance</a>
+  </div>
+  <div style="padding:8px 0;border-bottom:1px solid var(--bd);margin-bottom:8px;">
+    <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);padding:0 4px;margin-bottom:8px;">Resources & Company</div>
+    <a href="/documentation">Documentation</a>
+    <a href="/help">Help Center</a>
+    <a href="/blog">Blog</a>
+    <a href="/about">About Us</a>
+    <a href="/careers">Careers</a>
+    <a href="/contact">Contact</a>
+  </div>
+  <div style="padding-top:8px;">
+    <a href="/tenant/login" style="color:var(--blue);font-weight:600;">🏢 IT Admin Login →</a>
+    <div style="padding-top:12px;"><a href="/download" class="btn btn-primary" style="display:flex;justify-content:center;">Download Agent</a></div>
   </div>
 </nav>
 
-<!-- ── Page Content ─────────────────────────────────────────────────────────── -->
 {% block content %}{% endblock %}
 
-<!-- ── Footer ─────────────────────────────────────────────────────────────── -->
 <footer class="footer">
   <div class="footer-inner">
     <div class="footer-top">
       <div class="footer-brand">
-        <a href="/" class="nav-logo">
-          <div class="nav-logo-icon">
-            <img src="{{ brand.logo_png }}" alt="{{ brand.name }}" width="28" height="28"
-                style="display:block;border-radius:4px;"
-                onerror="this.style.display='none';this.parentElement.innerHTML=''">
+        <a href="/" class="nav-logo" style="text-decoration:none;margin-bottom:16px;">
+          <div class="nav-logo-icon" style="background:var(--blue-dim);border:1px solid rgba(14,165,233,0.2);">
+            <img src="{{ brand.logo_png }}" alt="{{ brand.name }}" width="22" height="22"
+                 style="display:block;border-radius:3px;object-fit:contain;"
+                 onerror="this.style.display='none';this.parentElement.innerHTML='<span style=\'font-size:13px;font-weight:800;color:var(--blue);\'>FM</span>'">
           </div>
           <div>
-            <span>{{ brand.name }}</span>
+            <span style="font-size:17px;font-weight:800;color:var(--t1);">{{ brand.name }}</span>
             <span class="nav-logo-tagline">{{ brand.tagline }}</span>
           </div>
         </a>
-        <p class="footer-brand-desc">
-          Enterprise endpoint detection &amp; response for Windows. Built in India, protecting endpoints worldwide.
-        </p>
+        <p class="footer-brand-desc">Enterprise endpoint detection &amp; response for Windows. Real-time file integrity, ransomware killswitch, AES-256 vault, and cloud C2. Built in India 🇮🇳</p>
+        <div style="display:flex;gap:8px;margin-top:16px;">
+          <a href="#" style="width:32px;height:32px;border-radius:var(--r-sm);background:var(--bg2);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--t3);font-weight:700;" onmouseover="this.style.color='var(--t1)';this.style.borderColor='var(--bdh)'" onmouseout="this.style.color='var(--t3)';this.style.borderColor='var(--bd)'">𝕏</a>
+          <a href="#" style="width:32px;height:32px;border-radius:var(--r-sm);background:var(--bg2);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--t3);font-weight:700;" onmouseover="this.style.color='var(--t1)';this.style.borderColor='var(--bdh)'" onmouseout="this.style.color='var(--t3)';this.style.borderColor='var(--bd)'">in</a>
+          <a href="#" style="width:32px;height:32px;border-radius:var(--r-sm);background:var(--bg2);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--t3);" onmouseover="this.style.color='var(--t1)';this.style.borderColor='var(--bdh)'" onmouseout="this.style.color='var(--t3)';this.style.borderColor='var(--bd)'">⌥</a>
+        </div>
       </div>
 
       <div class="footer-links">
         <h4>Product</h4>
         <ul>
           <li><a href="/features">Features</a></li>
+          <li><a href="/integrations">Integrations</a></li>
           <li><a href="/pricing">Pricing</a></li>
           <li><a href="/download">Download</a></li>
-          <li><a href="/documentation">Documentation</a></li>
-          <li><a href="/status">System Status</a></li>
+          <li><a href="/roadmap">Roadmap</a></li>
+          <li><a href="/roadmap#changelog">Changelog</a></li>
         </ul>
       </div>
 
       <div class="footer-links">
         <h4>Company</h4>
         <ul>
+          <li><a href="/about">About Us</a></li>
+          <li><a href="/careers">Careers <span style="font-size:10px;color:var(--green);font-weight:700;margin-left:4px;vertical-align:middle;">HIRING</span></a></li>
+          <li><a href="/partners">Partners</a></li>
+          <li><a href="/blog">Blog</a></li>
           <li><a href="/contact">Contact</a></li>
-          <li><a href="/privacy">Privacy Policy</a></li>
-          <li><a href="/terms">Terms of Service</a></li>
+          <li><a href="/status">System Status</a></li>
         </ul>
       </div>
 
       <div class="footer-links">
-        <h4>Portal</h4>
+        <h4>Resources</h4>
         <ul>
+          <li><a href="/documentation">Documentation</a></li>
+          <li><a href="/help">Help Center</a></li>
+          <li><a href="/case-studies">Case Studies</a></li>
+          <li><a href="/security">Security</a></li>
+          <li><a href="/blog">Insights</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-links">
+        <h4>Legal & Portal</h4>
+        <ul>
+          <li><a href="/privacy">Privacy Policy</a></li>
+          <li><a href="/terms">Terms of Service</a></li>
+          <li><a href="/cookie-policy">Cookie Policy</a></li>
           <li><a href="/tenant/login">IT Admin Login</a></li>
           <li><a href="/login">C2 Dashboard</a></li>
-          <li><a href="mailto:{{ brand.support_email }}">Support Email</a></li>
+          <li><a href="mailto:{{ brand.support_email }}">{{ brand.support_email }}</a></li>
         </ul>
       </div>
     </div>
 
     <div class="footer-bottom">
-      <p class="footer-copy">
-        &copy; {{ brand.copyright_year }} {{ brand.company }}. All rights reserved. Made in India 🇮🇳
-      </p>
+      <p class="footer-copy">&copy; {{ brand.copyright_year }} {{ brand.company }}. All rights reserved. Made with ❤️ in India 🇮🇳</p>
       <div class="footer-legal">
         <a href="/privacy">Privacy</a>
         <a href="/terms">Terms</a>
-        <a href="/status">Status</a>
-        <a href="mailto:{{ brand.support_email }}">Support</a>
+        <a href="/cookie-policy">Cookies</a>
+        <a href="/security">Security</a>
+        <a href="/status"><span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block;"></span>All Systems Operational</span></a>
       </div>
     </div>
   </div>
 </footer>
 
-<!-- ── Scripts ─────────────────────────────────────────────────────────────── -->
+<div class="cookie-banner hidden" id="cookie-banner">
+  <span style="font-size:22px;">🍪</span>
+  <p class="cookie-text">We use cookies to improve your experience. By continuing, you agree to our <a href="/cookie-policy">Cookie Policy</a> and <a href="/privacy">Privacy Policy</a>.</p>
+  <div class="cookie-actions">
+    <button class="btn btn-secondary btn-sm" onclick="cookieDecline()">Decline</button>
+    <button class="btn btn-primary btn-sm" onclick="cookieAccept()">Accept All</button>
+  </div>
+</div>
+
 <script src="/static/js/fmsecure.js"></script>
+<script>
+(function(){
+  if(!localStorage.getItem('fms_cookie_consent')){
+    document.getElementById('cookie-banner').classList.remove('hidden');
+  }
+})();
+function cookieAccept(){ localStorage.setItem('fms_cookie_consent','accepted'); document.getElementById('cookie-banner').style.display='none'; }
+function cookieDecline(){ localStorage.setItem('fms_cookie_consent','declined'); document.getElementById('cookie-banner').style.display='none'; }
+</script>
 {% block extra_js %}{% endblock %}
 </body>
 </html>

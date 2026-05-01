@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Cookie Policy & GDPR{% endblock %}
+{% block description %}FMSecure Cookie Policy — what cookies we use, why, and how to control them.{% endblock %}
+
+{% block content %}
+<section style="padding:calc(var(--nav-h) + 48px) 0 0;background:var(--grad-hero);">
+  <div class="container" style="max-width:780px;">
+    <div class="hero-eyebrow">Cookie Policy & GDPR</div>
+    <h1 style="font-size:clamp(32px,4.5vw,52px);font-weight:800;letter-spacing:-2px;margin-bottom:16px;">Cookie Policy</h1>
+    <p style="color:var(--t3);font-size:14px;margin-bottom:40px;">Last updated: April 2026 · Effective: April 1, 2026</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container" style="max-width:780px;">
+    <div style="display:flex;flex-direction:column;gap:36px;">
+
+      <div>
+        <h2 style="font-size:22px;font-weight:700;margin-bottom:12px;color:var(--t1);" id="what-are-cookies">1. What Are Cookies?</h2>
+        <p style="color:var(--t2);line-height:1.75;font-size:15px;">Cookies are small text files placed on your device by websites you visit. They are widely used to make websites work, or to work more efficiently, and to provide information to website operators. FMSecure uses a minimal set of cookies — only what's necessary to operate the service securely.</p>
+      </div>
+
+      <div>
+        <h2 style="font-size:22px;font-weight:700;margin-bottom:12px;color:var(--t1);">2. Cookies We Use</h2>
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:14px;">
+            <thead>
+              <tr style="background:var(--bg2);border-bottom:1px solid var(--bd);">
+                <th style="padding:12px 16px;text-align:left;color:var(--t2);font-weight:600;">Cookie Name</th>
+                <th style="padding:12px 16px;text-align:left;color:var(--t2);font-weight:600;">Type</th>
+                <th style="padding:12px 16px;text-align:left;color:var(--t2);font-weight:600;">Purpose</th>
+                <th style="padding:12px 16px;text-align:left;color:var(--t2);font-weight:600;">Duration</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% set cookies = [
+                ("fms_session", "Essential", "Authenticates your logged-in session to the IT Admin portal and C2 dashboard. HttpOnly + Secure + SameSite=Strict.", "24 hours"),
+                ("fms_cookie_consent", "Essential", "Remembers your cookie consent choice so we don't ask every page load. Stored in localStorage (not a cookie).", "1 year"),
+                ("fms_csrf_token", "Essential", "CSRF protection token for form submissions. Prevents cross-site request forgery attacks.", "Session"),
+                ("fms_ab_variant", "Functional", "Remembers which A/B test variant you were assigned for UI experiments (if any). No personal data.", "30 days"),
+              ] %}
+              {% for name, type, purpose, duration in cookies %}
+              <tr style="border-bottom:1px solid var(--bd);">
+                <td style="padding:12px 16px;font-family:var(--font-mono);font-size:12.5px;color:var(--blue);">{{ name }}</td>
+                <td style="padding:12px 16px;"><span class="compliance-check" style="font-size:11px;padding:2px 8px;">{{ type }}</span></td>
+                <td style="padding:12px 16px;color:var(--t2);line-height:1.5;">{{ purpose }}</td>
+                <td style="padding:12px 16px;color:var(--t3);font-size:13px;">{{ duration }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="card" style="margin-top:16px;padding:16px 20px;background:var(--green-dim);border-color:rgba(16,185,129,0.2);">
+          <p style="color:var(--green);font-size:13.5px;font-weight:600;">✓ We do NOT use advertising cookies, tracking pixels, or any third-party analytics. No Google Analytics, no Facebook Pixel.</p>
+        </div>
+      </div>
+
+      <div id="gdpr">
+        <h2 style="font-size:22px;font-weight:700;margin-bottom:12px;color:var(--t1);">3. GDPR & Your Rights</h2>
+        <p style="color:var(--t2);line-height:1.75;font-size:15px;margin-bottom:16px;">If you are located in the European Economic Area (EEA) or United Kingdom, you have the following rights under GDPR:</p>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          {% for right, desc in [
+            ("Right to Access", "Request a copy of all personal data we hold about you."),
+            ("Right to Erasure", "Request deletion of your account and all associated data. We'll complete this within 30 days."),
+            ("Right to Rectification", "Correct inaccurate personal data we hold about you."),
+            ("Right to Portability", "Export your data in a machine-readable format (JSON)."),
+            ("Right to Restrict Processing", "Limit how we process your data while a dispute is resolved."),
+            ("Right to Object", "Object to processing based on legitimate interests (e.g., marketing)."),
+          ] %}
+          <div style="display:flex;gap:12px;padding:14px 16px;background:var(--bg1);border:1px solid var(--bd);border-radius:var(--r-md);">
+            <span style="color:var(--blue);font-weight:700;flex-shrink:0;">→</span>
+            <div><span style="font-weight:600;color:var(--t1);">{{ right }}:</span> <span style="color:var(--t2);font-size:14px;">{{ desc }}</span></div>
+          </div>
+          {% endfor %}
+        </div>
+        <p style="color:var(--t2);font-size:14px;margin-top:16px;">To exercise any of these rights, email <a href="mailto:privacy@fmsecure.in">privacy@fmsecure.in</a>. We will respond within 30 days.</p>
+      </div>
+
+      <div>
+        <h2 style="font-size:22px;font-weight:700;margin-bottom:12px;color:var(--t1);">4. Managing Cookies</h2>
+        <p style="color:var(--t2);line-height:1.75;font-size:15px;margin-bottom:16px;">You can control cookies through your browser settings. Note that disabling essential cookies will prevent login from working correctly.</p>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;">
+          <a href="https://support.google.com/chrome/answer/95647" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">Chrome →</a>
+          <a href="https://support.mozilla.org/kb/enable-and-disable-cookies-website-preferences" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">Firefox →</a>
+          <a href="https://support.microsoft.com/topic/delete-and-manage-cookies-168dab11-0753-043d-7c16-ede5947fc64d" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">Edge →</a>
+          <a href="https://support.apple.com/guide/safari/manage-cookies-sfri11471" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">Safari →</a>
+        </div>
+      </div>
+
+      <div>
+        <h2 style="font-size:22px;font-weight:700;margin-bottom:12px;color:var(--t1);">5. Contact</h2>
+        <p style="color:var(--t2);line-height:1.75;font-size:15px;">For any questions about this Cookie Policy or our data practices, contact us at <a href="mailto:privacy@fmsecure.in">privacy@fmsecure.in</a>. Our Data Protection contact is available at the same address.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<section style="padding:48px 0;background:var(--bg1);border-top:1px solid var(--bd);">
+  <div class="container" style="max-width:780px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;">
+    <div style="font-size:13px;color:var(--t3);">Related: <a href="/privacy">Privacy Policy</a> · <a href="/terms">Terms of Service</a> · <a href="/security">Security</a></div>
+    <button onclick="cookieAccept();this.textContent='✓ Preferences saved'" class="btn btn-secondary btn-sm">Accept All Cookies</button>
+  </div>
+</section>
+{% endblock %}

@@ -1,139 +1,71 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>C2 Authentication | {{ brand.name }}</title>
-  <link rel="icon" type="image/x-icon" href="{{ brand.logo_ico }}">
-  <link rel="stylesheet" href="/static/css/fmsecure.css">
-  <style>
-    body {
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: var(--bg);
-      padding: 24px;
-      position: relative;
-      overflow: hidden;
-    }
-    /* Background grid */
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background-image:
-        linear-gradient(rgba(30,38,64,0.35) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(30,38,64,0.35) 1px, transparent 1px);
-      background-size: 48px 48px;
-      mask-image: radial-gradient(ellipse at center, black 20%, transparent 75%);
-      pointer-events: none;
-      z-index: 0;
-    }
-    .glow {
-      position: fixed;
-      top: -100px; left: 50%; transform: translateX(-50%);
-      width: 500px; height: 400px;
-      background: radial-gradient(circle, rgba(14,165,233,0.07) 0%, transparent 70%);
-      pointer-events: none;
-      z-index: 0;
-    }
-    .login-card {
-      position: relative;
-      z-index: 1;
-      background: var(--bg1);
-      border: 1px solid var(--bd);
-      border-radius: var(--r-xl);
-      padding: 44px 40px;
-      width: 100%;
-      max-width: 400px;
-      animation: fadeUp 0.5s var(--ease-out) both;
-    }
-    .login-logo {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 28px;
-    }
-    .login-logo-icon {
-      width: 40px; height: 40px;
-      background: linear-gradient(135deg, var(--blue), var(--cyan));
-      border-radius: var(--r-md);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 20px;
-    }
-    .login-title { font-family: var(--font-display); font-size: 22px; font-weight: 700; margin-bottom: 4px; }
-    .login-sub { font-size: 13px; color: var(--t2); margin-bottom: 28px; }
-    .security-badge {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: rgba(244,63,94,0.08);
-      border: 1px solid rgba(244,63,94,0.2);
-      border-radius: var(--r-md);
-      padding: 10px 14px;
-      margin-bottom: 24px;
-      font-size: 12px;
-      color: #fca5a5;
-    }
-  </style>
-</head>
-<body>
-  <div class="glow"></div>
+{% extends "base.html" %}
+{% block title %}C2 Dashboard Login{% endblock %}
+{% block description %}Login to the FMSecure C2 command & control dashboard.{% endblock %}
 
-  <div class="login-card">
-    <div class="login-logo">
-      <div class="login-logo-icon"></div>
-      <div>
-        <div style="font-family:var(--font-display);font-weight:700;font-size:16px;">{{ brand.name }}</div>
-        <div style="font-family:var(--font-mono);font-size:9px;color:var(--t3);letter-spacing:1.5px;text-transform:uppercase;">Command & Control</div>
-      </div>
-    </div>
+{% block content %}
+<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px 20px;background:var(--grad-hero);">
+  <div style="width:100%;max-width:400px;">
 
-    <div class="login-title">Authenticate</div>
-    <p class="login-sub">Super admin access — all tenants and endpoints</p>
-
-    <div class="security-badge">
-      <span>🔐</span>
-      <span>Restricted access. All sessions are logged.</span>
-    </div>
-
-    {% if error %}
-    <div class="alert alert-error" style="margin-bottom:18px;">
-      <span>⚠</span> {{ error }}
-    </div>
-    {% endif %}
-
-    <form method="POST" action="/login">
-      <div class="form-group">
-        <label class="form-label">Username</label>
-        <input type="text" name="username" class="form-input" required autofocus
-               placeholder="admin" autocomplete="username">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Password</label>
-        <input type="password" name="password" class="form-input" required
-               placeholder="••••••••••••" autocomplete="current-password">
-      </div>
-      <button type="submit" class="btn btn-primary btn-full btn-lg" style="margin-top:8px;">
-        Authenticate →
-      </button>
-    </form>
-
-    <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--bd);text-align:center;">
-      <a href="/tenant/login" style="font-size:13px;color:var(--t3);">
-        IT Admin portal →
+    <div style="text-align:center;margin-bottom:28px;">
+      <a href="/" style="display:inline-flex;align-items:center;gap:10px;text-decoration:none;margin-bottom:20px;">
+        <div style="width:40px;height:40px;border-radius:var(--r-md);background:var(--blue-dim);border:1px solid rgba(14,165,233,0.2);display:flex;align-items:center;justify-content:center;">
+          <img src="{{ brand.logo_png }}" alt="{{ brand.name }}" width="24" height="24"
+               style="display:block;object-fit:contain;"
+               onerror="this.style.display='none';this.parentElement.innerHTML='<span style=\'font-weight:800;color:var(--blue);\'>FM</span>'">
+        </div>
+        <span style="font-size:20px;font-weight:800;color:var(--t1);">{{ brand.name }}</span>
       </a>
-      <span style="color:var(--t4);margin:0 10px;">·</span>
-      <a href="/" style="font-size:13px;color:var(--t3);">Back to home</a>
+      <h1 style="font-size:22px;font-weight:800;letter-spacing:-0.8px;margin-bottom:6px;">C2 Dashboard</h1>
+      <p style="font-size:13.5px;color:var(--t2);">Super admin access only</p>
+    </div>
+
+    <div class="card" style="padding:28px;">
+      {% if error %}
+      <div style="background:var(--red-dim);border:1px solid rgba(244,63,94,0.2);border-radius:var(--r-md);padding:12px 14px;margin-bottom:18px;">
+        <span style="font-size:13px;color:var(--red);font-weight:600;">❌ {{ error }}</span>
+      </div>
+      {% endif %}
+
+      <form method="POST" action="/login" id="admin-form">
+        <div class="form-group">
+          <label class="form-label">Username</label>
+          <input name="username" type="text" class="form-input" required autofocus autocomplete="username" placeholder="admin">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <div style="position:relative;">
+            <input name="password" type="password" id="admin-pwd" class="form-input" required autocomplete="current-password" placeholder="••••••••" style="padding-right:42px;">
+            <button type="button" onclick="toggleAdminPwd()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--t3);font-size:15px;padding:0;line-height:1;">👁</button>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-full" style="display:flex;justify-content:center;margin-top:4px;" id="admin-submit">Sign In →</button>
+      </form>
+
+      <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--bd);">
+        <div style="font-size:11.5px;color:var(--t3);display:flex;align-items:center;gap:6px;justify-content:center;margin-bottom:6px;">
+          <span>🔒</span> Super admin credentials via env vars
+        </div>
+        <div style="font-size:11.5px;color:var(--t3);display:flex;align-items:center;gap:6px;justify-content:center;">
+          <span style="color:var(--amber);">⚠</span> Not an IT admin? Use the <a href="/tenant/login" style="color:var(--blue);">IT Admin portal →</a>
+        </div>
+      </div>
+    </div>
+
+    <div style="text-align:center;margin-top:16px;font-size:12px;color:var(--t3);">
+      <a href="/">← Back to product page</a>
     </div>
   </div>
+</div>
 
-  <script>
-    // Prevent form resubmission on back button
-    if (window.history.replaceState) {
-      window.history.replaceState(null, null, window.location.href);
-    }
-  </script>
-</body>
-</html>
+<script>
+function toggleAdminPwd() {
+  const el = document.getElementById('admin-pwd');
+  el.type = el.type === 'password' ? 'text' : 'password';
+}
+document.getElementById('admin-form').addEventListener('submit', () => {
+  const btn = document.getElementById('admin-submit');
+  btn.textContent = 'Signing in…'; btn.disabled = true;
+  setTimeout(() => { btn.textContent = 'Sign In →'; btn.disabled = false; }, 5000);
+});
+</script>
+{% endblock %}

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Page Not Found{% endblock %}
+{% block content %}
+<div class="error-page">
+  <div>
+    <div class="error-code">404</div>
+    <div class="error-title">Page not found.</div>
+    <p class="error-desc">The page you're looking for doesn't exist or has been moved. Check the URL or use the links below.</p>
+    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+      <a href="/" class="btn btn-primary">← Back to Home</a>
+      <a href="/help" class="btn btn-secondary">Help Center</a>
+      <a href="/contact" class="btn btn-secondary">Contact Support</a>
+    </div>
+    <div style="margin-top:48px;display:flex;gap:24px;justify-content:center;flex-wrap:wrap;">
+      <a href="/features" style="font-size:14px;color:var(--t3);">Features</a>
+      <a href="/pricing" style="font-size:14px;color:var(--t3);">Pricing</a>
+      <a href="/documentation" style="font-size:14px;color:var(--t3);">Docs</a>
+      <a href="/download" style="font-size:14px;color:var(--t3);">Download</a>
+      <a href="/status" style="font-size:14px;color:var(--t3);">Status</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

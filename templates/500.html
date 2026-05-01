@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Server Error{% endblock %}
+{% block content %}
+<div class="error-page">
+  <div>
+    <div class="error-code">500</div>
+    <div class="error-title">Something went wrong on our end.</div>
+    <p class="error-desc">We're already aware of the issue. Our team is working on a fix. Check the status page for updates.</p>
+    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+      <a href="/" class="btn btn-primary">← Back to Home</a>
+      <a href="/status" class="btn btn-secondary">Check Status →</a>
+    </div>
+    <div style="margin-top:32px;padding:16px 24px;background:var(--amber-dim);border:1px solid rgba(245,158,11,0.2);border-radius:var(--r-lg);max-width:420px;margin-left:auto;margin-right:auto;">
+      <p style="font-size:13.5px;color:var(--amber);">If this persists, email <a href="mailto:support@fmsecure.in" style="color:var(--amber);font-weight:700;">support@fmsecure.in</a> with what you were doing.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}

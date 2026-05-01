@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}Integrations{% endblock %}
+{% block description %}Connect FMSecure to your existing security stack — SIEM, Slack, Discord, webhooks, and more.{% endblock %}
+
+{% block content %}
+<section style="padding:calc(var(--nav-h) + 60px) 0 0;background:var(--grad-hero);">
+  <div class="container">
+    <div class="hero-inner-page" style="text-align:left;padding-top:0;">
+      <div class="hero-eyebrow">Integrations</div>
+      <h1 style="font-family:var(--font-display);font-size:clamp(36px,5vw,62px);font-weight:800;letter-spacing:-2.5px;line-height:1.05;margin-bottom:20px;">
+        FMSecure fits your<br><span class="grad-text">existing stack.</span>
+      </h1>
+      <p style="font-size:18px;color:var(--t2);max-width:520px;line-height:1.65;">Connect alerts to Slack, push telemetry to your SIEM, trigger webhooks on CRITICAL events, or query the API from your SOAR platform.</p>
+    </div>
+  </div>
+</section>
+
+<!-- Filter -->
+<section class="section">
+  <div class="container" style="max-width:1000px;">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:32px;">
+      {% for cat in ["All", "Alerting", "SIEM", "Threat Intelligence", "Webhooks & API", "Coming Soon"] %}
+      <button onclick="filterInt(this,'{{ cat }}')" style="padding:7px 16px;border-radius:var(--r-full);font-size:13px;font-weight:600;cursor:pointer;transition:all 0.15s;border:1px solid {% if loop.first %}var(--blue){% else %}var(--bd){% endif %};background:{% if loop.first %}var(--blue-dim){% else %}transparent{% endif %};color:{% if loop.first %}var(--blue){% else %}var(--t2){% endif %};">{{ cat }}</button>
+      {% endfor %}
+    </div>
+
+    <div class="card-grid" id="int-grid">
+      {% set integrations = [
+        ("💬", "Slack", "Alerting", "available", "Send CRITICAL and HIGH severity alerts directly to a Slack channel. Includes severity badge, file path, process attribution, and one-click ack link."),
+        ("🎮", "Discord", "Alerting", "available", "Discord webhook support with rich embeds. Color-coded by severity — red for CRITICAL, amber for HIGH, blue for MEDIUM."),
+        ("📧", "Email (Gmail SMTP)", "Alerting", "available", "SMTP email alerts via Gmail App Password. Supports HTML-formatted incident reports with full forensic details."),
+        ("🔗", "Webhooks", "Webhooks & API", "available", "Generic JSON webhooks for any endpoint. Payload includes event type, severity, file path, process, timestamp, and tenant ID."),
+        ("📡", "REST API", "Webhooks & API", "available", "Full REST API for querying agents, alerts, and licenses. API key authentication. Rate-limited to 100 req/min."),
+        ("🦠", "MalwareBazaar", "Threat Intelligence", "available", "Every new or modified file is checked against abuse.ch's 300k+ malware hash database. SQLite cache for zero-latency repeat lookups."),
+        ("🔍", "VirusTotal", "Threat Intelligence", "available", "Optional VirusTotal fallback for files not in MalwareBazaar. Requires your own VT API key."),
+        ("📊", "Microsoft Sentinel", "SIEM", "coming-soon", "Push FMSecure alerts to Microsoft Sentinel via the Log Analytics API. Native CEF format support."),
+        ("🔭", "Splunk", "SIEM", "coming-soon", "Splunk HTTP Event Collector (HEC) integration. Pre-built dashboard and alert queries included."),
+        ("🔶", "Elastic SIEM", "SIEM", "coming-soon", "Elastic Common Schema (ECS) formatted events pushed to your Elasticsearch cluster."),
+        ("🎯", "PagerDuty", "Alerting", "coming-soon", "Create PagerDuty incidents on CRITICAL alerts with automatic deduplication."),
+        ("📱", "Microsoft Teams", "Alerting", "coming-soon", "Teams webhook integration with adaptive card formatting."),
+      ] %}
+      {% for icon, name, cat, status, desc in integrations %}
+      <div class="card integration-card" data-cat="{{ cat }}">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div class="integration-icon">{{ icon }}</div>
+          <span class="integration-status {{ status }}">{{ "Available" if status == "available" else "Coming Soon" }}</span>
+        </div>
+        <div>
+          <div class="integration-name">{{ name }}</div>
+          <div style="font-size:11.5px;color:var(--t3);margin-top:2px;">{{ cat }}</div>
+        </div>
+        <div class="integration-desc">{{ desc }}</div>
+        {% if status == "available" %}
+        <a href="/documentation#integrations-{{ name|lower|replace(' ','') }}" class="btn btn-secondary btn-sm" style="align-self:flex-start;">View Docs →</a>
+        {% else %}
+        <button disabled style="background:var(--bg3);border:1px solid var(--bd);color:var(--t3);padding:7px 14px;border-radius:var(--r-sm);font-size:13px;cursor:not-allowed;align-self:flex-start;">Notify Me</button>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- Webhook example -->
+<section class="section section-alt">
+  <div class="container" style="max-width:800px;">
+    <div class="section-header">
+      <div class="section-label">Webhook Payload</div>
+      <h2 class="section-title">Simple, consistent JSON format.</h2>
+      <p class="section-sub">Every webhook event follows the same schema — easy to parse in any language.</p>
+    </div>
+    <div class="terminal" style="max-width:100%;">
+      <div class="terminal-header">
+        <div class="terminal-dot red"></div>
+        <div class="terminal-dot amber"></div>
+        <div class="terminal-dot green"></div>
+        <span class="terminal-title">POST https://your-webhook.example.com/fmsecure</span>
+      </div>
+      <div class="terminal-body" style="font-size:13px;line-height:1.7;">
+        <pre style="color:var(--t2);white-space:pre-wrap;">{
+  "event_type": "FILE_MODIFIED",
+  "severity":   "CRITICAL",
+  "timestamp":  "2026-04-28T14:32:11Z",
+  "tenant_id":  "fms-tenant-abc123",
+  "agent_id":   "agent-win-xyz789",
+  "hostname":   "DESKTOP-4KL2M3P",
+
+  "file": {
+    "path":          "C:\\Windows\\System32\\hosts",
+    "hash_before":   "d41d8cd98f00b204e9800998ecf8427e",
+    "hash_after":    "5d41402abc4b2a76b9719d911017c592",
+    "size_bytes":    1024
+  },
+
+  "process": {
+    "name":   "powershell.exe",
+    "pid":    4892,
+    "parent": "cmd.exe",
+    "user":   "SYSTEM",
+    "lolbin": true
+  },
+
+  "alert_id": "alert-2026-0428-001",
+  "acked":    false
+}</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="cta-band">
+      <h2>Need a custom integration?</h2>
+      <p>Our REST API covers everything. We also build custom integrations for Enterprise customers.</p>
+      <div class="cta-actions">
+        <a href="/documentation#api" class="btn btn-primary btn-xl">📖 API Reference</a>
+        <a href="/contact" class="btn btn-secondary btn-xl">Request Integration</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+function filterInt(btn, cat) {
+  document.querySelectorAll('[onclick*="filterInt"]').forEach(b => {
+    b.style.background = 'transparent'; b.style.color = 'var(--t2)'; b.style.borderColor = 'var(--bd)';
+  });
+  btn.style.background = 'var(--blue-dim)'; btn.style.color = 'var(--blue)'; btn.style.borderColor = 'var(--blue)';
+  document.querySelectorAll('#int-grid .integration-card').forEach(c => {
+    c.style.display = (cat === 'All' || c.dataset.cat === cat || (cat === 'Coming Soon' && c.querySelector('.coming-soon'))) ? '' : 'none';
+  });
+}
+</script>
+{% endblock %}

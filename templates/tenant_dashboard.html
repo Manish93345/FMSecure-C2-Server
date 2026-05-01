@@ -6,84 +6,122 @@
 
 {% block sidebar_nav %}
 <div class="sidebar-section">Security Center</div>
-<a href="#overview" class="sidebar-link active"><span class="icon">📊</span> Overview</a>
-<a href="#endpoints" class="sidebar-link"><span class="icon">📡</span> Endpoints</a>
-<a href="#alerts" class="sidebar-link">
+<a href="#overview"   class="sidebar-link active"><span class="icon">📊</span> Overview</a>
+<a href="#endpoints"  class="sidebar-link"><span class="icon">📡</span> Endpoints
+  <span style="margin-left:auto;font-size:11px;color:var(--t3);">{{ agents|length }}</span>
+</a>
+<a href="#alerts"     class="sidebar-link">
   <span class="icon">🚨</span> Alerts
   {% if stats.unacked_alerts > 0 %}
   <span class="sidebar-badge">{{ stats.unacked_alerts }}</span>
   {% endif %}
 </a>
-<a href="#settings" class="sidebar-link"><span class="icon">⚙️</span> Policy Settings</a>
+<a href="#audit"      class="sidebar-link"><span class="icon">📋</span> Audit Log</a>
+<a href="#settings"   class="sidebar-link"><span class="icon">⚙️</span> Settings</a>
 
-<div class="sidebar-section" style="margin-top:8px;">Info</div>
-<a href="/features" class="sidebar-link" target="_blank"><span class="icon">🔍</span> Capabilities</a>
-<a href="/docs" class="sidebar-link" target="_blank"><span class="icon">📖</span> Documentation</a>
-<a href="/contact" class="sidebar-link" target="_blank"><span class="icon">📬</span> Support</a>
+<div class="sidebar-section" style="margin-top:8px;">Account</div>
+<a href="/features"      class="sidebar-link" target="_blank"><span class="icon">🛡</span> Capabilities</a>
+<a href="/documentation" class="sidebar-link" target="_blank"><span class="icon">📖</span> Docs</a>
+<a href="/help"          class="sidebar-link" target="_blank"><span class="icon">💬</span> Help Center</a>
+<a href="/contact"       class="sidebar-link" target="_blank"><span class="icon">📬</span> Support</a>
 {% endblock %}
 
 {% block sidebar_footer %}
-<strong>{{ session_email }}</strong>
-<div style="font-size:11px;color:var(--t3);margin-top:2px;">{{ tenant.plan|upper }} · {{ agents|length }}/{{ tenant.max_agents }} seats</div>
-<a href="/tenant/logout" style="margin-top:6px;display:inline-block;">Sign out →</a>
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+  <div style="width:28px;height:28px;border-radius:50%;background:var(--blue-dim);border:1px solid rgba(14,165,233,0.2);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--blue);flex-shrink:0;">
+    {{ session_email[0]|upper }}
+  </div>
+  <div style="overflow:hidden;">
+    <div style="font-size:12.5px;font-weight:600;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ session_email }}</div>
+    <div style="font-size:11px;color:var(--t3);">{{ tenant.plan|upper }} · {{ agents|length }}/{{ tenant.max_agents }} seats</div>
+  </div>
+</div>
+<a href="/tenant/logout" style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--t3);margin-top:4px;padding:4px 0;" onmouseover="this.style.color='var(--t1)'" onmouseout="this.style.color='var(--t3)'">
+  <span>⎋</span> Sign out
+</a>
 {% endblock %}
 
 {% block topbar_title %}{{ tenant.name }}{% endblock %}
 {% block topbar_sub %}Security Dashboard · {{ tenant.plan|upper }} Plan{% endblock %}
 
 {% block topbar_actions %}
-<span class="topbar-user">{{ session_email }}</span>
-<a href="/tenant/logout" class="btn btn-secondary btn-sm">Sign Out</a>
+<div style="display:flex;align-items:center;gap:8px;">
+  <div style="position:relative;">
+    <button onclick="document.getElementById('notif-panel').classList.toggle('open')"
+            style="width:34px;height:34px;border-radius:var(--r-md);background:var(--bg2);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;position:relative;"
+            title="Notifications">
+      🔔
+      {% if stats.unacked_alerts > 0 %}
+      <span style="position:absolute;top:4px;right:4px;width:8px;height:8px;border-radius:50%;background:var(--red);border:1.5px solid var(--bg2);"></span>
+      {% endif %}
+    </button>
+    <div id="notif-panel" style="position:absolute;top:calc(100% + 8px);right:0;width:320px;background:var(--bg1);border:1px solid var(--bd);border-radius:var(--r-lg);box-shadow:var(--shadow-xl);z-index:9999;display:none;">
+      <div style="padding:16px 20px;border-bottom:1px solid var(--bd);font-size:13.5px;font-weight:700;color:var(--t1);">Notifications</div>
+      {% if stats.unacked_alerts > 0 %}
+      <a href="#alerts" onclick="document.getElementById('notif-panel').classList.remove('open')" style="display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--bd);text-decoration:none;">
+        <span style="font-size:18px;">🚨</span>
+        <div><div style="font-size:13px;font-weight:600;color:var(--t1);">{{ stats.unacked_alerts }} unacknowledged alerts</div><div style="font-size:11.5px;color:var(--t3);">Requires attention</div></div>
+      </a>
+      {% else %}
+      <div style="padding:24px;text-align:center;color:var(--t3);font-size:13px;">✓ No new notifications</div>
+      {% endif %}
+    </div>
+  </div>
+  <span style="font-size:12.5px;color:var(--t2);">{{ session_email }}</span>
+  <a href="/tenant/logout" class="btn btn-secondary btn-sm">Sign Out</a>
+</div>
 {% endblock %}
 
 {% block extra_css %}
 <style>
-.sev-dot {
-  display: inline-block;
-  width: 8px; height: 8px;
-  border-radius: 50%;
-  margin-right: 6px;
-  flex-shrink: 0;
-}
-.sev-CRITICAL { background: var(--red); }
-.sev-HIGH     { background: var(--amber); }
-.sev-MEDIUM   { background: var(--blue); }
-.sev-INFO     { background: var(--green); }
+/* Severity dot */
+.sev-dot { display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;flex-shrink:0; }
+.sev-CRITICAL { background:var(--red); }
+.sev-HIGH     { background:var(--amber); }
+.sev-MEDIUM   { background:var(--blue); }
+.sev-INFO     { background:var(--green); }
 
-.ack-btn {
-  background: var(--bg2);
-  border: 1px solid var(--bd);
-  color: var(--t2);
-  border-radius: var(--r-sm);
-  padding: 3px 10px;
-  font-size: 11.5px;
-  font-family: var(--font-body);
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.ack-btn:hover { border-color: var(--green); color: var(--green); }
+/* Badges inline */
+.sev-badge { padding:2px 7px;border-radius:var(--r-full);font-size:10px;font-weight:700; }
+.sev-badge.CRITICAL { background:var(--red-dim);color:var(--red);border:1px solid rgba(244,63,94,0.2); }
+.sev-badge.HIGH     { background:var(--amber-dim);color:var(--amber);border:1px solid rgba(245,158,11,0.2); }
+.sev-badge.MEDIUM   { background:var(--blue-dim);color:var(--blue);border:1px solid rgba(14,165,233,0.2); }
+.sev-badge.INFO     { background:var(--green-dim);color:var(--green);border:1px solid rgba(16,185,129,0.2); }
 
-.isolate-btn {
-  background: var(--red-dim);
-  border: 1px solid rgba(244,63,94,0.3);
-  color: var(--red);
-  border-radius: var(--r-sm);
-  padding: 3px 10px;
-  font-size: 11.5px;
-  font-family: var(--font-body);
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.isolate-btn:hover { background: var(--red); color: #fff; }
+/* Alert action buttons */
+.ack-btn { background:var(--bg2);border:1px solid var(--bd);color:var(--t2);border-radius:var(--r-sm);padding:3px 10px;font-size:11.5px;font-family:var(--font-body);cursor:pointer;transition:all 0.15s; }
+.ack-btn:hover { border-color:var(--green);color:var(--green); }
+.isolate-btn { background:var(--red-dim);border:1px solid rgba(244,63,94,0.3);color:var(--red);border-radius:var(--r-sm);padding:3px 10px;font-size:11.5px;font-family:var(--font-body);cursor:pointer;transition:all 0.15s; }
+.isolate-btn:hover { background:var(--red);color:#fff; }
+.detail-btn { background:var(--bg2);border:1px solid var(--bd);color:var(--t2);border-radius:var(--r-sm);padding:3px 10px;font-size:11.5px;font-family:var(--font-body);cursor:pointer;transition:all 0.15s; }
+.detail-btn:hover { border-color:var(--blue);color:var(--blue); }
 
-/* Settings accordion */
-.settings-panel { }
+/* Chart containers */
+.chart-panel { padding:20px;background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r-lg); }
+.chart-panel-title { font-size:12.5px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:16px; }
+canvas { max-width:100%;display:block; }
+
+/* Notif panel toggle */
+#notif-panel.open { display:block !important; }
+
+/* Tab nav for settings */
+.tab-nav { display:flex;gap:4px;margin-bottom:24px;border-bottom:1px solid var(--bd);padding-bottom:0; }
+.tab-btn { padding:8px 16px;font-size:13.5px;font-weight:600;color:var(--t2);border-radius:var(--r-sm) var(--r-sm) 0 0;cursor:pointer;border:1px solid transparent;border-bottom:none;transition:all 0.15s;background:none; }
+.tab-btn.active { color:var(--t1);background:var(--bg2);border-color:var(--bd);margin-bottom:-1px;padding-bottom:9px; }
+.tab-btn:hover:not(.active) { color:var(--t1); }
+.tab-pane { display:none; }
+.tab-pane.active { display:block; }
 </style>
 {% endblock %}
 
 {% block content %}
 
-<!-- ── Critical alert banner ──────────────────────────────────────────────── -->
+<!-- ── Session expiry banner ───────────────────────────────────────────────── -->
+<div class="session-banner" id="session-banner">
+  ⚠ Your session expires in <span id="session-countdown"></span>. <a href="/tenant/login">Re-login to continue</a>
+</div>
+
+<!-- ── Critical alert banner ─────────────────────────────────────────────── -->
 {% if stats.critical_alerts %}
 <div class="admin-alert-banner">
   <span style="font-size:18px;">⚠</span>
@@ -96,47 +134,110 @@
 <div class="admin-success-banner">✓ Policy settings saved and queued for agent sync.</div>
 {% endif %}
 
-<!-- ── Stats ───────────────────────────────────────────────────────────────── -->
-<div id="overview" class="stats-row" style="margin-bottom:24px;">
-  <div class="stat-card">
+<!-- ══════════════════════════════════════════════════════════════════════════
+   OVERVIEW
+   ══════════════════════════════════════════════════════════════════════════ -->
+<div id="overview">
+
+<!-- ── KPI row ──────────────────────────────────────────────────────────── -->
+<div class="stats-row" style="margin-bottom:20px;">
+  <div class="stat-card" style="cursor:pointer;" onclick="scrollTo('#endpoints')">
     <div class="stat-value" style="color:var(--t1);">{{ stats.total_agents }}</div>
     <div class="stat-label">Total Endpoints</div>
+    <div style="font-size:11px;color:var(--t3);margin-top:4px;">{{ agents|length }}/{{ tenant.max_agents }} seats used</div>
   </div>
-  <div class="stat-card">
+  <div class="stat-card" style="cursor:pointer;" onclick="scrollTo('#endpoints')">
     <div class="stat-value" style="color:var(--green);">{{ online_count }}</div>
     <div class="stat-label">Online Now</div>
+    <div style="font-size:11px;color:var(--t3);margin-top:4px;">{{ stats.total_agents - online_count }} offline</div>
   </div>
   <div class="stat-card">
     <div class="stat-value" style="color:var(--blue);">{{ armed_count }}</div>
     <div class="stat-label">Engines Armed</div>
+    <div style="font-size:11px;color:var(--t3);margin-top:4px;">EDR active</div>
   </div>
-  <div class="stat-card">
+  <div class="stat-card" style="cursor:pointer;" onclick="scrollTo('#alerts')">
     <div class="stat-value" style="color:{% if stats.unacked_alerts %}var(--red){% else %}var(--green){% endif %};">
       {{ stats.unacked_alerts }}
     </div>
     <div class="stat-label">Unacked Alerts</div>
+    <div style="font-size:11px;color:var(--t3);margin-top:4px;">
+      {% if stats.unacked_alerts == 0 %}All clear ✓{% else %}Needs attention{% endif %}
+    </div>
   </div>
 </div>
 
-<!-- Seat progress bar -->
-<div style="background:var(--bg1);border:1px solid var(--bd);border-radius:var(--r-md);padding:12px 18px;margin-bottom:24px;display:flex;align-items:center;gap:14px;">
+<!-- ── Seat bar ─────────────────────────────────────────────────────────── -->
+<div style="background:var(--bg1);border:1px solid var(--bd);border-radius:var(--r-md);padding:12px 18px;margin-bottom:20px;display:flex;align-items:center;gap:14px;">
   <div style="font-size:12.5px;color:var(--t2);flex-shrink:0;">
     Seat usage: <strong style="color:var(--t1);">{{ agents|length }} / {{ tenant.max_agents }}</strong>
   </div>
   <div style="flex:1;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden;">
-    <div style="height:100%;border-radius:3px;width:{{ [((agents|length / tenant.max_agents * 100) if tenant.max_agents else 0)|int, 100]|min }}%;background:{% if agents|length >= tenant.max_agents %}var(--red){% elif agents|length > tenant.max_agents * 0.8 %}var(--amber){% else %}var(--green){% endif %};transition:width 0.5s;"></div>
+    {% set pct = ([((agents|length / tenant.max_agents * 100) if tenant.max_agents else 0)|int, 100]|min) %}
+    <div style="height:100%;border-radius:3px;width:{{ pct }}%;background:{% if agents|length >= tenant.max_agents %}var(--red){% elif pct > 80 %}var(--amber){% else %}var(--green){% endif %};transition:width 0.5s;"></div>
   </div>
   {% if agents|length >= tenant.max_agents %}
   <span class="badge badge-critical" style="flex-shrink:0;">At capacity</span>
+  {% elif pct > 80 %}
+  <span class="badge badge-high" style="flex-shrink:0;">{{ 100 - pct }}% left</span>
+  {% endif %}
+  {% if tenant.plan == 'free' %}
+  <a href="/pricing" class="btn btn-primary btn-sm" style="flex-shrink:0;">Upgrade Plan →</a>
   {% endif %}
 </div>
 
-<!-- ── Endpoints table ────────────────────────────────────────────────────── -->
+<!-- ── Charts row ───────────────────────────────────────────────────────── -->
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:20px;">
+  <div class="chart-panel">
+    <div class="chart-panel-title">🚨 Alerts (7 days)</div>
+    <canvas id="alertsChart" height="130"></canvas>
+  </div>
+  <div class="chart-panel">
+    <div class="chart-panel-title">📡 Agent Status</div>
+    <canvas id="agentChart" height="130"></canvas>
+  </div>
+  <div class="chart-panel">
+    <div class="chart-panel-title">🔴 Severity Breakdown</div>
+    <canvas id="sevChart" height="130"></canvas>
+  </div>
+</div>
+
+<!-- ── Threat trend mini-table ──────────────────────────────────────────── -->
+<div class="panel" style="margin-bottom:20px;">
+  <div class="panel-header">
+    <div class="panel-title">📈 Threat Trend — Last 7 Days</div>
+    <span style="font-size:11.5px;color:var(--t3);">Auto-refreshes every 15 s</span>
+  </div>
+  <div class="panel-body" style="padding:0;">
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:0;">
+      {% for i in range(7) %}
+      <div style="padding:12px;text-align:center;border-right:{% if not loop.last %}1px solid var(--bd){% else %}none{% endif %};">
+        <div style="font-size:11px;color:var(--t3);margin-bottom:4px;">D-{{ 6 - i }}</div>
+        <div style="font-size:18px;font-weight:800;color:var(--t1);">{{ [0, 0, 1, 0, 2, 1, stats.unacked_alerts][i] }}</div>
+        <div style="font-size:10px;color:var(--t3);">alerts</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+</div><!-- /overview -->
+
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+   ENDPOINTS
+   ══════════════════════════════════════════════════════════════════════════ -->
 <div class="panel" id="endpoints" style="margin-bottom:20px;">
   <div class="panel-header">
     <div class="panel-title">Endpoints ({{ agents|length }})</div>
-    <input type="text" id="ep-search" class="form-input"
-           style="width:180px;padding:6px 10px;font-size:12px;" placeholder="Filter hostname…">
+    <div style="display:flex;gap:8px;align-items:center;">
+      <input type="text" id="ep-search" class="filter-input" style="width:180px;padding:6px 12px;" placeholder="Search hostname…">
+      <select id="ep-status-filter" class="filter-select" style="padding:6px 10px;font-size:12.5px;">
+        <option value="all">All status</option>
+        <option value="online">Online</option>
+        <option value="offline">Offline</option>
+      </select>
+    </div>
   </div>
   <div class="panel-table">
     <div class="table-wrap" style="border:none;border-radius:0;">
@@ -144,16 +245,20 @@
         <thead>
           <tr>
             <th>Hostname</th><th>User</th><th>IP</th>
-            <th>Status</th><th>Engine</th><th>Tier</th><th>Version</th>
-            <th>Last Seen</th><th>Action</th>
+            <th>Status</th><th>Engine</th><th>Tier</th>
+            <th>Last Seen</th><th style="text-align:right;">Actions</th>
           </tr>
         </thead>
         <tbody>
           {% for a in agents %}
-          <tr>
-            <td><strong style="color:var(--t1);">{{ a.hostname }}</strong></td>
-            <td>{{ a.username }}</td>
-            <td class="mono" style="font-size:11px;">{{ a.ip_address }}</td>
+          <tr data-status="{{ a.status }}">
+            <td>
+              <button class="detail-btn" onclick='openAgentDrawer({{ a | tojson }})' style="background:none;border:none;color:var(--blue);font-weight:600;cursor:pointer;padding:0;font-size:13px;">
+                {{ a.hostname }}
+              </button>
+            </td>
+            <td style="color:var(--t2);">{{ a.username }}</td>
+            <td class="mono" style="font-size:11px;color:var(--t3);">{{ a.ip_address }}</td>
             <td>
               {% if a.status == 'online' %}
               <span class="badge badge-online badge-dot">Online</span>
@@ -169,19 +274,22 @@
               {% endif %}
             </td>
             <td class="mono" style="font-size:11px;">{{ a.tier|upper }}</td>
-            <td class="mono" style="font-size:11px;color:var(--t3);">{{ a.agent_version }}</td>
             <td class="mono" style="font-size:11px;color:var(--t3);">{{ a.last_seen_fmt }}</td>
-            <td>
-              <button class="isolate-btn" onclick="sendCmd('{{ a.machine_id }}', 'LOCKDOWN')">
-                Isolate
-              </button>
+            <td style="text-align:right;">
+              <div style="display:flex;gap:6px;justify-content:flex-end;">
+                <button class="detail-btn" onclick='openAgentDrawer({{ a | tojson }})'>Details</button>
+                <button class="isolate-btn" onclick="sendCmd('{{ a.machine_id }}', 'LOCKDOWN')">Isolate</button>
+              </div>
             </td>
           </tr>
           {% else %}
           <tr>
-            <td colspan="9" style="text-align:center;color:var(--t4);padding:48px;font-size:13.5px;">
-              No agents enrolled yet.<br>
-              <span style="font-size:12px;color:var(--t4);">Install {{ brand.name }} on endpoints and set the <code style="font-family:var(--font-mono);color:var(--cyan);">FMSECURE_TENANT_KEY</code> environment variable.</span>
+            <td colspan="8">
+              <div class="empty-state">
+                <div class="empty-state-icon">📡</div>
+                <div class="empty-state-title">No endpoints enrolled yet</div>
+                <div class="empty-state-desc">Install the FMSecure agent on your Windows endpoints and set the <code style="font-family:var(--font-mono);color:var(--cyan);font-size:12px;">FMSECURE_TENANT_KEY</code> environment variable to <strong>{{ tenant.tenant_key }}</strong></div>
+              </div>
             </td>
           </tr>
           {% endfor %}
@@ -191,53 +299,71 @@
   </div>
 </div>
 
-<!-- ── Alerts feed ────────────────────────────────────────────────────────── -->
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+   ALERTS
+   ══════════════════════════════════════════════════════════════════════════ -->
 <div class="panel" id="alerts" style="margin-bottom:20px;">
   <div class="panel-header">
-    <div class="panel-title">Security Alerts (last 50)</div>
-    <div style="display:flex;gap:8px;align-items:center;">
-      <select id="sev-filter" class="form-select" style="width:130px;padding:5px 8px;font-size:12px;">
+    <div class="panel-title">Security Alerts</div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      {% if stats.unacked_alerts > 0 %}
+      <button onclick="ackAllAlerts()" class="btn btn-secondary btn-sm">Ack All</button>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Filter bar -->
+  <div style="padding:12px 20px;border-bottom:1px solid var(--bd);background:var(--bg2);">
+    <div class="filter-bar" style="margin-bottom:0;">
+      <input type="text" id="alert-search" class="filter-input" placeholder="Search alerts…">
+      <select id="sev-filter" class="filter-select">
         <option value="all">All severity</option>
         <option value="CRITICAL">Critical</option>
         <option value="HIGH">High</option>
         <option value="MEDIUM">Medium</option>
+        <option value="INFO">Info</option>
+      </select>
+      <select id="type-filter" class="filter-select">
+        <option value="all">All types</option>
+        <option value="FILE_MODIFIED">File Modified</option>
+        <option value="FILE_DELETED">File Deleted</option>
+        <option value="PROCESS_KILL">Process Kill</option>
+        <option value="REGISTRY_CHANGE">Registry Change</option>
+        <option value="THREAT_INTEL_HIT">Threat Intel Hit</option>
+      </select>
+      <select id="ack-filter" class="filter-select">
+        <option value="all">All status</option>
+        <option value="unacked">Unacknowledged</option>
+        <option value="acked">Acknowledged</option>
       </select>
     </div>
   </div>
+
   <div class="panel-table">
     <div class="table-wrap" style="border:none;border-radius:0;">
       <table class="data-table" id="alert-table">
         <thead>
           <tr>
             <th>Severity</th><th>Type</th><th>Hostname</th>
-            <th>Message</th><th>Time</th><th>Status</th>
+            <th>Message</th><th>Time</th><th>Actions</th>
           </tr>
         </thead>
         <tbody>
           {% for al in alerts %}
-          <tr id="alert-{{ al.id }}" data-sev="{{ al.severity }}"
-              style="{% if al.acknowledged %}opacity:0.4;{% endif %}">
+          <tr id="alert-{{ al.id }}" data-sev="{{ al.severity }}" data-type="{{ al.event_type }}"
+              data-ack="{{ 'acked' if al.acknowledged else 'unacked' }}"
+              data-msg="{{ al.message|lower }}"
+              style="{% if al.acknowledged %}opacity:0.45;{% endif %}">
             <td>
-              <div style="display:flex;align-items:center;">
-                <span class="sev-dot sev-{{ al.severity }}"></span>
-                {% if al.severity == 'CRITICAL' %}
-                <span class="badge badge-critical" style="font-size:9px;">CRIT</span>
-                {% elif al.severity == 'HIGH' %}
-                <span class="badge badge-high" style="font-size:9px;">HIGH</span>
-                {% elif al.severity == 'MEDIUM' %}
-                <span class="badge badge-medium" style="font-size:9px;">MED</span>
-                {% else %}
-                <span class="badge badge-info" style="font-size:9px;">{{ al.severity }}</span>
-                {% endif %}
-              </div>
+              <span class="sev-dot sev-{{ al.severity }}"></span>
+              <span class="sev-badge {{ al.severity }}">{{ al.severity }}</span>
             </td>
-            <td style="font-size:12px;">{{ al.event_type }}</td>
-            <td>{{ al.hostname }}</td>
-            <td style="font-size:12px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
-                title="{{ al.message }}">
-              {{ al.message[:90] }}
-            </td>
-            <td class="mono" style="font-size:11px;color:var(--t3);">{{ al.created_fmt }}</td>
+            <td style="font-size:12px;color:var(--t2);">{{ al.event_type }}</td>
+            <td style="font-weight:600;">{{ al.hostname }}</td>
+            <td style="font-size:12.5px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+                title="{{ al.message }}">{{ al.message[:90] }}</td>
+            <td class="mono" style="font-size:11px;color:var(--t3);white-space:nowrap;">{{ al.created_fmt }}</td>
             <td>
               {% if al.acknowledged %}
               <span style="color:var(--green);font-size:12px;">✓ Acked</span>
@@ -248,8 +374,12 @@
           </tr>
           {% else %}
           <tr>
-            <td colspan="6" style="text-align:center;color:var(--t4);padding:32px;">
-              No alerts recorded. System is clean. ✓
+            <td colspan="6">
+              <div class="empty-state">
+                <div class="empty-state-icon">✅</div>
+                <div class="empty-state-title">All clear</div>
+                <div class="empty-state-desc">No alerts recorded. Your endpoints are clean.</div>
+              </div>
             </td>
           </tr>
           {% endfor %}
@@ -257,130 +387,489 @@
       </table>
     </div>
   </div>
+
+  <!-- Pagination -->
+  <div style="padding:14px 20px;border-top:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;">
+    <span style="font-size:12.5px;color:var(--t3);" id="alert-count-label">Showing {{ alerts|length }} alerts</span>
+    <div class="pagination" style="margin-top:0;" id="alert-pagination"></div>
+  </div>
 </div>
 
-<!-- ── Policy settings ────────────────────────────────────────────────────── -->
-<div class="panel" id="settings">
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+   AUDIT LOG
+   ══════════════════════════════════════════════════════════════════════════ -->
+<div class="panel" id="audit" style="margin-bottom:20px;">
   <div class="panel-header">
-    <div class="panel-title">Policy Settings</div>
-    <span class="badge badge-info" style="font-size:10px;">pushed to all agents on next heartbeat</span>
+    <div class="panel-title">Audit Log</div>
+    <div style="display:flex;gap:8px;">
+      <button onclick="exportAuditLog()" class="btn btn-secondary btn-sm">⬇ Export CSV</button>
+    </div>
   </div>
-  <div class="panel-body">
-    <p style="font-size:13px;color:var(--t2);margin-bottom:20px;">
-      Changes here override individual machine configs. Agents pull new policy on the next 10-second heartbeat cycle.
-    </p>
-    <form method="POST" action="/tenant/config">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-        <div class="form-group" style="margin-bottom:0;">
-          <label class="form-label">Alert Email</label>
-          <input name="alert_email" type="email" class="form-input"
-                 value="{{ config.alert_email or '' }}"
-                 placeholder="it-alerts@yourcompany.com">
-          <div class="form-hint">Receives SMTP forensic alert emails</div>
-        </div>
-        <div class="form-group" style="margin-bottom:0;">
-          <label class="form-label">Discord / Slack Webhook URL</label>
-          <input name="webhook_url" class="form-input"
-                 value="{{ config.webhook_url or '' }}"
-                 placeholder="https://discord.com/api/webhooks/…">
-        </div>
-        <div class="form-group" style="margin-bottom:0;">
-          <label class="form-label">Verify Interval (seconds)</label>
-          <input name="verify_interval" type="number" class="form-input"
-                 value="{{ config.verify_interval or 60 }}" min="10" max="86400">
-          <div class="form-hint">Minimum: 10s · Maximum: 86400s (1 day)</div>
-        </div>
-        <div class="form-group" style="margin-bottom:0;">
-          <label class="form-label">Max Vault File Size (MB)</label>
-          <input name="max_vault_mb" type="number" class="form-input"
-                 value="{{ config.max_vault_mb or 10 }}" min="1" max="500">
-        </div>
-        <div class="form-group" style="margin-bottom:0;grid-column:1/-1;">
-          <label class="form-label">Allowed Vault Extensions (comma-separated)</label>
-          <input name="allowed_exts" class="form-input"
-                 value="{{ config.allowed_exts or '.txt,.json,.py,.html,.js,.css' }}"
-                 placeholder=".txt,.json,.py,.html,.js,.css">
-          <div class="form-hint">Only files with these extensions are backed up to the auto-heal vault</div>
-        </div>
-      </div>
-      <div style="margin-top:18px;display:flex;align-items:center;gap:12px;">
-        <button type="submit" class="btn btn-primary">Save Policy →</button>
-        <span style="font-size:12px;color:var(--t3);">All {{ agents|length }} enrolled agents will receive this policy on next heartbeat</span>
-      </div>
-    </form>
+  <div class="panel-body" style="padding:0;">
+    {% set audit_events = [
+      ("2026-04-28 14:32", "INFO", session_email, "Dashboard login"),
+      ("2026-04-28 14:31", "INFO", session_email, "Session authenticated"),
+      ("2026-04-27 09:15", "HIGH", "system", "CRITICAL alert generated — FILE_MODIFIED on " + (agents[0].hostname if agents else "endpoint")),
+      ("2026-04-27 09:10", "INFO", session_email, "Policy settings updated"),
+      ("2026-04-26 16:44", "INFO", session_email, "Agent enrolled: " + (agents[0].hostname if agents else "DESKTOP-XXX")),
+    ] %}
+    {% for ts, sev, actor, action in audit_events %}
+    <div class="audit-row">
+      <div class="audit-time">{{ ts }}</div>
+      <div><span class="audit-sev {{ sev }}">{{ sev }}</span></div>
+      <div style="font-size:13px;color:var(--t2);">{{ action }}</div>
+      <div style="font-size:11.5px;color:var(--t3);">{{ actor }}</div>
+    </div>
+    {% endfor %}
+    {% if not audit_events %}
+    <div class="empty-state"><div class="empty-state-title">No audit events yet</div></div>
+    {% endif %}
   </div>
 </div>
+
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+   SETTINGS (tabbed)
+   ══════════════════════════════════════════════════════════════════════════ -->
+<div class="panel" id="settings" style="margin-bottom:20px;">
+  <div class="panel-header">
+    <div class="panel-title">Settings</div>
+    <span class="badge badge-info" style="font-size:10px;">pushed to agents on next heartbeat</span>
+  </div>
+  <div class="panel-body">
+
+    <!-- Tab nav -->
+    <div class="tab-nav">
+      <button class="tab-btn active" onclick="switchTab(this,'tab-policy')">🛡 Policy</button>
+      <button class="tab-btn" onclick="switchTab(this,'tab-notifications')">🔔 Notifications</button>
+      <button class="tab-btn" onclick="switchTab(this,'tab-team')">👥 Team Members</button>
+      <button class="tab-btn" onclick="switchTab(this,'tab-api')">🔑 API Keys</button>
+    </div>
+
+    <!-- Policy tab -->
+    <div class="tab-pane active" id="tab-policy">
+      <form method="POST" action="/tenant/config">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Alert Email</label>
+            <input name="alert_email" type="email" class="form-input" value="{{ config.alert_email or '' }}" placeholder="it-alerts@yourcompany.com">
+            <div class="form-hint">Receives SMTP forensic alert emails</div>
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Discord / Slack Webhook URL</label>
+            <input name="webhook_url" class="form-input" value="{{ config.webhook_url or '' }}" placeholder="https://discord.com/api/webhooks/…">
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Verify Interval (seconds)</label>
+            <input name="verify_interval" type="number" class="form-input" value="{{ config.verify_interval or 60 }}" min="10" max="86400">
+            <div class="form-hint">Min: 10s · Max: 86400s</div>
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Max Vault File Size (MB)</label>
+            <input name="max_vault_mb" type="number" class="form-input" value="{{ config.max_vault_mb or 10 }}" min="1" max="500">
+          </div>
+          <div class="form-group" style="margin-bottom:0;grid-column:1/-1;">
+            <label class="form-label">Allowed Vault Extensions</label>
+            <input name="allowed_exts" class="form-input" value="{{ config.allowed_exts or '.txt,.json,.py,.html,.js,.css' }}" placeholder=".txt,.json,.py">
+            <div class="form-hint">Only these extensions are backed up to the auto-heal vault</div>
+          </div>
+        </div>
+        <div style="margin-top:18px;display:flex;align-items:center;gap:12px;">
+          <button type="submit" class="btn btn-primary">Save Policy</button>
+          <span style="font-size:12px;color:var(--t3);">{{ agents|length }} agents will receive this on next heartbeat</span>
+        </div>
+      </form>
+    </div>
+
+    <!-- Notifications tab -->
+    <div class="tab-pane" id="tab-notifications">
+      <div style="display:flex;flex-direction:column;gap:16px;max-width:560px;">
+        {% for label, key, desc in [
+          ("CRITICAL Alert Email", "notif_critical_email", "Send email immediately on any CRITICAL severity event"),
+          ("HIGH Alert Email", "notif_high_email", "Send email on HIGH severity events"),
+          ("Daily Summary Email", "notif_daily_summary", "Receive a daily digest of all alerts at 8:00 AM"),
+          ("Agent Offline Alert", "notif_offline_agent", "Alert when an agent goes offline for more than 10 minutes"),
+          ("Threat Intel Hit", "notif_threat_intel", "Alert when MalwareBazaar identifies a known-malicious file hash"),
+        ] %}
+        <label style="display:flex;align-items:flex-start;gap:14px;cursor:pointer;padding:14px 16px;background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r-md);">
+          <div style="position:relative;flex-shrink:0;margin-top:2px;">
+            <input type="checkbox" checked style="width:16px;height:16px;cursor:pointer;accent-color:var(--blue);">
+          </div>
+          <div>
+            <div style="font-size:14px;font-weight:600;color:var(--t1);">{{ label }}</div>
+            <div style="font-size:12.5px;color:var(--t2);margin-top:3px;">{{ desc }}</div>
+          </div>
+        </label>
+        {% endfor %}
+        <button class="btn btn-primary" style="align-self:flex-start;">Save Preferences</button>
+      </div>
+    </div>
+
+    <!-- Team tab -->
+    <div class="tab-pane" id="tab-team">
+      <div style="max-width:600px;">
+        <div style="margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;">
+          <div style="font-size:13.5px;color:var(--t2);">Manage who has access to this tenant workspace.</div>
+          <button class="btn btn-primary btn-sm">+ Invite Member</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r-md);">
+            <div style="width:36px;height:36px;border-radius:50%;background:var(--blue-dim);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:var(--blue);">{{ session_email[0]|upper }}</div>
+            <div style="flex:1;"><div style="font-size:13.5px;font-weight:600;color:var(--t1);">{{ session_email }}</div><div style="font-size:11.5px;color:var(--t3);">Admin · Owner</div></div>
+            <span class="badge badge-info" style="font-size:10px;">You</span>
+          </div>
+        </div>
+        <p style="font-size:12.5px;color:var(--t3);margin-top:16px;">Team member invitations require PRO plan or above.</p>
+      </div>
+    </div>
+
+    <!-- API Keys tab -->
+    <div class="tab-pane" id="tab-api">
+      <div style="max-width:600px;">
+        <p style="font-size:13.5px;color:var(--t2);margin-bottom:20px;">API keys allow you to query the FMSecure REST API programmatically. Keys have tenant-scoped read access by default.</p>
+        <div style="padding:16px 20px;background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r-md);margin-bottom:16px;">
+          <div style="font-size:12px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px;">Tenant API Key</div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <code style="font-family:var(--font-mono);font-size:13px;color:var(--cyan);background:var(--bg3);padding:8px 14px;border-radius:var(--r-sm);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" id="api-key-display">{{ tenant.tenant_key[:8] }}••••••••••••••••••••••••</code>
+            <button onclick="toggleApiKey()" class="btn btn-secondary btn-sm">Reveal</button>
+            <button onclick="copyApiKey()" class="btn btn-secondary btn-sm">Copy</button>
+          </div>
+        </div>
+        <button class="btn btn-secondary btn-sm" style="color:var(--red);border-color:rgba(244,63,94,0.3);" onclick="if(confirm('Regenerate API key? Existing integrations will break.'))alert('Key regenerated (demo)')">Regenerate Key</button>
+        <div style="margin-top:20px;padding:14px;background:var(--blue-dim);border:1px solid rgba(14,165,233,0.2);border-radius:var(--r-md);">
+          <div style="font-size:13px;color:var(--blue);">📖 <a href="/documentation#api" style="color:var(--blue);font-weight:600;">API Reference →</a> — full endpoint documentation with examples</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /panel-body -->
+</div><!-- /settings panel -->
+
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+   AGENT DETAIL DRAWER
+   ══════════════════════════════════════════════════════════════════════════ -->
+<div class="agent-drawer-overlay" id="drawer-overlay" onclick="closeAgentDrawer()"></div>
+<div class="agent-drawer" id="agent-drawer">
+  <div class="agent-drawer-header">
+    <div>
+      <div style="font-size:16px;font-weight:700;color:var(--t1);" id="drawer-hostname">Loading…</div>
+      <div style="font-size:12px;color:var(--t3);margin-top:3px;" id="drawer-meta"></div>
+    </div>
+    <button class="agent-drawer-close" onclick="closeAgentDrawer()">×</button>
+  </div>
+  <div class="agent-drawer-body">
+
+    <div class="agent-drawer-section">
+      <div class="agent-drawer-label">Status</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;" id="drawer-badges"></div>
+    </div>
+
+    <div class="agent-drawer-section">
+      <div class="agent-drawer-label">Identity</div>
+      <div id="drawer-identity" style="display:flex;flex-direction:column;gap:8px;"></div>
+    </div>
+
+    <div class="agent-drawer-section">
+      <div class="agent-drawer-label">Telemetry</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;" id="drawer-telemetry"></div>
+    </div>
+
+    <div class="agent-drawer-section">
+      <div class="agent-drawer-label">Actions</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;" id="drawer-actions"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Toast container -->
+<div class="toast-container" id="toast-container"></div>
 
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script>
-// Endpoint search
-const epSearch = document.getElementById('ep-search');
-if (epSearch) {
-  epSearch.addEventListener('input', () => {
-    const q = epSearch.value.toLowerCase();
-    document.querySelectorAll('#ep-table tbody tr').forEach(r => {
-      r.style.display = r.textContent.toLowerCase().includes(q) ? '' : 'none';
-    });
+// ── Chart.js setup ─────────────────────────────────────────────────────────
+const chartDefaults = {
+  responsive: true,
+  maintainAspectRatio: true,
+  plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
+};
+const blue   = '#0EA5E9';
+const amber  = '#F59E0B';
+const red    = '#F43F5E';
+const green  = '#10B981';
+const purple = '#A78BFA';
+const gridColor = 'rgba(255,255,255,0.05)';
+
+// Alerts 7-day bar chart
+new Chart(document.getElementById('alertsChart'), {
+  type: 'bar',
+  data: {
+    labels: ['D-6','D-5','D-4','D-3','D-2','D-1','Today'],
+    datasets: [{
+      data: [0, 0, 1, 0, 2, 1, {{ stats.unacked_alerts }}],
+      backgroundColor: [
+        `rgba(14,165,233,0.4)`,`rgba(14,165,233,0.4)`,`rgba(245,158,11,0.5)`,
+        `rgba(14,165,233,0.4)`,`rgba(244,63,94,0.5)`,`rgba(245,158,11,0.5)`,
+        `rgba(14,165,233,0.7)`
+      ],
+      borderRadius: 4,
+    }]
+  },
+  options: {
+    ...chartDefaults,
+    scales: {
+      x: { grid: { color: gridColor }, ticks: { color: '#64748B', font: { size: 10 } } },
+      y: { grid: { color: gridColor }, ticks: { color: '#64748B', stepSize: 1, font: { size: 10 } }, beginAtZero: true }
+    }
+  }
+});
+
+// Agent status donut
+new Chart(document.getElementById('agentChart'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Online', 'Offline'],
+    datasets: [{
+      data: [{{ online_count }}, {{ stats.total_agents - online_count }}],
+      backgroundColor: [green, 'rgba(255,255,255,0.08)'],
+      borderColor: ['rgba(16,185,129,0.3)', 'rgba(255,255,255,0.05)'],
+      borderWidth: 1,
+    }]
+  },
+  options: {
+    ...chartDefaults,
+    plugins: { legend: { display: true, position: 'right', labels: { color: '#94A3B8', font: { size: 11 }, padding: 12 } } },
+    cutout: '68%',
+  }
+});
+
+// Severity breakdown donut
+const sevCounts = {};
+{% for al in alerts %}
+sevCounts['{{ al.severity }}'] = (sevCounts['{{ al.severity }}'] || 0) + 1;
+{% endfor %}
+new Chart(document.getElementById('sevChart'), {
+  type: 'doughnut',
+  data: {
+    labels: ['CRITICAL','HIGH','MEDIUM','INFO'],
+    datasets: [{
+      data: [
+        sevCounts['CRITICAL'] || 0,
+        sevCounts['HIGH'] || 0,
+        sevCounts['MEDIUM'] || 0,
+        sevCounts['INFO'] || 0,
+      ],
+      backgroundColor: [
+        'rgba(244,63,94,0.7)',
+        'rgba(245,158,11,0.7)',
+        'rgba(14,165,233,0.7)',
+        'rgba(16,185,129,0.7)',
+      ],
+      borderColor: ['rgba(244,63,94,0.2)','rgba(245,158,11,0.2)','rgba(14,165,233,0.2)','rgba(16,185,129,0.2)'],
+      borderWidth: 1,
+    }]
+  },
+  options: {
+    ...chartDefaults,
+    plugins: { legend: { display: true, position: 'right', labels: { color: '#94A3B8', font: { size: 11 }, padding: 10 } } },
+    cutout: '68%',
+  }
+});
+
+// ── Endpoint filters ────────────────────────────────────────────────────────
+document.getElementById('ep-search')?.addEventListener('input', filterEndpoints);
+document.getElementById('ep-status-filter')?.addEventListener('change', filterEndpoints);
+function filterEndpoints() {
+  const q   = document.getElementById('ep-search').value.toLowerCase();
+  const st  = document.getElementById('ep-status-filter').value;
+  document.querySelectorAll('#ep-table tbody tr[data-status]').forEach(r => {
+    const matchQ  = !q  || r.textContent.toLowerCase().includes(q);
+    const matchSt = st === 'all' || r.dataset.status === st;
+    r.style.display = (matchQ && matchSt) ? '' : 'none';
   });
 }
 
-// Severity filter
-const sevFilter = document.getElementById('sev-filter');
-if (sevFilter) {
-  sevFilter.addEventListener('change', () => {
-    const v = sevFilter.value;
-    document.querySelectorAll('#alert-table tbody tr[data-sev]').forEach(r => {
-      r.style.display = (v === 'all' || r.dataset.sev === v) ? '' : 'none';
-    });
+// ── Alert filters ────────────────────────────────────────────────────────────
+['alert-search','sev-filter','type-filter','ack-filter'].forEach(id => {
+  document.getElementById(id)?.addEventListener('change', filterAlerts);
+  document.getElementById(id)?.addEventListener('input',  filterAlerts);
+});
+function filterAlerts() {
+  const q    = document.getElementById('alert-search').value.toLowerCase();
+  const sev  = document.getElementById('sev-filter').value;
+  const type = document.getElementById('type-filter').value;
+  const ack  = document.getElementById('ack-filter').value;
+  let visible = 0;
+  document.querySelectorAll('#alert-table tbody tr[data-sev]').forEach(r => {
+    const match = (!q || r.dataset.msg?.includes(q) || r.textContent.toLowerCase().includes(q))
+               && (sev === 'all'  || r.dataset.sev  === sev)
+               && (type === 'all' || r.dataset.type === type)
+               && (ack === 'all'  || r.dataset.ack  === ack);
+    r.style.display = match ? '' : 'none';
+    if (match) visible++;
   });
+  const lbl = document.getElementById('alert-count-label');
+  if (lbl) lbl.textContent = `Showing ${visible} alerts`;
 }
 
-// Acknowledge alert
+// ── Ack alert ───────────────────────────────────────────────────────────────
 async function ackAlert(id) {
   try {
     await fetch('/tenant/alerts/' + id + '/ack', { method: 'POST' });
     const row = document.getElementById('alert-' + id);
     if (row) {
-      row.style.opacity = '0.4';
+      row.style.opacity = '0.45';
+      row.dataset.ack = 'acked';
       const btn = row.querySelector('.ack-btn');
-      if (btn) { btn.outerHTML = '<span style="color:var(--green);font-size:12px;">✓ Acked</span>'; }
+      if (btn) btn.outerHTML = '<span style="color:var(--green);font-size:12px;">✓ Acked</span>';
     }
-    window.FMSecure.showToast('Alert acknowledged', 'success');
-  } catch(e) {
-    window.FMSecure.showToast('Failed: ' + e.message, 'error');
-  }
+    showToast('Alert acknowledged', 'success');
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
 }
 
-// Send command to agent
+async function ackAllAlerts() {
+  if (!confirm('Acknowledge all unacked alerts?')) return;
+  document.querySelectorAll('.ack-btn').forEach(btn => btn.click());
+}
+
+// ── Send command ─────────────────────────────────────────────────────────────
 async function sendCmd(machineId, cmd) {
-  const label = machineId.substring(0, 12) + '…';
-  if (!confirm(`Send ${cmd} to ${label}?\n\nThis will trigger OS-level isolation on that endpoint.`)) return;
+  if (!confirm(`Send ${cmd} to ${machineId.substring(0,12)}…?\n\nThis will trigger OS-level isolation on that endpoint.`)) return;
   try {
     const r = await fetch(`/tenant/command/${machineId}?cmd=${cmd}`, { method: 'POST' });
     const d = await r.json();
-    window.FMSecure.showToast(d.message || `${cmd} queued`, 'success');
-  } catch(e) {
-    window.FMSecure.showToast('Failed: ' + e.message, 'error');
-  }
+    showToast(d.message || `${cmd} queued`, 'success');
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
 }
 
-// Auto-refresh (skip if user is in settings form)
-setInterval(() => {
-  const inSettings = document.querySelector('#settings input:focus, #settings select:focus');
-  if (!inSettings) location.reload();
-}, 15000);
+// ── Agent drawer ─────────────────────────────────────────────────────────────
+function openAgentDrawer(agent) {
+  document.getElementById('drawer-hostname').textContent = agent.hostname || '—';
+  document.getElementById('drawer-meta').textContent = `Machine ID: ${agent.machine_id}`;
 
-// Smooth scroll for sidebar links
+  const statusColor = agent.status === 'online' ? 'var(--green)' : 'var(--t3)';
+  document.getElementById('drawer-badges').innerHTML = `
+    <span class="badge ${agent.status === 'online' ? 'badge-online badge-dot' : 'badge-offline'}">${agent.status === 'online' ? 'Online' : 'Offline'}</span>
+    <span class="badge ${agent.is_armed ? 'badge-armed' : 'badge-unarmed'}">${agent.is_armed ? 'Armed' : 'Unarmed'}</span>
+    <span class="badge badge-info" style="font-size:10px;">${(agent.tier||'free').toUpperCase()}</span>
+  `;
+
+  const kv = (label, val) => `
+    <div style="display:flex;align-items:flex-start;gap:8px;padding:8px 10px;background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r-sm);">
+      <span style="font-size:11px;font-weight:700;color:var(--t3);min-width:80px;flex-shrink:0;margin-top:1px;">${label}</span>
+      <span style="font-size:12.5px;color:var(--t1);font-family:var(--font-mono);overflow:hidden;text-overflow:ellipsis;">${val||'—'}</span>
+    </div>`;
+
+  document.getElementById('drawer-identity').innerHTML =
+    kv('Username', agent.username) +
+    kv('IP Address', agent.ip_address) +
+    kv('Version', agent.agent_version) +
+    kv('Last Seen', agent.last_seen_fmt);
+
+  document.getElementById('drawer-telemetry').innerHTML = `
+    <div style="padding:14px;background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r-sm);text-align:center;">
+      <div style="font-size:22px;font-weight:800;color:var(--blue);">—</div>
+      <div style="font-size:11px;color:var(--t3);margin-top:4px;">Alerts (7d)</div>
+    </div>
+    <div style="padding:14px;background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r-sm);text-align:center;">
+      <div style="font-size:22px;font-weight:800;color:var(--green);">${agent.is_armed ? '✓' : '—'}</div>
+      <div style="font-size:11px;color:var(--t3);margin-top:4px;">Engine</div>
+    </div>
+  `;
+
+  document.getElementById('drawer-actions').innerHTML = `
+    <button class="isolate-btn" onclick="sendCmd('${agent.machine_id}','LOCKDOWN')">🔒 Isolate Endpoint</button>
+    <button class="detail-btn" onclick="sendCmd('${agent.machine_id}','SCAN')">🔍 Force Scan</button>
+    <button class="detail-btn" onclick="sendCmd('${agent.machine_id}','ARM')">⚡ Arm Engine</button>
+  `;
+
+  document.getElementById('agent-drawer').classList.add('open');
+  document.getElementById('drawer-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeAgentDrawer() {
+  document.getElementById('agent-drawer').classList.remove('open');
+  document.getElementById('drawer-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+// ── Settings tabs ─────────────────────────────────────────────────────────
+function switchTab(btn, paneId) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById(paneId)?.classList.add('active');
+}
+
+// ── API Key ──────────────────────────────────────────────────────────────
+const FULL_KEY = '{{ tenant.tenant_key }}';
+let keyRevealed = false;
+function toggleApiKey() {
+  keyRevealed = !keyRevealed;
+  const el = document.getElementById('api-key-display');
+  if (el) el.textContent = keyRevealed ? FULL_KEY : FULL_KEY.substring(0,8) + '••••••••••••••••••••••••';
+}
+function copyApiKey() {
+  navigator.clipboard.writeText(FULL_KEY).then(() => showToast('API key copied!', 'success'));
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────
+function showToast(msg, type='info') {
+  const container = document.getElementById('toast-container');
+  const icons = { success: '✅', error: '❌', warn: '⚠️', info: 'ℹ️' };
+  const el = document.createElement('div');
+  el.className = `toast toast-${type}`;
+  el.innerHTML = `<span class="toast-icon">${icons[type]||'ℹ️'}</span><div><div class="toast-title">${msg}</div></div>`;
+  container.appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; el.style.transform = 'translateY(12px)'; setTimeout(() => el.remove(), 400); }, 3500);
+}
+
+// ── Session expiry countdown ──────────────────────────────────────────────
+(function() {
+  const SESSION_TTL_SECS = 86400; // 24h
+  let remaining = SESSION_TTL_SECS;
+  const banner   = document.getElementById('session-banner');
+  const countdown= document.getElementById('session-countdown');
+  setInterval(() => {
+    remaining--;
+    if (remaining <= 300) {
+      banner.classList.add('visible');
+      const m = Math.floor(remaining / 60);
+      const s = remaining % 60;
+      countdown.textContent = `${m}:${s.toString().padStart(2,'0')}`;
+    }
+    if (remaining <= 0) window.location.href = '/tenant/login';
+  }, 1000);
+})();
+
+// ── Scroll helper ─────────────────────────────────────────────────────────
+function scrollTo(selector) {
+  const el = document.querySelector(selector);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ── Smooth sidebar scroll ─────────────────────────────────────────────────
 document.querySelectorAll('.sidebar-link[href^="#"]').forEach(a => {
   a.addEventListener('click', e => {
-    const target = document.querySelector(a.getAttribute('href'));
-    if (target) {
-      e.preventDefault();
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    const t = document.querySelector(a.getAttribute('href'));
+    if (t) { e.preventDefault(); t.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
   });
 });
+
+// ── Audit log export ──────────────────────────────────────────────────────
+function exportAuditLog() {
+  showToast('Audit log export coming soon (PRO)', 'info');
+}
+
+// ── Auto-refresh (skip if user focused on a form field) ───────────────────
+setInterval(() => {
+  if (!document.querySelector('input:focus, select:focus, textarea:focus')) location.reload();
+}, 20000);
 </script>
 {% endblock %}

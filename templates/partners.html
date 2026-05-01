@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Partners & MSPs{% endblock %}
+{% block description %}FMSecure partner program for MSPs, resellers, and technology partners. Protect your clients' endpoints at scale.{% endblock %}
+
+{% block content %}
+<section style="padding:calc(var(--nav-h) + 60px) 0 0;background:var(--grad-hero);">
+  <div class="container">
+    <div class="hero-inner-page" style="text-align:left;padding-top:0;">
+      <div class="hero-eyebrow">Partner Program</div>
+      <h1 style="font-family:var(--font-display);font-size:clamp(36px,5vw,62px);font-weight:800;letter-spacing:-2.5px;line-height:1.05;margin-bottom:20px;">
+        Protect your clients.<br><span class="grad-text">Grow your business.</span>
+      </h1>
+      <p style="font-size:18px;color:var(--t2);max-width:520px;line-height:1.65;">The FMSecure Partner Program gives MSPs and resellers the tools, pricing, and multi-tenant dashboard to deliver enterprise endpoint security to every client.</p>
+      <div style="display:flex;gap:12px;margin-top:28px;flex-wrap:wrap;">
+        <a href="/contact?type=partner" class="btn btn-primary btn-xl">Become a Partner →</a>
+        <a href="#tiers" class="btn btn-secondary btn-xl">See Partner Tiers</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Benefits -->
+<section class="section section-alt">
+  <div class="container" style="max-width:900px;">
+    <div class="section-header center">
+      <div class="section-label">Why Partner With Us</div>
+      <h2 class="section-title">Built for MSPs.</h2>
+    </div>
+    <div class="card-grid card-grid-3">
+      <div class="card" style="padding:24px;">
+        <div class="card-icon">🏢</div>
+        <div class="card-title">Multi-Tenant Dashboard</div>
+        <div class="card-desc">Manage all your clients from a single pane of glass. Separate tenant workspaces, isolated data, per-client billing and seat management.</div>
+      </div>
+      <div class="card" style="padding:24px;">
+        <div class="card-icon">💰</div>
+        <div class="card-title">Reseller Pricing</div>
+        <div class="card-desc">Up to 40% margin on licenses sold to your clients. Monthly or annual billing with volume discounts starting at 10 seats.</div>
+      </div>
+      <div class="card" style="padding:24px;">
+        <div class="card-icon">📊</div>
+        <div class="card-title">White-Label Ready</div>
+        <div class="card-desc">Customize the dashboard with your branding. Present FMSecure as part of your managed security offering.</div>
+      </div>
+      <div class="card" style="padding:24px;">
+        <div class="card-icon">🤝</div>
+        <div class="card-title">Dedicated Support</div>
+        <div class="card-desc">Priority email support, a partner Slack channel, and a dedicated partner success manager for Gold and Platinum tier partners.</div>
+      </div>
+      <div class="card" style="padding:24px;">
+        <div class="card-icon">📚</div>
+        <div class="card-title">Partner Portal</div>
+        <div class="card-desc">Access sales collateral, technical documentation, competitive battlecards, and training materials in one place.</div>
+      </div>
+      <div class="card" style="padding:24px;">
+        <div class="card-icon">🔗</div>
+        <div class="card-title">API Access</div>
+        <div class="card-desc">Full REST API for automating deployments, pulling alert data into your SIEM/SOAR, and managing licenses programmatically.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Tiers -->
+<section class="section" id="tiers">
+  <div class="container" style="max-width:900px;">
+    <div class="section-header center">
+      <div class="section-label">Partner Tiers</div>
+      <h2 class="section-title">Choose your level.</h2>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:20px;">
+      {% for tier, color, margin, seats, features in [
+        ("Silver", "var(--t2)", "20%", "10–49", ["Multi-tenant dashboard", "Partner pricing", "Email support", "Sales collateral"]),
+        ("Gold", "var(--amber)", "30%", "50–199", ["All Silver benefits", "Priority support", "Partner Slack", "Quarterly reviews", "White-label option"]),
+        ("Platinum", "var(--blue)", "40%", "200+", ["All Gold benefits", "Dedicated success manager", "Custom SLA", "Co-marketing", "API integration support"]),
+      ] %}
+      <div class="card" style="padding:28px;border-color:{% if tier == 'Gold' %}rgba(245,158,11,0.3){% elif tier == 'Platinum' %}rgba(14,165,233,0.3){% else %}var(--bd){% endif %};">
+        <div style="font-size:14px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:{{ color }};margin-bottom:12px;">{{ tier }}</div>
+        <div style="font-size:28px;font-weight:900;letter-spacing:-1px;color:var(--t1);margin-bottom:4px;">{{ margin }}</div>
+        <div style="font-size:13px;color:var(--t3);margin-bottom:20px;">margin on sales · {{ seats }} seats/mo</div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:24px;">
+          {% for f in features %}
+          <div style="display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--t2);">
+            <span style="color:{{ color }};">✓</span> {{ f }}
+          </div>
+          {% endfor %}
+        </div>
+        <a href="/contact?type=partner&tier={{ tier|lower }}" class="btn btn-secondary btn-full" style="display:flex;justify-content:center;">Apply for {{ tier }}</a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="section section-alt">
+  <div class="container">
+    <div class="cta-band">
+      <h2>Ready to add EDR to your offering?</h2>
+      <p>Tell us about your client base and we'll recommend the right partner tier.</p>
+      <div class="cta-actions">
+        <a href="/contact?type=partner" class="btn btn-primary btn-xl">Become a Partner</a>
+        <a href="mailto:partners@fmsecure.in" class="btn btn-secondary btn-xl">📧 partners@fmsecure.in</a>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

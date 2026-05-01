@@ -1,50 +1,52 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Forgot Password | {{ brand.name }}</title>
-  <link rel="icon" type="image/x-icon" href="{{ brand.logo_ico }}">
-  <link rel="stylesheet" href="/static/css/fmsecure.css">
-  <style>
-    body { min-height:100vh; display:flex; align-items:center; justify-content:center; background:var(--bg); padding:24px; position:relative; overflow:hidden; }
-    body::before { content:''; position:fixed; inset:0; background-image:linear-gradient(rgba(30,38,64,0.35) 1px,transparent 1px),linear-gradient(90deg,rgba(30,38,64,0.35) 1px,transparent 1px); background-size:48px 48px; mask-image:radial-gradient(ellipse at center,black 20%,transparent 75%); pointer-events:none; z-index:0; }
-    .card { position:relative; z-index:1; background:var(--bg1); border:1px solid var(--bd); border-radius:var(--r-xl); padding:44px 40px; width:100%; max-width:400px; animation:fadeUp 0.5s var(--ease-out) both; }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <a href="/tenant/login" style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--t3);margin-bottom:28px;text-decoration:none;">
-      ← Back to login
-    </a>
+{% extends "base.html" %}
+{% block title %}Reset Password{% endblock %}
 
-    <div style="width:48px;height:48px;background:var(--blue-dim);border:1px solid rgba(14,165,233,0.3);border-radius:var(--r-md);display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:20px;">🔑</div>
+{% block content %}
+<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px 20px;background:var(--grad-hero);">
+  <div style="width:100%;max-width:420px;">
 
-    <h2 style="font-family:var(--font-display);font-size:22px;font-weight:700;margin-bottom:8px;">Forgot password?</h2>
-    <p style="font-size:13.5px;color:var(--t2);margin-bottom:28px;line-height:1.65;">
-      Enter your registered IT admin email. If it matches our records, we'll send a 6-digit reset code.
-    </p>
+    <div style="text-align:center;margin-bottom:32px;">
+      <a href="/" style="display:inline-flex;align-items:center;gap:10px;text-decoration:none;margin-bottom:20px;">
+        <div style="width:40px;height:40px;border-radius:var(--r-md);background:var(--blue-dim);border:1px solid rgba(14,165,233,0.2);display:flex;align-items:center;justify-content:center;">
+          <img src="{{ brand.logo_png }}" alt="{{ brand.name }}" width="24" height="24"
+               style="display:block;object-fit:contain;"
+               onerror="this.style.display='none';this.parentElement.innerHTML='<span style=\'font-weight:800;color:var(--blue);\'>FM</span>'">
+        </div>
+        <span style="font-size:20px;font-weight:800;color:var(--t1);">{{ brand.name }}</span>
+      </a>
+      <h1 style="font-size:24px;font-weight:800;letter-spacing:-0.8px;margin-bottom:6px;">Reset Password</h1>
+      <p style="font-size:14px;color:var(--t2);">We'll send a one-time code to your email</p>
+    </div>
 
-    {% if error %}
-    <div class="alert alert-error" style="margin-bottom:18px;"><span>⚠</span> {{ error }}</div>
-    {% endif %}
-    {% if success %}
-    <div class="alert alert-success" style="margin-bottom:18px;"><span>✓</span> {{ success }}</div>
-    {% endif %}
-
-    <form method="POST" action="/tenant/forgot-password">
-      <div class="form-group">
-        <label class="form-label">Email Address</label>
-        <input type="email" name="email" class="form-input" required autofocus placeholder="admin@company.com">
+    <div class="card" style="padding:32px;">
+      {% if error %}
+      <div style="background:var(--red-dim);border:1px solid rgba(244,63,94,0.2);border-radius:var(--r-md);padding:12px 16px;margin-bottom:20px;">
+        <span style="font-size:13.5px;color:var(--red);font-weight:600;">❌ {{ error }}</span>
       </div>
-      <button type="submit" class="btn btn-primary btn-full btn-lg" style="margin-top:4px;">
-        Send Reset Code
-      </button>
-    </form>
+      {% endif %}
+      {% if success %}
+      <div style="background:var(--green-dim);border:1px solid rgba(16,185,129,0.2);border-radius:var(--r-md);padding:16px;margin-bottom:20px;text-align:center;">
+        <div style="font-size:28px;margin-bottom:8px;">📧</div>
+        <div style="font-size:14px;color:var(--green);font-weight:600;">{{ success }}</div>
+        <div style="font-size:12.5px;color:var(--t2);margin-top:8px;">Check your inbox and spam folder. The code expires in 15 minutes.</div>
+      </div>
+      {% else %}
+      <form method="POST" action="/tenant/forgot">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="form-group">
+          <label class="form-label">Email Address</label>
+          <input name="email" type="email" class="form-input" required autofocus
+                 placeholder="admin@yourcompany.com" autocomplete="email">
+          <div class="form-hint">We'll send a 6-digit OTP to this address if it exists in our system.</div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-full" style="display:flex;justify-content:center;">Send Reset Code →</button>
+      </form>
+      {% endif %}
+    </div>
 
-    <p style="font-size:12px;color:var(--t3);text-align:center;margin-top:20px;">
-      We won't confirm whether the email exists for security reasons.
-    </p>
+    <div style="text-align:center;margin-top:16px;font-size:13px;">
+      <a href="/tenant/login" style="color:var(--blue);">← Back to Login</a>
+    </div>
   </div>
-</body>
-</html>
+</div>
+{% endblock %}

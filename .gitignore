@@ -1,2 +1,7 @@
 /lisajaanu
 /Archive
+.env
+.env*
+__pycache__
+CHANGES_phase7_8.md
+CHANGES.md

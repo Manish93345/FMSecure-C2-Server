@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}Roadmap{% endblock %}
+{% block description %}FMSecure product roadmap — what we've built, what's coming, and how we prioritize.{% endblock %}
+
+{% block content %}
+<section style="padding:calc(var(--nav-h) + 60px) 0 0;background:var(--grad-hero);">
+  <div class="container">
+    <div class="hero-inner-page" style="text-align:left;padding-top:0;">
+      <div class="hero-eyebrow">Roadmap & Changelog</div>
+      <h1 style="font-family:var(--font-display);font-size:clamp(36px,5vw,62px);font-weight:800;letter-spacing:-2.5px;line-height:1.05;margin-bottom:20px;">
+        What we're building<br><span class="grad-text">and what's next.</span>
+      </h1>
+      <p style="font-size:18px;color:var(--t2);max-width:520px;line-height:1.65;">Our roadmap is public. We believe customers should know what we're working on and vote on what matters most.</p>
+      <div style="display:flex;gap:12px;margin-top:24px;flex-wrap:wrap;">
+        <a href="#upcoming" class="btn btn-primary">See Upcoming →</a>
+        <a href="#changelog" class="btn btn-secondary">Changelog</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Status legend -->
+<section style="padding:32px 0;background:var(--bg1);border-top:1px solid var(--bd);border-bottom:1px solid var(--bd);">
+  <div class="container">
+    <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:center;">
+      <span style="font-size:13px;color:var(--t3);">Status:</span>
+      <span class="compliance-check">✓ Shipped</span>
+      <span style="padding:4px 12px;border-radius:var(--r-full);font-size:12px;font-weight:600;background:var(--amber-dim);color:var(--amber);border:1px solid rgba(245,158,11,0.2);">⚡ In Progress</span>
+      <span style="padding:4px 12px;border-radius:var(--r-full);font-size:12px;font-weight:600;background:var(--blue-dim);color:var(--blue);border:1px solid rgba(14,165,233,0.2);">📋 Planned</span>
+      <span style="padding:4px 12px;border-radius:var(--r-full);font-size:12px;font-weight:600;background:var(--bg3);color:var(--t3);border:1px solid var(--bd);">💭 Considering</span>
+    </div>
+  </div>
+</section>
+
+<!-- Upcoming -->
+<section class="section" id="upcoming">
+  <div class="container" style="max-width:800px;">
+    <div class="section-header">
+      <div class="section-label">Q2–Q3 2026</div>
+      <h2 class="section-title">Upcoming features.</h2>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      {% set upcoming = [
+        ("in-progress", "⚡", "Linux Agent (Beta)", "Extend FMSecure protection to Ubuntu/Debian servers. Same watchdog engine, same C2 dashboard.", ["Linux", "Multi-OS"]),
+        ("in-progress", "⚡", "2FA TOTP for Tenant Logins", "Google Authenticator / Authy support for all tenant admin accounts. TOTP-based, no SMS.", ["Security", "Auth"]),
+        ("planned", "📋", "macOS Agent", "File integrity monitoring and process attribution for macOS endpoints.", ["macOS", "Multi-OS"]),
+        ("planned", "📋", "Splunk & Elastic SIEM Integration", "Native SIEM push via CEF/ECS format. Pre-built dashboards included.", ["SIEM", "Integration"]),
+        ("planned", "📋", "Alert Suppression Rules", "Create rules to suppress known-good events. Reduce noise from scheduled tasks, backup software, etc.", ["Dashboard", "UX"]),
+        ("planned", "📋", "SOC 2 Type II Certification", "Third-party audit of our security controls. Report published publicly on completion.", ["Compliance"]),
+        ("considering", "💭", "Mobile App (iOS/Android)", "Push notifications for CRITICAL alerts and basic dashboard access from mobile.", ["Mobile"]),
+        ("considering", "💭", "AI Threat Summarization", "Use LLM to summarize alert clusters into plain-English incident reports.", ["AI", "EDR"]),
+      ] %}
+      {% for status, icon, title, desc, tags in upcoming %}
+      <div class="card" style="display:flex;align-items:flex-start;gap:16px;padding:20px 24px;">
+        <div style="font-size:20px;flex-shrink:0;margin-top:2px;">{{ icon }}</div>
+        <div style="flex:1;">
+          <div style="font-size:15px;font-weight:700;color:var(--t1);margin-bottom:4px;">{{ title }}</div>
+          <div style="font-size:13.5px;color:var(--t2);line-height:1.5;">{{ desc }}</div>
+          <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
+            {% for tag in tags %}<span class="timeline-tag">{{ tag }}</span>{% endfor %}
+          </div>
+        </div>
+        <button onclick="voteFeature(this)" style="flex-shrink:0;background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r-sm);padding:6px 14px;font-size:13px;color:var(--t2);cursor:pointer;transition:all 0.15s;" onmouseover="this.style.borderColor='var(--blue)';this.style.color='var(--blue)'" onmouseout="this.style.borderColor='var(--bd)';this.style.color='var(--t2)'">▲ Vote</button>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- Changelog -->
+<section class="section section-alt" id="changelog">
+  <div class="container" style="max-width:800px;">
+    <div class="section-header">
+      <div class="section-label">Changelog</div>
+      <h2 class="section-title">What we've shipped.</h2>
+    </div>
+    <div class="timeline">
+      {% set releases = [
+        ("v2.5.0", "April 2026", "EDR Engine — Process Attribution & Registry Monitor", [
+          "Process attribution: every file event now shows the responsible executable",
+          "System path monitoring with 50+ known-sensitive Windows paths",
+          "Registry persistence detector — 14 HKCU/HKLM autorun keys",
+          "MalwareBazaar threat intelligence with SQLite cache (7-day TTL)",
+          "VirusTotal fallback for unrecognized hashes",
+          "EDR Engine card in GUI with 3 toggle pills"
+        ]),
+        ("v2.4.0", "March 2026", "Cloud C2 — Tenant Management & Multi-Org", [
+          "Multi-tenant architecture with isolated workspaces",
+          "IT Admin portal with seat management",
+          "Razorpay payment integration (INR)",
+          "OTP-based password reset via email",
+          "Tenant agent heartbeat & command queue"
+        ]),
+        ("v2.3.0", "February 2026", "Encryption & Licensing", [
+          "AES-256 encrypted logs (Fernet, machine-bound key)",
+          "HMAC-signed commercial license keys",
+          "License manager with offline validation",
+          "Encrypted users.json with bcrypt passwords",
+          "PRO feature gating system"
+        ]),
+        ("v2.0.0", "January 2026", "Authentication & Severity Intelligence", [
+          "Admin/User dual-mode authentication",
+          "CRITICAL / HIGH / MEDIUM / INFO severity engine",
+          "Safe Mode — monitoring freeze on system compromise",
+          "Incident snapshots with last-10-event forensic report",
+          "Auto-response rules (kill on CRITICAL, snapshot on HIGH)"
+        ]),
+      ] %}
+      {% for version, date, title, notes in releases %}
+      <div class="timeline-item done">
+        <div class="timeline-dot"></div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
+          <span style="font-size:12px;font-weight:700;padding:3px 10px;background:var(--green-dim);color:var(--green);border-radius:var(--r-full);border:1px solid rgba(16,185,129,0.2);">{{ version }}</span>
+          <span class="timeline-date" style="margin-bottom:0;">{{ date }}</span>
+        </div>
+        <div class="timeline-title">{{ title }}</div>
+        <div style="margin-top:10px;display:flex;flex-direction:column;gap:5px;">
+          {% for note in notes %}
+          <div style="display:flex;align-items:flex-start;gap:8px;font-size:13.5px;color:var(--t2);">
+            <span style="color:var(--green);flex-shrink:0;margin-top:1px;">✓</span>{{ note }}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="section">
+  <div class="container">
+    <div class="cta-band">
+      <h2>Have a feature request?</h2>
+      <p>We read every suggestion. High-voted features move up the roadmap.</p>
+      <div class="cta-actions">
+        <a href="mailto:feedback@fmsecure.in?subject=Feature Request" class="btn btn-primary btn-xl">📬 Send Feedback</a>
+        <a href="/contact" class="btn btn-secondary btn-xl">Talk to the Team</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+function voteFeature(btn) {
+  if(btn.dataset.voted) return;
+  btn.dataset.voted = '1';
+  btn.textContent = '▲ Voted';
+  btn.style.borderColor = 'var(--green)';
+  btn.style.color = 'var(--green)';
+  btn.style.background = 'var(--green-dim)';
+}
+</script>
+{% endblock %}

@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Case Studies{% endblock %}
+{% block description %}See how organizations use FMSecure to protect Windows endpoints, detect threats, and respond in real time.{% endblock %}
+
+{% block content %}
+<section style="padding:calc(var(--nav-h) + 60px) 0 0;background:var(--grad-hero);">
+  <div class="container">
+    <div class="hero-inner-page" style="text-align:left;padding-top:0;">
+      <div class="hero-eyebrow">Case Studies</div>
+      <h1 style="font-family:var(--font-display);font-size:clamp(36px,5vw,62px);font-weight:800;letter-spacing:-2.5px;line-height:1.05;margin-bottom:20px;">
+        Real protection.<br><span class="grad-text">Real results.</span>
+      </h1>
+      <p style="font-size:18px;color:var(--t2);max-width:520px;line-height:1.65;">See how IT teams use FMSecure to detect threats that traditional antivirus misses — before they cause damage.</p>
+    </div>
+  </div>
+</section>
+
+<!-- Stats -->
+<section style="padding:48px 0;background:var(--bg1);border-top:1px solid var(--bd);border-bottom:1px solid var(--bd);">
+  <div class="container">
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:32px;text-align:center;">
+      <div><div style="font-size:36px;font-weight:900;letter-spacing:-2px;" class="grad-text">&lt;200ms</div><div style="font-size:13px;color:var(--t3);margin-top:4px;">Alert-to-kill latency</div></div>
+      <div><div style="font-size:36px;font-weight:900;letter-spacing:-2px;" class="grad-text">119 GB</div><div style="font-size:13px;color:var(--t3);margin-top:4px;">Scanned in 65 seconds</div></div>
+      <div><div style="font-size:36px;font-weight:900;letter-spacing:-2px;" class="grad-text">14</div><div style="font-size:13px;color:var(--t3);margin-top:4px;">Registry keys monitored</div></div>
+      <div><div style="font-size:36px;font-weight:900;letter-spacing:-2px;" class="grad-text">300k+</div><div style="font-size:13px;color:var(--t3);margin-top:4px;">Malware samples in threat DB</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- Case studies -->
+<section class="section">
+  <div class="container" style="max-width:900px;">
+    <div class="card-grid card-grid-2">
+      {% set cases = [
+        ("🏭", "Manufacturing Company", "10 endpoints", "Ransomware Detection", "FMSecure's behavioral engine detected ransomware traversal across a network share within 180ms and killed the process before a single file was encrypted. Traditional AV missed it completely.", "Stopped ransomware before any file was encrypted"),
+        ("🏥", "Healthcare Clinic", "6 endpoints", "Unauthorized File Access", "After enabling file integrity monitoring on patient record directories, the IT admin detected an unauthorized modification attempt within minutes. The attacker had used a legitimate admin tool — process attribution exposed them.", "Detected insider threat in 4 minutes"),
+        ("💻", "Software Startup", "25 endpoints", "Registry Persistence", "FMSecure detected a new autorun entry in HKCU\\Run immediately after a developer installed a suspicious build tool. CRITICAL alert fired within 3 seconds of the registry change.", "Identified malware persistence on Day 1"),
+        ("🏦", "Financial Services Firm", "40 endpoints", "Threat Intelligence Hit", "A contractor's machine was flagged — a file hash matched a WannaCry variant in MalwareBazaar. The machine was isolated before it connected to any internal resources.", "Prevented lateral movement instantly"),
+      ] %}
+      {% for icon, org, scale, title, story, result in cases %}
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div style="padding:24px 28px;border-bottom:1px solid var(--bd);background:var(--bg2);display:flex;align-items:center;gap:14px;">
+          <div style="width:48px;height:48px;border-radius:var(--r-md);background:var(--blue-dim);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">{{ icon }}</div>
+          <div>
+            <div style="font-size:15px;font-weight:700;color:var(--t1);">{{ org }}</div>
+            <div style="font-size:12px;color:var(--t3);margin-top:2px;">{{ scale }} · {{ title }}</div>
+          </div>
+        </div>
+        <div style="padding:24px 28px;">
+          <p style="font-size:14px;color:var(--t2);line-height:1.65;margin-bottom:16px;">{{ story }}</p>
+          <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--green-dim);border:1px solid rgba(16,185,129,0.2);border-radius:var(--r-md);">
+            <span style="color:var(--green);font-size:16px;">✓</span>
+            <span style="font-size:13px;font-weight:600;color:var(--green);">{{ result }}</span>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- Testimonials -->
+<section class="section section-alt">
+  <div class="container" style="max-width:900px;">
+    <div class="section-header center">
+      <div class="section-label">What they say</div>
+      <h2 class="section-title">From the people using it daily.</h2>
+    </div>
+    <div class="card-grid card-grid-2">
+      {% set quotes = [
+        ("The process attribution feature is what sets FMSecure apart. Knowing exactly which executable touched which file — that's forensic-level detail I've never had in a free tool.", "Arun M.", "IT Manager, Bangalore"),
+        ("We went from zero visibility to full endpoint telemetry in under 10 minutes. The single EXE deployment is genuinely magic — no IT tickets, no driver approvals.", "Priya S.", "Sysadmin, Chennai"),
+        ("The ransomware killswitch actually killed a test ransomware binary in our sandbox before it encrypted a single file. I showed management and got budget approved that week.", "Ravi K.", "Security Lead, Pune"),
+        ("The audit logs are signed and encrypted. When our compliance team asked for tamper-evident logs, I just pointed them to FMSecure. Done.", "Deepa L.", "IT Director, Mumbai"),
+      ] %}
+      {% for text, name, role in quotes %}
+      <div class="card quote-card">
+        <div class="quote-text">{{ text }}</div>
+        <div class="quote-author">
+          <div class="quote-avatar">{{ name[0] }}</div>
+          <div><div class="quote-name">{{ name }}</div><div class="quote-meta">{{ role }}</div></div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="section">
+  <div class="container">
+    <div class="cta-band">
+      <h2>Ready to be the next success story?</h2>
+      <p>Start free. No credit card. Full EDR in 60 seconds.</p>
+      <div class="cta-actions">
+        <a href="/download" class="btn btn-primary btn-xl">⬇ Download Agent</a>
+        <a href="/contact" class="btn btn-secondary btn-xl">Talk to an Expert →</a>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
