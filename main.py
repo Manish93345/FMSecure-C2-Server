@@ -248,6 +248,7 @@ def init_db():
                 status        TEXT NOT NULL DEFAULT 'offline',
                 last_seen     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 registered_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                sigma_rule_count INTEGER DEFAULT 0,
                 UNIQUE(tenant_id, machine_id)
             );
         
@@ -292,8 +293,8 @@ def init_db():
 
             DO $$ BEGIN
               IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                             WHERE table_name='licenses' AND column_name='machine_id') 
-              THEN ALTER TABLE licenses ADD COLUMN machine_id TEXT DEFAULT NULL; END IF;
+                             WHERE table_name='tenant_agents' AND column_name='sigma_rule_count') 
+              THEN ALTER TABLE tenant_agents ADD COLUMN sigma_rule_count INTEGER DEFAULT 0; END IF;
             END $$;
         """)
 
@@ -774,6 +775,7 @@ class Heartbeat(BaseModel):
     is_armed:   bool
     agent_version: str = "2.5.0"
     os_info:       str = ""
+    sigma_rules:   list = []
 
 @app.post("/api/heartbeat")
 @limiter.limit("200/minute")
@@ -853,6 +855,15 @@ async def receive_heartbeat(request: Request, data: Heartbeat):
                     data.is_armed, data.agent_version, data.os_info
                 ))
                 agent_row = cur.fetchone()
+                # --- NEW CODE: Store sigma rules count ---
+                if agent_row:
+                    agent_id = agent_row["id"]
+                    sigma_count = len(data.sigma_rules)
+                    cur.execute(
+                        "UPDATE tenant_agents SET sigma_rule_count = %s WHERE id = %s",
+                        (sigma_count, agent_id)
+                    )
+                # -----------------------------------------
                 conn.commit(); cur.close(); conn.close()
  
             except Exception as e:
@@ -869,10 +880,13 @@ async def receive_heartbeat(request: Request, data: Heartbeat):
  
     if api_key != API_KEY:
         raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    # NEW CODE: Save the sigma_rule_count in the memory dict
     agents[data.machine_id] = {
         "hostname": data.hostname, "username": data.username,
         "tier": data.tier, "is_armed": data.is_armed,
-        "last_seen": time.time(), "ip": request.client.host
+        "last_seen": time.time(), "ip": request.client.host,
+        "sigma_rule_count": len(data.sigma_rules)
     }
     return {"status": "ok", "command": commands.pop(data.machine_id, "NONE")}
 
@@ -1669,7 +1683,7 @@ async def tenant_dashboard(request: Request, config_saved: str = ""):
 
     cur.execute("""
         SELECT machine_id, hostname, ip_address, username, tier,
-               is_armed, status, last_seen, agent_version
+               is_armed, status, last_seen, agent_version, sigma_rule_count 
         FROM tenant_agents WHERE tenant_id=%s
         ORDER BY status DESC, last_seen DESC
     """, (tenant_id,))

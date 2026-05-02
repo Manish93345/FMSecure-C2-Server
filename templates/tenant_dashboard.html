@@ -246,6 +246,7 @@ canvas { max-width:100%;display:block; }
           <tr>
             <th>Hostname</th><th>User</th><th>IP</th>
             <th>Status</th><th>Engine</th><th>Tier</th>
+            <th>Detection Rules</th> <!-- NEW COLUMN -->
             <th>Last Seen</th><th style="text-align:right;">Actions</th>
           </tr>
         </thead>
@@ -274,6 +275,11 @@ canvas { max-width:100%;display:block; }
               {% endif %}
             </td>
             <td class="mono" style="font-size:11px;">{{ a.tier|upper }}</td>
+            <td>
+              <span style="color: #3fb950; font-size: 11px; font-weight: 600;">
+                {{ a.sigma_rule_count | default(0) }} rules active
+              </span>
+            </td>
             <td class="mono" style="font-size:11px;color:var(--t3);">{{ a.last_seen_fmt }}</td>
             <td style="text-align:right;">
               <div style="display:flex;gap:6px;justify-content:flex-end;">
