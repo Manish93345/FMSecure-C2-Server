@@ -44,82 +44,1004 @@
 
 {% block extra_css %}
 <style>
-.agent-row td { vertical-align: middle; }
-.isolate-btn {
-  background: var(--red-dim);
-  color: var(--red);
+/* ═══════════════════════════════════════════════════════════════════════════
+   Dashboard-only redesign — fully scoped under #fm-dash
+   Industrial / SOC War Room aesthetic — 3D, animated, holographic
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+#fm-dash {
+  --dash-grid: rgba(14,165,233,0.06);
+  --dash-grid-bold: rgba(14,165,233,0.14);
+  --neon-blue: #38BDF8;
+  --neon-cyan: #22D3EE;
+  --neon-purple: #A78BFA;
+  --neon-green: #34D399;
+  --neon-red: #FB7185;
+  --neon-amber: #FBBF24;
+  --glass-bd: rgba(56,189,248,0.18);
+  --glass-bg: linear-gradient(155deg, rgba(28,36,56,0.72) 0%, rgba(12,15,24,0.85) 100%);
+  position: relative;
+  perspective: 1800px;
+}
+
+/* ── Animated mesh background ─────────────────────────────────────────────── */
+#fm-dash::before,
+#fm-dash::after {
+  content: "";
+  position: absolute;
+  inset: -40px -20px auto -20px;
+  height: 520px;
+  pointer-events: none;
+  z-index: 0;
+}
+#fm-dash::before {
+  background:
+    radial-gradient(ellipse 60% 40% at 12% 0%, rgba(14,165,233,0.20) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 50% at 90% 0%, rgba(167,139,250,0.16) 0%, transparent 60%),
+    radial-gradient(ellipse 80% 60% at 50% 100%, rgba(34,211,238,0.10) 0%, transparent 70%);
+  filter: blur(2px);
+  animation: dashAuroraDrift 18s ease-in-out infinite alternate;
+}
+#fm-dash::after {
+  background-image:
+    linear-gradient(var(--dash-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--dash-grid) 1px, transparent 1px);
+  background-size: 48px 48px, 48px 48px;
+  background-position: -1px -1px;
+  mask-image: radial-gradient(ellipse 90% 60% at 50% 0%, #000 0%, transparent 80%);
+  -webkit-mask-image: radial-gradient(ellipse 90% 60% at 50% 0%, #000 0%, transparent 80%);
+  animation: dashGridSlide 32s linear infinite;
+}
+@keyframes dashAuroraDrift {
+  0%   { transform: translate3d(0,0,0) scale(1); opacity: 0.85; }
+  50%  { transform: translate3d(-20px,15px,0) scale(1.05); opacity: 1; }
+  100% { transform: translate3d(20px,-10px,0) scale(1); opacity: 0.9; }
+}
+@keyframes dashGridSlide {
+  from { background-position: 0 0, 0 0; }
+  to   { background-position: 48px 48px, 48px 48px; }
+}
+
+#fm-dash > * { position: relative; z-index: 1; }
+
+/* ── HERO BANNER — mission control header ────────────────────────────────── */
+.dash-hero {
+  position: relative;
+  padding: 28px 28px 24px;
+  margin-bottom: 28px;
+  border-radius: var(--r-xl);
+  background: linear-gradient(135deg, rgba(14,165,233,0.08) 0%, rgba(167,139,250,0.06) 50%, rgba(34,211,238,0.05) 100%), var(--bg1);
+  border: 1px solid var(--glass-bd);
+  overflow: hidden;
+  box-shadow: 0 30px 60px -20px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.04);
+  transform-style: preserve-3d;
+}
+.dash-hero::before {
+  content: "";
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(34,211,238,0.18), transparent 40%),
+    radial-gradient(circle at 100% 100%, rgba(167,139,250,0.14), transparent 40%);
+  pointer-events: none;
+}
+.dash-hero::after {
+  /* scanline */
+  content: "";
+  position: absolute; left: 0; right: 0; top: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--neon-cyan), var(--neon-blue), transparent);
+  animation: dashScan 4.5s ease-in-out infinite;
+  box-shadow: 0 0 18px var(--neon-cyan);
+  opacity: 0.7;
+}
+@keyframes dashScan {
+  0%, 100% { transform: translateY(0); opacity: 0; }
+  20%      { opacity: 1; }
+  80%      { opacity: 1; }
+  100%     { transform: translateY(420px); opacity: 0; }
+}
+
+.dash-hero-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1.2fr auto;
+  gap: 28px;
+  align-items: center;
+  z-index: 2;
+}
+.dash-hero-eyebrow {
+  display: inline-flex; align-items: center; gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: var(--neon-cyan);
+  padding: 5px 12px;
+  background: rgba(34,211,238,0.08);
+  border: 1px solid rgba(34,211,238,0.25);
+  border-radius: var(--r-full);
+  margin-bottom: 12px;
+}
+.dash-hero-eyebrow::before {
+  content: "";
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--neon-cyan);
+  box-shadow: 0 0 10px var(--neon-cyan), 0 0 18px var(--neon-cyan);
+  animation: dashPulse 1.6s ease-in-out infinite;
+}
+@keyframes dashPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+.dash-hero h1 {
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.8px;
+  line-height: 1.1;
+  margin: 0 0 8px;
+  color: var(--t1);
+  background: linear-gradient(135deg, #FFFFFF 0%, #BAE6FD 60%, #C4B5FD 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.dash-hero p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--t2);
+  max-width: 560px;
+  line-height: 1.55;
+}
+
+/* Live radar widget */
+.dash-radar {
+  position: relative;
+  width: 140px; height: 140px;
+  border-radius: 50%;
+  background: radial-gradient(circle at center, rgba(14,165,233,0.18) 0%, rgba(7,8,12,0.6) 70%);
+  border: 1px solid rgba(56,189,248,0.3);
+  box-shadow: inset 0 0 30px rgba(14,165,233,0.18), 0 0 30px rgba(14,165,233,0.15);
+  flex-shrink: 0;
+}
+.dash-radar::before,
+.dash-radar::after {
+  content: "";
+  position: absolute; inset: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(56,189,248,0.18);
+}
+.dash-radar::before { transform: scale(0.66); }
+.dash-radar::after  { transform: scale(0.33); }
+.dash-radar-sweep {
+  position: absolute; inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent 0deg, rgba(34,211,238,0.55) 25deg, transparent 60deg);
+  animation: dashRadarSpin 3.2s linear infinite;
+  mix-blend-mode: screen;
+}
+.dash-radar-dot {
+  position: absolute;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--neon-green);
+  box-shadow: 0 0 10px var(--neon-green);
+}
+.dash-radar-dot.d1 { top: 32%; left: 58%; animation: dashBlip 2.4s ease-out infinite 0.3s; }
+.dash-radar-dot.d2 { top: 64%; left: 28%; animation: dashBlip 2.4s ease-out infinite 0.9s; }
+.dash-radar-dot.d3 { top: 22%; left: 30%; animation: dashBlip 2.4s ease-out infinite 1.5s; background: var(--neon-amber); box-shadow: 0 0 10px var(--neon-amber); }
+.dash-radar-dot.d4 { top: 70%; left: 72%; animation: dashBlip 2.4s ease-out infinite 2.0s; }
+@keyframes dashRadarSpin { to { transform: rotate(360deg); } }
+@keyframes dashBlip {
+  0%, 90%, 100% { transform: scale(1); opacity: 1; }
+  45%           { transform: scale(2.2); opacity: 0.2; }
+}
+
+/* ── KPI STAT CARDS — 3D, animated ───────────────────────────────────────── */
+.dash-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+  margin-bottom: 28px;
+}
+@media (max-width: 1100px) { .dash-stats { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px)  { .dash-stats { grid-template-columns: 1fr; } }
+
+.dash-stat {
+  position: relative;
+  padding: 20px 22px;
+  border-radius: var(--r-lg);
+  background: var(--glass-bg);
+  border: 1px solid var(--bd);
+  overflow: hidden;
+  isolation: isolate;
+  transition: transform var(--dur-med) var(--ease), border-color var(--dur-med) var(--ease), box-shadow var(--dur-med) var(--ease);
+  transform-style: preserve-3d;
+  cursor: default;
+}
+.dash-stat::before {
+  content: "";
+  position: absolute; inset: 0;
+  background: var(--stat-grad, linear-gradient(135deg, rgba(14,165,233,0.18), transparent 50%));
+  opacity: 0.65;
+  z-index: -1;
+  transition: opacity var(--dur-med);
+}
+.dash-stat::after {
+  /* corner accent */
+  content: "";
+  position: absolute;
+  top: 0; right: 0;
+  width: 90px; height: 90px;
+  background: radial-gradient(circle at top right, var(--stat-glow, rgba(56,189,248,0.4)), transparent 70%);
+  opacity: 0.6;
+  pointer-events: none;
+  filter: blur(10px);
+}
+.dash-stat:hover {
+  transform: translateY(-4px) rotateX(2deg) rotateY(-2deg);
+  border-color: var(--stat-bd, rgba(56,189,248,0.35));
+  box-shadow: 0 24px 40px -12px rgba(0,0,0,0.7), 0 0 0 1px var(--stat-bd, rgba(56,189,248,0.2));
+}
+.dash-stat:hover::before { opacity: 1; }
+
+.dash-stat-head {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 14px;
+}
+.dash-stat-label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: var(--t2);
+}
+.dash-stat-icon {
+  width: 36px; height: 36px;
+  border-radius: var(--r-sm);
+  display: flex; align-items: center; justify-content: center;
+  background: var(--stat-icon-bg, rgba(56,189,248,0.12));
+  border: 1px solid var(--stat-icon-bd, rgba(56,189,248,0.25));
+  color: var(--stat-icon-c, var(--neon-blue));
+  font-size: 16px;
+  box-shadow: inset 0 0 14px rgba(0,0,0,0.4);
+}
+.dash-stat-value {
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  color: var(--t1);
+  line-height: 1;
+  margin-bottom: 8px;
+  font-variant-numeric: tabular-nums;
+  display: flex; align-items: baseline; gap: 6px;
+}
+.dash-stat-value .unit {
+  font-size: 14px; font-weight: 600;
+  color: var(--t3);
+  letter-spacing: 0;
+}
+.dash-stat-trend {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--neon-green);
+}
+.dash-stat-trend.warn  { color: var(--neon-amber); }
+.dash-stat-trend.crit  { color: var(--neon-red); }
+.dash-stat-trend .arrow { font-size: 10px; }
+
+/* Mini sparkline bars */
+.dash-spark {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 28px;
+  margin-top: 10px;
+}
+.dash-spark span {
+  flex: 1;
+  background: var(--stat-icon-c, var(--neon-blue));
+  border-radius: 1px;
+  opacity: 0.55;
+  transform-origin: bottom;
+  animation: dashSparkRise 1s var(--ease) backwards;
+}
+@keyframes dashSparkRise {
+  from { transform: scaleY(0); opacity: 0; }
+  to   { transform: scaleY(1); opacity: 0.55; }
+}
+
+/* Color variants */
+.dash-stat.s-blue  { --stat-grad: linear-gradient(135deg, rgba(14,165,233,0.20), transparent 55%); --stat-glow: rgba(56,189,248,0.45); --stat-bd: rgba(56,189,248,0.4); --stat-icon-bg: rgba(56,189,248,0.12); --stat-icon-bd: rgba(56,189,248,0.3); --stat-icon-c: #38BDF8; }
+.dash-stat.s-green { --stat-grad: linear-gradient(135deg, rgba(16,185,129,0.18), transparent 55%); --stat-glow: rgba(52,211,153,0.45); --stat-bd: rgba(52,211,153,0.4); --stat-icon-bg: rgba(52,211,153,0.12); --stat-icon-bd: rgba(52,211,153,0.3); --stat-icon-c: #34D399; }
+.dash-stat.s-amber { --stat-grad: linear-gradient(135deg, rgba(245,158,11,0.18), transparent 55%); --stat-glow: rgba(251,191,36,0.45); --stat-bd: rgba(251,191,36,0.4); --stat-icon-bg: rgba(251,191,36,0.12); --stat-icon-bd: rgba(251,191,36,0.3); --stat-icon-c: #FBBF24; }
+.dash-stat.s-purple{ --stat-grad: linear-gradient(135deg, rgba(167,139,250,0.18), transparent 55%); --stat-glow: rgba(167,139,250,0.45); --stat-bd: rgba(167,139,250,0.4); --stat-icon-bg: rgba(167,139,250,0.12); --stat-icon-bd: rgba(167,139,250,0.3); --stat-icon-c: #A78BFA; }
+
+/* ── DEPLOY CONSOLE (Version Publisher) ──────────────────────────────────── */
+.dash-deploy {
+  position: relative;
+  margin-bottom: 28px;
+  border-radius: var(--r-xl);
+  background: var(--glass-bg);
+  border: 1px solid var(--bd);
+  overflow: hidden;
+  box-shadow: 0 24px 60px -20px rgba(0,0,0,0.65);
+  transform-style: preserve-3d;
+}
+.dash-deploy::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  background: conic-gradient(from var(--ang, 0deg), transparent 0deg, rgba(56,189,248,0.55) 60deg, rgba(167,139,250,0.45) 120deg, transparent 180deg, transparent 360deg);
+  border-radius: var(--r-xl);
+  z-index: -1;
+  animation: dashConicSpin 8s linear infinite;
+  opacity: 0.55;
+  filter: blur(2px);
+}
+@property --ang {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+@keyframes dashConicSpin { to { --ang: 360deg; } }
+
+.dash-deploy-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--bd);
+  background: linear-gradient(90deg, rgba(56,189,248,0.05), transparent 60%);
+}
+.dash-deploy-head .lhs {
+  display: flex; align-items: center; gap: 12px;
+}
+.dash-deploy-icon {
+  width: 38px; height: 38px;
+  border-radius: var(--r-sm);
+  background: linear-gradient(135deg, rgba(56,189,248,0.18), rgba(167,139,250,0.18));
+  border: 1px solid rgba(56,189,248,0.35);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+  box-shadow: inset 0 0 14px rgba(56,189,248,0.25), 0 0 18px rgba(56,189,248,0.18);
+}
+.dash-deploy-title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--t1);
+  letter-spacing: -0.3px;
+}
+.dash-deploy-sub {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--t3);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+.dash-deploy-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  padding: 5px 10px;
+  border-radius: var(--r-full);
+  background: rgba(52,211,153,0.1);
+  color: var(--neon-green);
+  border: 1px solid rgba(52,211,153,0.3);
+}
+.dash-deploy-pill::before {
+  content: "";
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--neon-green);
+  box-shadow: 0 0 8px var(--neon-green);
+  animation: dashPulse 1.6s ease-in-out infinite;
+}
+
+.dash-deploy-body { padding: 22px; }
+.dash-deploy-hint {
+  font-size: 13px;
+  color: var(--t2);
+  margin-bottom: 18px;
+  line-height: 1.55;
+}
+.dash-deploy-hint code {
+  background: var(--bg);
+  border: 1px solid var(--bd);
+  padding: 2px 7px;
+  border-radius: 4px;
+  color: var(--neon-cyan);
+  font-size: 11.5px;
+}
+
+.dash-deploy-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+@media (max-width: 700px) { .dash-deploy-grid { grid-template-columns: 1fr; } }
+
+.dash-field {
+  position: relative;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.dash-field label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--t2);
+  display: flex; align-items: center; gap: 6px;
+}
+.dash-field label .req { color: var(--neon-red); }
+.dash-field input {
+  width: 100%;
+  padding: 11px 14px;
+  background: var(--bg);
+  border: 1px solid var(--bd);
+  border-radius: var(--r-sm);
+  color: var(--t1);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  transition: border-color var(--dur-fast), box-shadow var(--dur-fast), background var(--dur-fast);
+}
+.dash-field input::placeholder { color: var(--t3); }
+.dash-field input:focus {
+  outline: none;
+  border-color: var(--neon-blue);
+  background: rgba(56,189,248,0.04);
+  box-shadow: 0 0 0 3px rgba(56,189,248,0.15), inset 0 0 12px rgba(56,189,248,0.08);
+}
+
+.dash-deploy-actions {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px dashed var(--bd);
+  flex-wrap: wrap; gap: 12px;
+}
+.dash-deploy-meta {
+  display: flex; align-items: center; gap: 16px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--t3);
+}
+.dash-deploy-meta .m {
+  display: inline-flex; align-items: center; gap: 5px;
+}
+.dash-deploy-meta .dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--neon-green);
+  box-shadow: 0 0 6px var(--neon-green);
+}
+
+.dash-btn-publish {
+  position: relative;
+  padding: 12px 22px;
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #FFF;
+  background: linear-gradient(135deg, #0EA5E9 0%, #06B6D4 100%);
+  border: none;
+  border-radius: var(--r-md);
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform var(--dur-fast), box-shadow var(--dur-fast);
+  box-shadow: 0 8px 24px rgba(14,165,233,0.35), inset 0 1px 0 rgba(255,255,255,0.25);
+}
+.dash-btn-publish::before {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.35) 50%, transparent 70%);
+  transform: translateX(-100%);
+  transition: transform 0.7s var(--ease);
+}
+.dash-btn-publish:hover { transform: translateY(-2px); box-shadow: 0 14px 32px rgba(14,165,233,0.5); }
+.dash-btn-publish:hover::before { transform: translateX(100%); }
+.dash-btn-publish:active { transform: translateY(0); }
+
+/* ── ENDPOINT CONSOLE (Agent Table) ──────────────────────────────────────── */
+.dash-console {
+  position: relative;
+  border-radius: var(--r-xl);
+  background: var(--glass-bg);
+  border: 1px solid var(--bd);
+  overflow: hidden;
+  box-shadow: 0 24px 60px -20px rgba(0,0,0,0.65);
+}
+.dash-console-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--bd);
+  background: linear-gradient(90deg, rgba(56,189,248,0.04), transparent 60%);
+  flex-wrap: wrap; gap: 12px;
+}
+.dash-console-head .lhs { display: flex; align-items: center; gap: 14px; }
+.dash-console-icon {
+  width: 38px; height: 38px;
+  border-radius: var(--r-sm);
+  background: linear-gradient(135deg, rgba(52,211,153,0.18), rgba(56,189,248,0.18));
+  border: 1px solid rgba(52,211,153,0.3);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 17px;
+  box-shadow: inset 0 0 14px rgba(52,211,153,0.18);
+}
+.dash-console-title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--t1);
+  letter-spacing: -0.3px;
+  display: flex; align-items: center; gap: 10px;
+}
+.dash-console-title .count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--neon-cyan);
+  background: rgba(34,211,238,0.10);
+  border: 1px solid rgba(34,211,238,0.25);
+  padding: 3px 9px;
+  border-radius: var(--r-full);
+  letter-spacing: 0.5px;
+}
+.dash-console-sub {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--t3);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+.dash-console-tools {
+  display: flex; align-items: center; gap: 10px;
+}
+.dash-search {
+  position: relative;
+}
+.dash-search input {
+  width: 220px;
+  padding: 8px 14px 8px 34px;
+  background: var(--bg);
+  border: 1px solid var(--bd);
+  border-radius: var(--r-md);
+  color: var(--t1);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  transition: border-color var(--dur-fast), box-shadow var(--dur-fast), width var(--dur-med);
+}
+.dash-search input:focus {
+  outline: none;
+  border-color: var(--neon-blue);
+  width: 280px;
+  box-shadow: 0 0 0 3px rgba(56,189,248,0.15);
+}
+.dash-search::before {
+  content: "⌕";
+  position: absolute;
+  left: 11px; top: 50%; transform: translateY(-50%);
+  color: var(--t3);
+  font-size: 14px;
+  pointer-events: none;
+}
+.dash-refresh-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  padding: 6px 10px;
+  border-radius: var(--r-full);
+  background: rgba(34,211,238,0.08);
+  color: var(--neon-cyan);
+  border: 1px solid rgba(34,211,238,0.25);
+}
+.dash-refresh-pill .ring {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid var(--neon-cyan);
+  border-top-color: transparent;
+  animation: dashSpin 1.4s linear infinite;
+}
+@keyframes dashSpin { to { transform: rotate(360deg); } }
+
+/* table */
+.dash-tablewrap { overflow-x: auto; }
+.dash-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+}
+.dash-table thead th {
+  position: sticky; top: 0;
+  background: linear-gradient(180deg, var(--bg) 0%, var(--bg1) 100%);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: var(--t2);
+  text-align: left;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--bd);
+  white-space: nowrap;
+}
+.dash-table tbody tr {
+  transition: background var(--dur-fast), transform var(--dur-fast);
+  position: relative;
+}
+.dash-table tbody tr::after {
+  content: "";
+  position: absolute; left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--row-accent, transparent);
+  transition: background var(--dur-fast);
+}
+.dash-table tbody tr:hover {
+  background: linear-gradient(90deg, rgba(56,189,248,0.06), transparent 70%);
+}
+.dash-table tbody tr:hover::after { background: var(--neon-blue); box-shadow: 0 0 12px var(--neon-blue); }
+.dash-table tbody td {
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(30,38,64,0.6);
+  color: var(--t2);
+  vertical-align: middle;
+}
+.dash-table tbody tr:last-child td { border-bottom: none; }
+.dash-table .mono {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--t3);
+}
+.dash-host {
+  display: flex; align-items: center; gap: 10px;
+}
+.dash-host-avatar {
+  width: 30px; height: 30px;
+  border-radius: 7px;
+  background: linear-gradient(135deg, var(--neon-blue), var(--neon-purple));
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: #FFF;
+  flex-shrink: 0;
+  box-shadow: inset 0 0 10px rgba(0,0,0,0.4), 0 4px 10px rgba(56,189,248,0.25);
+}
+.dash-host-name {
+  color: var(--t1);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+/* status badges (override locally for animation, no global change) */
+.dash-status {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  padding: 5px 9px;
+  border-radius: var(--r-full);
+}
+.dash-status::before {
+  content: "";
+  width: 7px; height: 7px;
+  border-radius: 50%;
+}
+.dash-status.online {
+  background: rgba(52,211,153,0.10);
+  color: var(--neon-green);
+  border: 1px solid rgba(52,211,153,0.3);
+}
+.dash-status.online::before {
+  background: var(--neon-green);
+  box-shadow: 0 0 8px var(--neon-green);
+  animation: dashPulse 1.6s ease-in-out infinite;
+}
+.dash-status.offline {
+  background: rgba(74,87,112,0.12);
+  color: var(--t3);
+  border: 1px solid var(--bd);
+}
+.dash-status.offline::before { background: var(--t3); }
+
+.dash-engine {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  padding: 5px 9px;
+  border-radius: var(--r-sm);
+}
+.dash-engine.armed   { background: rgba(56,189,248,0.10); color: var(--neon-blue); border: 1px solid rgba(56,189,248,0.3); }
+.dash-engine.armed::before { content: "⛨"; font-size: 11px; }
+.dash-engine.unarmed { background: rgba(251,191,36,0.10); color: var(--neon-amber); border: 1px solid rgba(251,191,36,0.3); }
+.dash-engine.unarmed::before { content: "⚠"; font-size: 11px; }
+
+/* Isolate button */
+.dash-isolate {
+  position: relative;
+  padding: 7px 14px;
+  background: rgba(244,63,94,0.08);
+  color: var(--neon-red);
   border: 1px solid rgba(244,63,94,0.3);
   border-radius: var(--r-sm);
-  padding: 4px 12px;
-  font-size: 12px;
-  font-weight: 600;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
   cursor: pointer;
-  font-family: var(--font-body);
-  transition: all 0.2s;
+  display: inline-flex; align-items: center; gap: 6px;
+  overflow: hidden;
+  transition: all var(--dur-fast);
 }
-.isolate-btn:hover { background: var(--red); color: #fff; }
+.dash-isolate::before {
+  content: "";
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--neon-red);
+  box-shadow: 0 0 6px var(--neon-red);
+}
+.dash-isolate::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.18) 50%, transparent 70%);
+  transform: translateX(-100%);
+  transition: transform 0.6s var(--ease);
+}
+.dash-isolate:hover {
+  background: var(--red);
+  color: #FFF;
+  border-color: var(--red);
+  box-shadow: 0 0 18px rgba(244,63,94,0.5), 0 6px 14px rgba(244,63,94,0.3);
+  transform: translateY(-1px);
+}
+.dash-isolate:hover::before { background: #FFF; box-shadow: 0 0 8px #FFF; }
+.dash-isolate:hover::after { transform: translateX(100%); }
+
+/* Empty state */
+.dash-empty {
+  padding: 64px 24px !important;
+  text-align: center;
+}
+.dash-empty-icon {
+  font-size: 44px;
+  margin-bottom: 12px;
+  opacity: 0.6;
+  filter: drop-shadow(0 0 14px rgba(56,189,248,0.4));
+  animation: dashFloat 4s ease-in-out infinite;
+}
+@keyframes dashFloat {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-6px); }
+}
+.dash-empty-title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--t1);
+  margin-bottom: 6px;
+}
+.dash-empty-text {
+  font-size: 13px;
+  color: var(--t3);
+  max-width: 480px;
+  margin: 0 auto;
+  line-height: 1.55;
+}
+
+/* Entry animations */
+.dash-fadein  { animation: dashFadeIn 0.7s var(--ease) backwards; }
+.dash-fadeup  { animation: dashFadeUp 0.7s var(--ease) backwards; }
+@keyframes dashFadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes dashFadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: none; } }
+
+@media (max-width: 700px) {
+  .dash-hero-row { grid-template-columns: 1fr; }
+  .dash-radar { width: 110px; height: 110px; margin: 0 auto; }
+  .dash-hero h1 { font-size: 24px; }
+  .dash-search input { width: 100%; }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  #fm-dash *,
+  #fm-dash *::before,
+  #fm-dash *::after { animation: none !important; transition: none !important; }
+}
 </style>
 {% endblock %}
 
 {% block content %}
+<div id="fm-dash">
 
-<!-- ── Version Publisher ───────────────────────────────────────────────────── -->
-<div class="panel" style="margin-bottom:24px;">
-  <div class="panel-header">
-    <div>
-      <div class="panel-title">Publish New Version</div>
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       HERO: Mission Control Banner
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <section class="dash-hero dash-fadein">
+    <div class="dash-hero-row">
+      <div>
+        <span class="dash-hero-eyebrow">C2 · LIVE · NODE-01</span>
+        <h1>Global Command &amp; Control</h1>
+        <p>Real-time telemetry from every connected FMSecure agent. Roll out new versions, isolate compromised endpoints, and watch the fleet — all from one war room.</p>
+      </div>
+      <div class="dash-radar" aria-hidden="true">
+        <div class="dash-radar-sweep"></div>
+        <div class="dash-radar-dot d1"></div>
+        <div class="dash-radar-dot d2"></div>
+        <div class="dash-radar-dot d3"></div>
+        <div class="dash-radar-dot d4"></div>
+      </div>
     </div>
-    <span class="badge badge-online" style="font-size:10px;">auto-notifies all agents</span>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       KPI STATS GRID — animated count-up cards
+       ═══════════════════════════════════════════════════════════════════════ -->
+  {% set total = agents|length %}
+  {% set online_count = agents.values()|selectattr('online')|list|length if agents else 0 %}
+  {% set armed_count  = agents.values()|selectattr('is_armed')|list|length if agents else 0 %}
+  {% set offline_count = total - online_count %}
+
+  <div class="dash-stats">
+
+    <div class="dash-stat s-blue dash-fadeup" style="animation-delay:0.05s;">
+      <div class="dash-stat-head">
+        <span class="dash-stat-label">Total Endpoints</span>
+        <span class="dash-stat-icon">🖥</span>
+      </div>
+      <div class="dash-stat-value"><span class="js-count" data-count="{{ total }}">0</span></div>
+      <span class="dash-stat-trend"><span class="arrow">▲</span> fleet live</span>
+      <div class="dash-spark" data-spark="blue"></div>
+    </div>
+
+    <div class="dash-stat s-green dash-fadeup" style="animation-delay:0.15s;">
+      <div class="dash-stat-head">
+        <span class="dash-stat-label">Online Now</span>
+        <span class="dash-stat-icon">📡</span>
+      </div>
+      <div class="dash-stat-value">
+        <span class="js-count" data-count="{{ online_count }}">0</span>
+        <span class="unit">/ {{ total }}</span>
+      </div>
+      <span class="dash-stat-trend"><span class="arrow">●</span> heartbeats green</span>
+      <div class="dash-spark" data-spark="green"></div>
+    </div>
+
+    <div class="dash-stat s-purple dash-fadeup" style="animation-delay:0.25s;">
+      <div class="dash-stat-head">
+        <span class="dash-stat-label">Armed Engines</span>
+        <span class="dash-stat-icon">⛨</span>
+      </div>
+      <div class="dash-stat-value">
+        <span class="js-count" data-count="{{ armed_count }}">0</span>
+        <span class="unit">/ {{ total }}</span>
+      </div>
+      <span class="dash-stat-trend"><span class="arrow">▲</span> EDR active</span>
+      <div class="dash-spark" data-spark="purple"></div>
+    </div>
+
+    <div class="dash-stat s-amber dash-fadeup" style="animation-delay:0.35s;">
+      <div class="dash-stat-head">
+        <span class="dash-stat-label">Offline / Stale</span>
+        <span class="dash-stat-icon">⏻</span>
+      </div>
+      <div class="dash-stat-value"><span class="js-count" data-count="{{ offline_count }}">0</span></div>
+      <span class="dash-stat-trend {% if offline_count > 0 %}warn{% endif %}"><span class="arrow">▼</span> awaiting reconnect</span>
+      <div class="dash-spark" data-spark="amber"></div>
+    </div>
+
   </div>
-  <div class="panel-body">
-    <p style="font-size:13px;color:var(--t2);margin-bottom:18px;">When you ship a new EXE, fill this in. Every running agent will show an update banner within seconds.</p>
-    <form method="POST" action="/api/version/publish-form">
-      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;">
-        <div class="form-group" style="margin-bottom:0;">
-          <label class="form-label">Version Number *</label>
-          <input name="version" class="form-input" placeholder="e.g. 2.6.0" required>
-        </div>
-        <div class="form-group" style="margin-bottom:0;">
-          <label class="form-label">Release Notes (shown in banner)</label>
-          <input name="release_notes" class="form-input" placeholder="Bug fixes, new cloud features…">
-        </div>
-        <div class="form-group" style="margin-bottom:0;">
-          <label class="form-label">Download URL (blank = default)</label>
-          <input name="download_url" class="form-input" placeholder="https://…">
-        </div>
-        <div class="form-group" style="margin-bottom:0;">
-          <label class="form-label">Changelog URL (blank = default)</label>
-          <input name="changelog_url" class="form-input" placeholder="https://…">
-        </div>
-        <div style="grid-column:1/-1;">
-          <button type="submit" class="btn btn-success">Publish Version →</button>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       DEPLOY CONSOLE — Version Publisher (animated conic border)
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <section class="dash-deploy dash-fadeup" style="animation-delay:0.45s;">
+    <div class="dash-deploy-head">
+      <div class="lhs">
+        <div class="dash-deploy-icon">🚀</div>
+        <div>
+          <div class="dash-deploy-title">Deploy New Version</div>
+          <div class="dash-deploy-sub">FMSECURE · OTA · AGENT FLEET</div>
         </div>
       </div>
-    </form>
-  </div>
-</div>
-
-<!-- ── Agent Table ────────────────────────────────────────────────────────── -->
-<div class="panel">
-  <div class="panel-header">
-    <div class="panel-title">Legacy Free-Tier Endpoints ({{ agents|length }})</div>
-    <div style="display:flex;align-items:center;gap:8px;">
-      <input type="text" id="agent-search" class="form-input" style="width:180px;padding:6px 10px;font-size:12px;" placeholder="Search hostname…">
+      <span class="dash-deploy-pill">Auto-broadcasts to all agents</span>
     </div>
-  </div>
-  <div class="panel-table">
-    <div class="table-wrap" style="border:none;border-radius:0;">
-      <table class="data-table" id="agent-table">
+
+    <div class="dash-deploy-body">
+      <p class="dash-deploy-hint">
+        When you ship a new EXE, fill this in. Every running agent will receive the update banner within seconds via the live <code>/api/version/check</code> channel.
+      </p>
+
+      <form method="POST" action="/api/version/publish-form">
+        <div class="dash-deploy-grid">
+
+          <div class="dash-field">
+            <label>Version Number <span class="req">*</span></label>
+            <input name="version" placeholder="e.g.  2.6.0" required>
+          </div>
+
+          <div class="dash-field">
+            <label>Release Notes <span style="color:var(--t3);">(shown in banner)</span></label>
+            <input name="release_notes" placeholder="Bug fixes, new cloud features…">
+          </div>
+
+          <div class="dash-field">
+            <label>Download URL <span style="color:var(--t3);">(blank = default)</span></label>
+            <input name="download_url" placeholder="https://…">
+          </div>
+
+          <div class="dash-field">
+            <label>Changelog URL <span style="color:var(--t3);">(blank = default)</span></label>
+            <input name="changelog_url" placeholder="https://…">
+          </div>
+
+        </div>
+
+        <div class="dash-deploy-actions">
+          <div class="dash-deploy-meta">
+            <span class="m"><span class="dot"></span> Channel <strong style="color:var(--t1);">stable</strong></span>
+            <span class="m">⚡ propagation &lt; 5s</span>
+            <span class="m">🔐 signed payload</span>
+          </div>
+          <button type="submit" class="dash-btn-publish">
+            Publish Version &nbsp;→
+          </button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       ENDPOINT CONSOLE — agent table, industrial style
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <section class="dash-console dash-fadeup" style="animation-delay:0.55s;">
+    <div class="dash-console-head">
+      <div class="lhs">
+        <div class="dash-console-icon">🛰</div>
+        <div>
+          <div class="dash-console-title">
+            Legacy Free-Tier Endpoints
+            <span class="count">{{ agents|length }} NODES</span>
+          </div>
+          <div class="dash-console-sub">REAL-TIME · AUTO-REFRESH · 8s TICK</div>
+        </div>
+      </div>
+      <div class="dash-console-tools">
+        <div class="dash-search">
+          <input type="text" id="agent-search" placeholder="Search hostname, IP, user…" autocomplete="off">
+        </div>
+        <span class="dash-refresh-pill"><span class="ring"></span> Live</span>
+      </div>
+    </div>
+
+    <div class="dash-tablewrap">
+      <table class="dash-table" id="agent-table">
         <thead>
           <tr>
             <th>Machine ID</th>
             <th>Hostname</th>
             <th>User</th>
-            <th>IP</th>
+            <th>IP Address</th>
             <th>Status</th>
             <th>Engine</th>
             <th>Last Seen</th>
-            <th>Action</th>
+            <th style="text-align:right;">Action</th>
           </tr>
         </thead>
         <tbody>
@@ -127,26 +1049,34 @@
             {% for mid, info in agents.items() %}
             <tr class="agent-row">
               <td class="mono">{{ mid[:14] }}…</td>
-              <td><strong style="color:var(--t1);">{{ info.hostname }}</strong></td>
+              <td>
+                <div class="dash-host">
+                  <div class="dash-host-avatar">{{ info.hostname[:2]|upper }}</div>
+                  <div>
+                    <div class="dash-host-name">{{ info.hostname }}</div>
+                    <div class="mono" style="font-size:10.5px;">node #{{ loop.index }}</div>
+                  </div>
+                </div>
+              </td>
               <td>{{ info.username }}</td>
               <td class="mono">{{ info.ip }}</td>
               <td>
                 {% if info.online %}
-                <span class="badge badge-online badge-dot">Online</span>
+                <span class="dash-status online">Online</span>
                 {% else %}
-                <span class="badge badge-offline">Offline</span>
+                <span class="dash-status offline">Offline</span>
                 {% endif %}
               </td>
               <td>
                 {% if info.is_armed %}
-                <span class="badge badge-armed">Armed</span>
+                <span class="dash-engine armed">Armed</span>
                 {% else %}
-                <span class="badge badge-unarmed">Unarmed</span>
+                <span class="dash-engine unarmed">Unarmed</span>
                 {% endif %}
               </td>
-              <td class="mono" style="font-size:11px;">{{ info.last_seen_fmt }}</td>
-              <td>
-                <button class="isolate-btn" onclick="lockdown('{{ mid }}')">
+              <td class="mono">{{ info.last_seen_fmt }}</td>
+              <td style="text-align:right;">
+                <button class="dash-isolate" onclick="lockdown('{{ mid }}')">
                   Isolate
                 </button>
               </td>
@@ -154,45 +1084,114 @@
             {% endfor %}
           {% else %}
             <tr>
-              <td colspan="8" style="text-align:center;color:var(--t4);padding:48px;font-size:13.5px;">
-                No legacy endpoints connected. Free-tier agents connect here. Enterprise endpoints appear in <a href="/super/dashboard" style="color:var(--blue);">Tenant dashboard →</a>
+              <td colspan="8" class="dash-empty">
+                <div class="dash-empty-icon">🛰</div>
+                <div class="dash-empty-title">No legacy endpoints connected</div>
+                <div class="dash-empty-text">
+                  Free-tier agents check in here. Enterprise endpoints appear in the
+                  <a href="/super/dashboard" style="color:var(--neon-cyan);">Tenant dashboard →</a>
+                </div>
               </td>
             </tr>
           {% endif %}
         </tbody>
       </table>
     </div>
-  </div>
-</div>
+  </section>
 
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-// Search filter
-const searchInput = document.getElementById('agent-search');
-if (searchInput) {
-  searchInput.addEventListener('input', () => {
-    const q = searchInput.value.toLowerCase();
-    document.querySelectorAll('#agent-table tbody tr').forEach(row => {
-      row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+/* ═══════════════════════════════════════════════════════════════════════════
+   Dashboard interactivity — count-up, sparklines, 3D tilt, filter, lockdown
+   All scoped to #fm-dash. No global side-effects.
+   ═══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  const root = document.getElementById('fm-dash');
+  if (!root) return;
+
+  /* ── Count-up animation for KPI numbers ─────────────────────────────────── */
+  const easeOut = t => 1 - Math.pow(1 - t, 3);
+  root.querySelectorAll('.js-count').forEach(el => {
+    const target = parseInt(el.dataset.count, 10) || 0;
+    if (target === 0) { el.textContent = '0'; return; }
+    const dur = 1100;
+    const start = performance.now();
+    function step(now) {
+      const p = Math.min(1, (now - start) / dur);
+      el.textContent = Math.round(target * easeOut(p)).toLocaleString();
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  });
+
+  /* ── Generate sparkline bars per stat card ──────────────────────────────── */
+  root.querySelectorAll('.dash-spark').forEach(spark => {
+    const N = 18;
+    let html = '';
+    for (let i = 0; i < N; i++) {
+      const h = 25 + Math.random() * 75; // 25%–100%
+      const delay = (i * 35);
+      html += `<span style="height:${h}%;animation-delay:${delay}ms;"></span>`;
+    }
+    spark.innerHTML = html;
+  });
+
+  /* ── 3D tilt on stat cards (mouse-follow) ───────────────────────────────── */
+  root.querySelectorAll('.dash-stat').forEach(card => {
+    let rect;
+    card.addEventListener('mouseenter', () => { rect = card.getBoundingClientRect(); });
+    card.addEventListener('mousemove', (e) => {
+      if (!rect) rect = card.getBoundingClientRect();
+      const x = (e.clientX - rect.left) / rect.width  - 0.5;
+      const y = (e.clientY - rect.top)  / rect.height - 0.5;
+      card.style.transform = `translateY(-4px) rotateX(${(-y * 6).toFixed(2)}deg) rotateY(${(x * 8).toFixed(2)}deg)`;
+    });
+    card.addEventListener('mouseleave', () => {
+      card.style.transform = '';
+      rect = null;
     });
   });
-}
 
-// Auto-refresh (skips if user is typing)
-setInterval(() => {
-  if (!document.querySelector('input:focus, textarea:focus')) location.reload();
-}, 8000);
+  /* ── Hostname / IP / user search filter ─────────────────────────────────── */
+  const searchInput = document.getElementById('agent-search');
+  if (searchInput) {
+    searchInput.addEventListener('input', () => {
+      const q = searchInput.value.toLowerCase();
+      document.querySelectorAll('#agent-table tbody tr').forEach(row => {
+        if (row.classList.contains('agent-row')) {
+          row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+        }
+      });
+    });
+  }
 
+  /* ── Auto-refresh (skips while user is typing) ──────────────────────────── */
+  setInterval(() => {
+    if (!document.querySelector('input:focus, textarea:focus')) location.reload();
+  }, 8000);
+
+})();
+
+/* ── Isolate / Lockdown action ─────────────────────────────────────────────── */
 async function lockdown(mid) {
   if (!confirm(`Send LOCKDOWN to ${mid.substring(0,14)}…?\n\nThis will trigger icacls lockdown on that endpoint.`)) return;
   try {
     const r = await fetch('/api/trigger_lockdown/' + mid, { method: 'POST' });
     const d = await r.json();
-    window.FMSecure.showToast('Lockdown queued for ' + mid.substring(0,12) + '…', 'success');
-  } catch(e) {
-    window.FMSecure.showToast('Failed: ' + e.message, 'error');
+    if (window.FMSecure && window.FMSecure.showToast) {
+      window.FMSecure.showToast('Lockdown queued for ' + mid.substring(0,12) + '…', 'success');
+    } else {
+      alert('Lockdown queued for ' + mid.substring(0,12) + '…');
+    }
+  } catch (e) {
+    if (window.FMSecure && window.FMSecure.showToast) {
+      window.FMSecure.showToast('Failed: ' + e.message, 'error');
+    } else {
+      alert('Failed: ' + e.message);
+    }
   }
 }
 </script>
