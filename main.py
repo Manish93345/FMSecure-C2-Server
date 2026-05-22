@@ -159,6 +159,28 @@ agents = {}; commands = {}
 _pending_transfers: dict = {}
 _TRANSFER_OTP_TTL = 300   # 5 minutes
 
+_LAST_SWEEP_AT = 0
+def _maybe_sweep_offline(force=False):
+    """Mark stale agents offline — but only at most once every 5 minutes,
+    and only when called by a real request handler (lazy)."""
+    global _LAST_SWEEP_AT
+    now = time.time()
+    if not force and (now - _LAST_SWEEP_AT) < 300:   # 5 min throttle
+        return
+    if not DATABASE_URL:
+        return
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute(
+            "UPDATE tenant_agents SET status='offline' "
+            "WHERE status='online' AND last_seen < NOW() - INTERVAL '45 seconds'"
+        )
+        conn.commit(); cur.close(); conn.close()
+        _LAST_SWEEP_AT = now
+    except Exception as e:
+        print(f"[SWEEP-LAZY] {e}")
+
+
 # ── Database ───────────────────────────────────────────────────────────────────
 def get_db():
     return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
@@ -282,8 +304,23 @@ def init_db():
                 alert_email     TEXT NOT NULL DEFAULT '',
                 verify_interval INTEGER NOT NULL DEFAULT 60,
                 max_vault_mb    INTEGER NOT NULL DEFAULT 10,
-                allowed_exts    TEXT NOT NULL DEFAULT '.txt,.json,.py,.html,.js,.css'
+                allowed_exts    TEXT NOT NULL DEFAULT '.txt,.json,.py,.html,.js,.css',
+                retention_days  INTEGER NOT NULL DEFAULT 90,
+                updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );
+
+            CREATE TABLE IF NOT EXISTS erasure_log (
+                id            SERIAL PRIMARY KEY,
+                tenant_id     TEXT NOT NULL,
+                tenant_name   TEXT NOT NULL,
+                erased_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                requested_by  TEXT NOT NULL DEFAULT 'api',
+                requester_ip  TEXT NOT NULL DEFAULT '',
+                rows_deleted  INTEGER NOT NULL DEFAULT 0
+            );
+            CREATE INDEX IF NOT EXISTS idx_erasure_log_tenant
+                ON erasure_log(tenant_id, erased_at DESC);
+
         
             CREATE INDEX IF NOT EXISTS idx_tenant_agents_tenant
                 ON tenant_agents(tenant_id);
@@ -296,6 +333,17 @@ def init_db():
                              WHERE table_name='tenant_agents' AND column_name='sigma_rule_count') 
               THEN ALTER TABLE tenant_agents ADD COLUMN sigma_rule_count INTEGER DEFAULT 0; END IF;
             END $$;
+
+            DO $$ BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                WHERE table_name='tenant_config' AND column_name='retention_days')
+                THEN ALTER TABLE tenant_config ADD COLUMN retention_days INTEGER NOT NULL DEFAULT 90; END IF;
+
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                WHERE table_name='tenant_config' AND column_name='updated_at')
+                THEN ALTER TABLE tenant_config ADD COLUMN updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(); END IF;
+            END $$;
+
         """)
 
         cur.execute("SELECT COUNT(*) FROM versions")
@@ -354,7 +402,7 @@ def _start_offline_sweeper():
 async def startup():
   if DATABASE_URL:
     init_db()
-    _start_offline_sweeper()
+    # _start_offline_sweeper()
   else:
     print("[DB] WARNING: No DATABASE_URL")
 
@@ -980,6 +1028,12 @@ async def get_agent_config(request: Request):
                     if e.strip().startswith(".")]
             if exts:
                 cfg["vault_allowed_exts"] = exts
+        if cfg_row.get("retention_days") and cfg_row["retention_days"] > 0:
+            # Mirrors retention_manager.py keys
+            cfg["retention_telemetry_days"]   = int(cfg_row["retention_days"])
+            cfg["retention_forensics_days"]   = int(cfg_row["retention_days"]) * 2
+            cfg["retention_log_history_days"] = int(cfg_row["retention_days"]) * 4
+
  
     return JSONResponse(
         content={
@@ -999,6 +1053,7 @@ async def trigger_lockdown(machine_id: str, _: bool = Depends(verify_session)):
 
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request, _: bool = Depends(verify_session)):
+    _maybe_sweep_offline()
     now = time.time()
     agents_ctx = {}
     for mid, info in agents.items():
@@ -1276,6 +1331,7 @@ async def super_all_alerts(api_key: str = "", limit: int = 100):
 @app.get("/super/dashboard", response_class=HTMLResponse)
 async def super_dashboard(request: Request, _: bool = Depends(verify_session),
                            new_key: str = "", msg: str = ""):
+    _maybe_sweep_offline()
     if not DATABASE_URL:
         return HTMLResponse("<h1>No database configured</h1>")
 
@@ -1660,6 +1716,7 @@ async def tenant_reset_password_submit(
 # ── Tenant Admin: Main Dashboard ──────────────────────────────────────────────
 @app.get("/tenant/dashboard", response_class=HTMLResponse)
 async def tenant_dashboard(request: Request, config_saved: str = ""):
+    _maybe_sweep_offline()
     session = _get_tenant_session(request)
     if not session:
         return RedirectResponse("/tenant/login", status_code=302)
@@ -1730,35 +1787,44 @@ async def tenant_save_config(
     verify_interval: int = Form(60),
     max_vault_mb:    int = Form(10),
     allowed_exts:    str = Form(".txt,.json,.py,.html,.js,.css"),
+    retention_days:  int = Form(90),
 ):
     session = _get_tenant_session(request)
     if not session:
         return RedirectResponse("/tenant/login", status_code=302)
     if not DATABASE_URL:
         return RedirectResponse("/tenant/dashboard", status_code=302)
- 
-    verify_interval = max(10, min(verify_interval, 86400))
-    max_vault_mb    = max(1,  min(max_vault_mb, 500))
- 
+
+    # Clamp all inputs (defense-in-depth — HTML attrs are advisory only)
+    verify_interval = max(10,  min(verify_interval, 86400))
+    max_vault_mb    = max(1,   min(max_vault_mb,    500))
+    retention_days  = max(30,  min(retention_days,  730))   # GDPR/PCI-DSS bounds
+
     conn = get_db(); cur = conn.cursor()
     cur.execute("""
         INSERT INTO tenant_config
             (tenant_id, alert_email, webhook_url,
-             verify_interval, max_vault_mb, allowed_exts)
-        VALUES (%s,%s,%s,%s,%s,%s)
+             verify_interval, max_vault_mb, allowed_exts,
+             retention_days, updated_at)
+        VALUES (%s,%s,%s,%s,%s,%s,%s, NOW())
         ON CONFLICT (tenant_id) DO UPDATE SET
             alert_email     = EXCLUDED.alert_email,
             webhook_url     = EXCLUDED.webhook_url,
             verify_interval = EXCLUDED.verify_interval,
             max_vault_mb    = EXCLUDED.max_vault_mb,
-            allowed_exts    = EXCLUDED.allowed_exts
+            allowed_exts    = EXCLUDED.allowed_exts,
+            retention_days  = EXCLUDED.retention_days,
+            updated_at      = NOW()
     """, (session["tenant_id"],
           alert_email.strip(), webhook_url.strip(),
-          verify_interval, max_vault_mb, allowed_exts.strip()))
+          verify_interval, max_vault_mb, allowed_exts.strip(),
+          retention_days))
     conn.commit(); cur.close(); conn.close()
- 
-    print(f"[TENANT CONFIG] Updated for tenant {session['tenant_id'][:8]}…")
+
+    print(f"[TENANT CONFIG] tenant={session['tenant_id'][:8]}… "
+          f"retention={retention_days}d verify={verify_interval}s")
     return RedirectResponse("/tenant/dashboard?config_saved=1", status_code=302)
+
 
 # ── Tenant Admin: Acknowledge alert ───────────────────────────────────────────
 @app.post("/tenant/alerts/{alert_id}/ack")
@@ -1808,6 +1874,124 @@ async def tenant_send_command(
     print(f"[TENANT CMD] {cmd} queued for {machine_id} "
           f"by {session['email']}")
     return {"ok": True, "message": f"{cmd} queued for {machine_id}"}
+
+@app.get("/tenant/rules", response_class=HTMLResponse)
+async def tenant_rules_page(request: Request):
+    # 1. Use your custom tenant session manager
+    session = _get_tenant_session(request)
+    if not session:
+        return RedirectResponse("/tenant/login", status_code=302)
+        
+    tenant_id = session["tenant_id"]
+    if not DATABASE_URL:
+        return HTMLResponse("<h1>Database not configured</h1>")
+
+    # 2. Fetch agents using PostgreSQL syntax
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        """SELECT hostname, sigma_rule_count, last_seen, status
+           FROM tenant_agents
+           WHERE tenant_id = %s
+           ORDER BY sigma_rule_count DESC""",
+        (tenant_id,)
+    )
+    agents = cur.fetchall()
+    cur.close()
+    conn.close()
+        
+    # 3. Calculate Stats
+    total_agents  = len(agents)
+    agents_online = sum(1 for a in agents if a["status"] == "online")
+    avg_rules     = (
+        sum((a["sigma_rule_count"] or 0) for a in agents) // total_agents
+        if total_agents else 0
+    )
+        
+    # 4. Generate dynamic rows
+    agent_rows = ""
+    for a in agents:
+        is_online = (a["status"] == "online")
+        last_seen_str = a['last_seen'].strftime("%Y-%m-%d %H:%M") if a['last_seen'] else 'Never'
+        rule_count = a['sigma_rule_count'] or 0
+        agent_rows += f"""
+        <tr>
+            <td>{a['hostname']}</td>
+            <td class="{'online' if is_online else 'offline'}">
+                {'● Online' if is_online else '○ Offline'}
+            </td>
+            <td><span class="rules-badge">{rule_count} rules</span></td>
+            <td style="color:#8b949e">{last_seen_str}</td>
+        </tr>"""
+
+    # 5. Render HTML
+    html = f"""
+    <html>
+    <head>
+        <title>Detection Rules — FMSecure</title>
+        <style>
+            body {{ font-family: 'Segoe UI', sans-serif; background: #0d1117; color: #e6edf3; margin: 0; padding: 24px; }}
+            h1 {{ color: #2f81f7; }} 
+            .stat {{ display: inline-block; background: #161b22; border: 1px solid #30363d; 
+                     border-radius: 8px; padding: 16px 28px; margin: 8px; text-align: center; }}
+            .stat-num {{ font-size: 32px; font-weight: bold; color: #3fb950; }}
+            .stat-lbl {{ font-size: 12px; color: #8b949e; margin-top: 4px; }}
+            table {{ width: 100%; border-collapse: collapse; margin-top: 24px; }}
+            th {{ background: #161b22; color: #8b949e; padding: 10px 14px; text-align: left; font-size: 12px; text-transform: uppercase; }}
+            td {{ padding: 10px 14px; border-bottom: 1px solid #21262d; font-size: 14px; }}
+            .online {{ color: #3fb950; }} .offline {{ color: #f85149; }}
+            .rules-badge {{ background: #1a4b8c; color: #58a6ff; padding: 2px 10px; border-radius: 12px; font-size: 12px; }}
+            a {{ color: #2f81f7; text-decoration: none; }}
+        </style>
+    </head>
+    <body>
+        <h1>🛡 Detection Coverage</h1>
+        <a href="/tenant/dashboard">← Back to Dashboard</a>
+        
+        <div style="margin: 20px 0;">
+            <div class="stat">
+                <div class="stat-num">{total_agents}</div>
+                <div class="stat-lbl">Total Endpoints</div>
+            </div>
+            <div class="stat">
+                <div class="stat-num" style="color:#2f81f7">{agents_online}</div>
+                <div class="stat-lbl">Online Now</div>
+            </div>
+            <div class="stat">
+                <div class="stat-num">{avg_rules}</div>
+                <div class="stat-lbl">Avg Rules / Endpoint</div>
+            </div>
+        </div>
+        <table>
+            <tr>
+                <th>Endpoint</th>
+                <th>Status</th>
+                <th>Active Rules</th>
+                <th>Last Seen</th>
+            </tr>
+            {agent_rows}
+        </table>
+        <div style="margin-top:32px; padding:16px; background:#161b22; border-radius:8px; border:1px solid #30363d;">
+            <h3 style="color:#d29922; margin-top:0;">📋 Active Detection Rules</h3>
+            <p style="color:#8b949e; font-size:13px;">
+                Rules are loaded from <code>core/sigma_rules/*.yml</code> on each agent.<br>
+                To add new detection coverage: add a .yml file and agents will pick it up on next restart.
+            </p>
+            <table>
+                <tr>
+                    <th>Rule Name</th><th>MITRE Technique</th><th>Severity</th>
+                </tr>
+                <tr><td>Ransomware Burst Detected</td><td>T1486 — Data Encrypted for Impact</td><td style="color:#f85149">CRITICAL</td></tr>
+                <tr><td>LOLBin Process Attribution</td><td>T1059 — Command and Scripting Interpreter</td><td style="color:#f0883e">HIGH</td></tr>
+                <tr><td>File Created in Startup Folder</td><td>T1547.001 — Registry Run Keys / Startup</td><td style="color:#f0883e">HIGH</td></tr>
+                <tr><td>Mass File Deletion</td><td>T1485 — Data Destruction</td><td style="color:#f0883e">HIGH</td></tr>
+                <tr><td>Honeypot File Accessed</td><td>T1083 — File and Directory Discovery</td><td style="color:#f85149">CRITICAL</td></tr>
+            </table>
+        </div>
+    </body>
+    </html>
+    """
+    return HTMLResponse(html)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PRODUCT LANDING PAGE
@@ -2909,3 +3093,81 @@ async def tenant_ack_alert(request: Request, alert_id: str):
         return JSONResponse({"ok": True})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# GDPR Article 17 — Right to Erasure
+# ══════════════════════════════════════════════════════════════════════════════
+@app.delete("/api/v1/tenant/data")
+async def gdpr_erase_tenant_data(request: Request):
+    """
+    GDPR Article 17 — Right to Erasure.
+    Permanently deletes all telemetry, alerts and registered agents for the
+    requesting tenant. The tenant account itself, billing records and the
+    erasure_log audit row are PRESERVED (we need them for legal traceability
+    and to prove the erasure happened — GDPR Art. 5(2) accountability).
+
+    Auth: x-tenant-key header (matches tenants.api_key).
+    """
+    if not DATABASE_URL:
+        return JSONResponse({"ok": False, "reason": "Database not configured"},
+                            status_code=503)
+
+    tenant_key = request.headers.get("x-tenant-key", "").strip()
+    if not tenant_key:
+        return JSONResponse({"ok": False, "reason": "Missing x-tenant-key header"},
+                            status_code=401)
+
+    # Look up tenant — api_key is stored plaintext in this codebase
+    # (matches /agent/config and /api/heartbeat behaviour).
+    tenant = _get_tenant_by_api_key(tenant_key)
+    if not tenant:
+        return JSONResponse({"ok": False, "reason": "Invalid tenant key"},
+                            status_code=401)
+
+    tenant_id   = tenant["id"]
+    tenant_name = tenant["name"]
+    requester   = request.headers.get("x-requested-by", "tenant-portal")
+    client_ip   = (request.client.host if request.client else "") or ""
+
+    conn = get_db()
+    cur  = conn.cursor()
+    try:
+        # Single transaction so we either erase everything or nothing.
+        cur.execute("DELETE FROM tenant_alerts WHERE tenant_id = %s", (tenant_id,))
+        deleted_alerts = cur.rowcount
+        cur.execute("DELETE FROM tenant_agents WHERE tenant_id = %s", (tenant_id,))
+        deleted_agents = cur.rowcount
+        total_deleted  = deleted_alerts + deleted_agents
+
+        # Audit row — kept regardless, so the erasure itself is traceable.
+        cur.execute(
+            """INSERT INTO erasure_log
+               (tenant_id, tenant_name, requested_by, requester_ip, rows_deleted)
+               VALUES (%s, %s, %s, %s, %s)""",
+            (tenant_id, tenant_name, requester, client_ip, total_deleted)
+        )
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        print(f"[GDPR] Erasure failed for tenant {tenant_id}: {e}")
+        return JSONResponse({"ok": False, "reason": "Internal error"},
+                            status_code=500)
+    finally:
+        cur.close(); conn.close()
+
+    print(f"[GDPR] Tenant '{tenant_name}' ({tenant_id[:8]}…) erased "
+          f"{total_deleted} rows ({deleted_alerts} alerts, {deleted_agents} agents) "
+          f"by {requester} from {client_ip}")
+
+    return JSONResponse({
+        "ok":             True,
+        "message":        f"All security data for tenant '{tenant_name}' has been erased.",
+        "erased_at":      datetime.now(timezone.utc).isoformat(),
+        "rows_deleted":   total_deleted,
+        "alerts_deleted": deleted_alerts,
+        "agents_deleted": deleted_agents,
+        "gdpr_article":   "Article 17 — Right to Erasure",
+        "audit_retained": "Tenant account, billing records and erasure audit log are preserved per GDPR Art. 5(2)."
+    })

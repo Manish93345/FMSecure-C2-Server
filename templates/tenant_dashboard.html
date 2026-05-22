@@ -16,6 +16,7 @@
   <span class="sidebar-badge">{{ stats.unacked_alerts }}</span>
   {% endif %}
 </a>
+<a href="/tenant/rules" class="sidebar-link"><span class="icon">🛡</span> Detection Rules</a>
 <a href="#audit"      class="sidebar-link"><span class="icon">📋</span> Audit Log</a>
 <a href="#settings"   class="sidebar-link"><span class="icon">⚙️</span> Settings</a>
 
@@ -485,7 +486,47 @@ canvas { max-width:100%;display:block; }
           <button type="submit" class="btn btn-primary">Save Policy</button>
           <span style="font-size:12px;color:var(--t3);">{{ agents|length }} agents will receive this on next heartbeat</span>
         </div>
+                <!-- ── Data Retention Policy (GDPR Art. 5(1)(e) / PCI-DSS 10.7) ── -->
+        <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--bd);">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+            <h4 style="margin:0;font-size:14px;color:var(--t1);">🗂 Data Retention Policy</h4>
+            <span class="badge badge-info" style="font-size:10px;">GDPR · PCI-DSS</span>
+          </div>
+          <div class="form-hint" style="margin-bottom:14px;">
+            How long telemetry and alerts are kept on this server before automatic deletion.
+            GDPR Art. 5(1)(e): no longer than necessary. PCI-DSS Req 10.7: ≥ 365 days.
+          </div>
+          <div class="form-group" style="margin-bottom:0;max-width:280px;">
+            <label class="form-label">Retention Period (days)</label>
+            <input name="retention_days" type="number" class="form-input"
+                   value="{{ config.retention_days or 90 }}"
+                   min="30" max="730">
+            <div class="form-hint">Min: 30 · Max: 730 · Recommended: 90 (CrowdStrike default)</div>
+          </div>
+        </div>
+
       </form>
+
+            <!-- ── GDPR Right to Erasure ─────────────────────────────────────── -->
+      <div style="margin-top:28px;padding:16px 18px;border:1px solid rgba(244,63,94,0.3);
+                  border-radius:var(--r-md);background:rgba(244,63,94,0.04);">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+          <h4 style="margin:0;font-size:14px;color:var(--red);">⚠ GDPR Right to Erasure</h4>
+          <span class="badge" style="background:rgba(244,63,94,0.15);color:var(--red);font-size:10px;">Article 17</span>
+        </div>
+        <div class="form-hint" style="margin-bottom:14px;">
+          Permanently delete <strong>all</strong> alerts and registered agents for this tenant.
+          Your account, billing, and the erasure audit record will be preserved.
+          <strong style="color:var(--red);">This cannot be undone.</strong>
+        </div>
+        <button type="button" class="btn btn-secondary btn-sm"
+                style="color:var(--red);border-color:rgba(244,63,94,0.4);"
+                onclick="confirmErasure()">
+          Request Data Erasure
+        </button>
+      </div>
+
+
     </div>
 
     <!-- Notifications tab -->
@@ -877,5 +918,37 @@ function exportAuditLog() {
 setInterval(() => {
   if (!document.querySelector('input:focus, select:focus, textarea:focus')) location.reload();
 }, 20000);
+
+function confirmErasure() {
+  const phrase = 'ERASE';
+  const typed  = prompt(
+    "GDPR Article 17 — Right to Erasure\n\n" +
+    "This will permanently delete ALL alerts and agents for this tenant.\n" +
+    "Your account itself is preserved.\n\n" +
+    "Type " + phrase + " to confirm:"
+  );
+  if (typed !== phrase) return;
+
+  fetch('/api/v1/tenant/data', {
+    method:  'DELETE',
+    headers: {
+      'x-tenant-key':   '{{ tenant.tenant_key }}',
+      'x-requested-by': '{{ session_email }}'
+    }
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.ok) {
+      alert('✓ Data erasure complete.\n\n' +
+            'Rows deleted: ' + d.rows_deleted + '\n' +
+            'Reference: ' + d.gdpr_article + '\n' +
+            'Timestamp: ' + d.erased_at);
+      location.reload();
+    } else {
+      alert('Erasure failed: ' + (d.reason || 'unknown error'));
+    }
+  })
+  .catch(err => alert('Network error: ' + err));
+}
 </script>
 {% endblock %}
