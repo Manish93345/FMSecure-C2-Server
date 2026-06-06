@@ -1384,18 +1384,40 @@ async def super_dashboard(request: Request, _: bool = Depends(verify_session),
 async def super_create_tenant_form(
     request: Request,
     name:           str = Form(...),
-    slug:           str = Form(...),
     contact_email:  str = Form(...),
+    slug:           str = Form(""),          # optional – auto-derived from name
     plan:           str = Form("business"),
     max_agents:     int = Form(10),
     notes:          str = Form(""),
     admin_email:    str = Form(""),
     admin_password: str = Form(""),
+    password:       str = Form(""),          # form field is named `password`
     _: bool = Depends(verify_session)
 ):
     tenant_id  = str(uuid.uuid4())
     tenant_key = _gen_tenant_api_key()
-    slug_clean = slug.lower().strip().replace(" ", "-")
+
+    # ── Accept either `admin_password` or `password` from the form ────────────
+    if not admin_password and password:
+        admin_password = password
+    # ── If admin_email not provided, fall back to contact_email ───────────────
+    if not admin_email:
+        admin_email = contact_email
+
+    # ── Auto-generate a URL-safe slug from the org name if none given ─────────
+    import re as _re
+    raw_slug = (slug or name).lower().strip()
+    slug_clean = _re.sub(r"[^a-z0-9]+", "-", raw_slug).strip("-") or "org"
+
+    # Ensure uniqueness — append short suffix if slug already exists
+    try:
+        _c = get_db(); _cur = _c.cursor()
+        _cur.execute("SELECT 1 FROM tenants WHERE slug=%s", (slug_clean,))
+        if _cur.fetchone():
+            slug_clean = f"{slug_clean}-{tenant_id[:6]}"
+        _cur.close(); _c.close()
+    except Exception:
+        pass
  
     try:
         conn = get_db(); cur = conn.cursor()
