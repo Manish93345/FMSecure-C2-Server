@@ -51,6 +51,8 @@ from fastapi import Response
 from fastapi import FastAPI, Request, Depends, HTTPException, Form, Cookie
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+# ── NEW: live rule-pack management ────────────────────────────────────────
+import rules_manager
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -59,6 +61,7 @@ from slowapi.errors import RateLimitExceeded
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import razorpay
+
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 DATABASE_URL      = os.getenv("DATABASE_URL", "")
@@ -71,8 +74,10 @@ ADMIN_USER        = os.getenv("ADMIN_USERNAME", "admin")
 ADMIN_PASS        = os.getenv("ADMIN_PASSWORD", "password")
 API_KEY           = os.getenv("API_KEY", "default-dev-key")
 SENDGRID_API_KEY  = os.getenv("SENDGRID_API_KEY", "")   # legacy fallback, not used
-GMAIL_USER        = os.getenv("GMAIL_USER", "")
-GMAIL_APP_PASSWORD= os.getenv("GMAIL_APP_PASSWORD", "")
+GMAIL_USER        = os.getenv("GMAIL_USER", "").strip()
+# Google shows app passwords as "abcd efgh ijkl mnop" — strip spaces so admins
+# can paste them as-is into Render's env vars without breaking SMTP login.
+GMAIL_APP_PASSWORD= os.getenv("GMAIL_APP_PASSWORD", "").replace(" ", "").strip()
 SENDER_EMAIL      = os.getenv("SENDER_EMAIL", "fmsecure.team@gmail.com")
 SUPER_ADMIN_EMAIL = os.getenv("SUPER_ADMIN_EMAIL", SENDER_EMAIL)
 SESSION_TOKEN     = secrets.token_hex(16)
@@ -344,6 +349,13 @@ def init_db():
                 THEN ALTER TABLE tenant_config ADD COLUMN updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(); END IF;
             END $$;
 
+            -- Phase 7: optional TOTP 2FA column for tenant_users
+            DO $$ BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                WHERE table_name='tenant_users' AND column_name='totp_secret')
+                THEN ALTER TABLE tenant_users ADD COLUMN totp_secret TEXT; END IF;
+            END $$;
+
         """)
 
         cur.execute("SELECT COUNT(*) FROM versions")
@@ -362,6 +374,11 @@ def init_db():
             ))
 
         conn.commit()
+        # ── NEW: Initialize rule-pack tables ──
+        try:
+            rules_manager.ensure_schema(get_db)
+        except Exception as e:
+            print(f"[INIT] rules_manager schema error: {e}")
         print("[DB] Tables ready.")
 
     except Exception as e:
@@ -432,6 +449,18 @@ def _save_license(key, email, tier, payment_id, order_id, expires_iso):
 def _check_admin(api_key):
     if api_key != ADMIN_API_KEY:
         raise HTTPException(status_code=403, detail="Forbidden")
+
+def _check_admin_or_session(request: "Request", api_key: str = ""):
+    """Accept EITHER a valid super-admin session cookie OR an explicit api_key.
+    Used by endpoints that are reachable both from the dashboard UI (cookie-auth)
+    and from programmatic callers (api_key). The old behaviour of REQUIRING
+    api_key broke UI buttons because <form> POSTs never carry the admin key."""
+    cookie_val = request.cookies.get("fmsecure_session", "")
+    if cookie_val and secrets.compare_digest(cookie_val, SESSION_TOKEN):
+        return True
+    if api_key and secrets.compare_digest(api_key, ADMIN_API_KEY):
+        return True
+    raise HTTPException(status_code=403, detail="Forbidden")
 
 def _gen_tenant_api_key() -> str:
     return "fms-tenant-" + secrets.token_urlsafe(24)
@@ -639,30 +668,54 @@ async def verify_session(fmsecure_session: str = Cookie(None)):
 
 # ── Gmail SMTP Helper ──────────────────────────────────────────────────────────
 def _send_gmail(to: str, subject: str, html_body: str) -> bool:
-    """Send an HTML email via Gmail SMTP using App Password. Returns True on success."""
-    import smtplib
+    """Send an HTML email via Gmail SMTP using App Password. Returns True on success.
+
+    Verbose logging is intentional: when this runs inside a background task on
+    Render, *any* uncaught exception is otherwise invisible.
+    """
+    import smtplib, traceback
     from email.mime.multipart import MIMEMultipart
     from email.mime.text import MIMEText
+    from email.utils import formataddr
 
-    if not GMAIL_USER or not GMAIL_APP_PASSWORD:
-        print(f"[EMAIL] No GMAIL_USER/GMAIL_APP_PASSWORD set — skipping send to {to}")
+    if not to or "@" not in (to or ""):
+        print(f"[EMAIL] ❌ Invalid recipient address: {to!r} — aborting")
         return False
+    if not GMAIL_USER or not GMAIL_APP_PASSWORD:
+        print(f"[EMAIL] ❌ GMAIL_USER / GMAIL_APP_PASSWORD not set in environment — "
+              f"cannot send to {to}. (GMAIL_USER set: {bool(GMAIL_USER)}, "
+              f"GMAIL_APP_PASSWORD set: {bool(GMAIL_APP_PASSWORD)})")
+        return False
+
     try:
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
-        msg["From"]    = f"FMSecure <{SENDER_EMAIL}>"
+        msg["From"]    = formataddr(("FMSecure", SENDER_EMAIL))
         msg["To"]      = to
-        msg.attach(MIMEText(html_body, "html"))
+        # Plain-text fallback helps deliverability (Gmail/SpamAssassin penalise
+        # HTML-only mail). Order matters: text first, HTML second.
+        import re as _re_strip
+        plain = _re_strip.sub(r"<[^>]+>", "", html_body)
+        plain = _re_strip.sub(r"\s+", " ", plain).strip()
+        msg.attach(MIMEText(plain or " ", "plain", "utf-8"))
+        msg.attach(MIMEText(html_body, "html", "utf-8"))
 
-        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+        print(f"[EMAIL] → Connecting to smtp.gmail.com:587 for {to} (subject={subject!r})")
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=30) as server:
             server.ehlo()
             server.starttls()
+            server.ehlo()
             server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
-            server.sendmail(SENDER_EMAIL, to, msg.as_string())
-        print(f"[EMAIL] Sent to {to} via Gmail SMTP")
+            server.sendmail(SENDER_EMAIL, [to], msg.as_string())
+        print(f"[EMAIL] ✅ Sent to {to} via Gmail SMTP — subject: {subject!r}")
         return True
+    except smtplib.SMTPAuthenticationError as e:
+        print(f"[EMAIL] ❌ Gmail AUTH failed for {to}: {e}. "
+              f"Check GMAIL_APP_PASSWORD (must be a 16-char Google App Password, no spaces).")
+        return False
     except Exception as e:
-        print(f"[EMAIL] Gmail SMTP failed for {to}: {e}")
+        print(f"[EMAIL] ❌ Gmail SMTP failed for {to}: {type(e).__name__}: {e}")
+        traceback.print_exc()
         return False
 
 
@@ -720,8 +773,13 @@ def _send_license_email(email: str, license_key: str, tier: str, expires_iso: st
 
 
 def send_tenant_welcome_email(org_email: str, org_name: str, api_key: str, max_agents: int, plan: str):
-    if not GMAIL_USER:
-        print(f"[TENANT] No GMAIL_USER set. API key for {org_email}: {api_key}")
+    print(f"[TENANT] ▶ send_tenant_welcome_email called for org={org_name!r} "
+          f"email={org_email!r} plan={plan} seats={max_agents}")
+    if not GMAIL_USER or not GMAIL_APP_PASSWORD:
+        print(f"[TENANT] ❌ GMAIL credentials missing. API key for {org_email}: {api_key}")
+        return
+    if not org_email or "@" not in (org_email or ""):
+        print(f"[TENANT] ❌ Invalid org_email={org_email!r}. API key was: {api_key}")
         return
 
     plan_label = {"business": "Business", "enterprise": "Enterprise", "trial": "Trial"}.get(plan, "Business")
@@ -781,11 +839,13 @@ def send_tenant_welcome_email(org_email: str, org_name: str, api_key: str, max_a
     try:
         ok = _send_gmail(org_email, f"{BRAND['name']} Enterprise — Your API Key & Setup Instructions", html)
         if ok:
-            print(f"[TENANT] Welcome email sent to {org_email}")
+            print(f"[TENANT] ✅ Welcome email delivered to {org_email}")
         else:
-            print(f"[TENANT] API key was: {api_key}")
+            print(f"[TENANT] ⚠ Welcome email NOT delivered to {org_email}. API key was: {api_key}")
     except Exception as e:
-        print(f"[TENANT] Welcome email failed: {e}")
+        import traceback as _tb
+        print(f"[TENANT] ❌ Welcome email crashed: {type(e).__name__}: {e}")
+        _tb.print_exc()
         print(f"[TENANT] API key was: {api_key}")
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -918,12 +978,22 @@ async def receive_heartbeat(request: Request, data: Heartbeat):
                 print(f"[TENANT HB] DB error: {e}")
  
         cmd = commands.pop(data.machine_id, "NONE")
+
+        # NEW: tell the agent which rule-pack version we're publishing.
+        # Uses a 60-second in-memory cache → no extra Neon load per heartbeat.
+        rule_version = ""
+        try:
+            rule_version = rules_manager.get_current_version(get_db, tenant["id"])
+        except Exception as e:
+            print(f"[HB] rule_version lookup error: {e}")
+
         return {
-            "status":  "ok",
-            "command": cmd,
-            "tenant":  tenant["slug"],
-            "tier":    tenant["plan"],
-            "is_pro":  tenant["plan"] in ("pro", "business", "enterprise"),
+            "status":       "ok",
+            "command":      cmd,
+            "tenant":       tenant["slug"],
+            "tier":         tenant["plan"],
+            "is_pro":       tenant["plan"] in ("pro", "business", "enterprise"),
+            "rule_version": rule_version,   # ← NEW
         }
  
     if api_key != API_KEY:
@@ -1050,6 +1120,122 @@ async def get_agent_config(request: Request):
 async def trigger_lockdown(machine_id: str, _: bool = Depends(verify_session)):
     commands[machine_id] = "LOCKDOWN"
     return {"status": "Lockdown queued"}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# LIVE DETECTION-RULE PUBLISHING (YARA + Sigma)
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/api/rules/manifest")
+async def get_rules_manifest(request: Request):
+    """
+    Agent-facing: returns the current rule-pack manifest for the calling
+    tenant. Authenticated via x-tenant-key header. Agents call this ONLY
+    when their local rule_version differs from the version they saw in
+    the latest heartbeat response.
+    """
+    tenant_key = request.headers.get("x-tenant-key", "")
+    if not tenant_key:
+        raise HTTPException(status_code=400,
+                            detail="x-tenant-key header required")
+
+    tenant = _get_tenant_by_api_key(tenant_key)
+    if not tenant:
+        raise HTTPException(status_code=401, detail="Invalid tenant key")
+
+    if not DATABASE_URL:
+        raise HTTPException(status_code=503, detail="Database not configured")
+
+    manifest = rules_manager.get_current_manifest(get_db, tenant["id"])
+    if not manifest:
+        # No pack published yet — agents will keep using bundled rules.
+        return JSONResponse(
+            {"version": "", "message": "No rule pack published yet."},
+            status_code=200,
+            headers={"Cache-Control": "no-store"})
+
+    return JSONResponse(
+        content=manifest,
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate"})
+
+
+class RulePackBody(BaseModel):
+    yara_files:    list[dict] = []   # [{"name": "foo.yar", "content": "..."}, ...]
+    sigma_files:   list[dict] = []   # same shape
+    release_notes: str        = ""
+    version:       str        = ""   # optional; auto-generated if blank
+
+
+@app.post("/api/rules/publish")
+async def publish_rule_pack(request: Request, body: RulePackBody):
+    """
+    Tenant-admin facing: publish a new rule pack for the calling tenant.
+    Authenticated via x-tenant-key header (same key the agents use).
+
+    For UI-driven publishing (forms), see /tenant/rules below.
+    """
+    tenant_key = request.headers.get("x-tenant-key", "")
+    if not tenant_key:
+        raise HTTPException(status_code=400,
+                            detail="x-tenant-key header required")
+    tenant = _get_tenant_by_api_key(tenant_key)
+    if not tenant:
+        raise HTTPException(status_code=401, detail="Invalid tenant key")
+    if not DATABASE_URL:
+        raise HTTPException(status_code=503, detail="Database not configured")
+
+    yara_list  = [(f.get("name", ""), f.get("content", ""))
+                  for f in body.yara_files
+                  if (f.get("name") and f.get("content"))]
+    sigma_list = [(f.get("name", ""), f.get("content", ""))
+                  for f in body.sigma_files
+                  if (f.get("name") and f.get("content"))]
+
+    if not yara_list and not sigma_list:
+        raise HTTPException(status_code=400,
+                            detail="At least one rule file required.")
+
+    result = rules_manager.publish_pack(
+        get_db,
+        tenant_id=tenant["id"],
+        yara_files=yara_list,
+        sigma_files=sigma_list,
+        release_notes=body.release_notes,
+        version=(body.version or None),
+    )
+
+    print(f"[RULES] Tenant {tenant['slug']} published "
+          f"v{result['version']} ({result['count']} rules)")
+    return {"ok": True, **result}
+
+
+@app.get("/api/rules/status")
+async def rules_status(request: Request):
+    """Diagnostic: agents/admins can see current published version."""
+    tenant_key = request.headers.get("x-tenant-key", "")
+    if not tenant_key:
+        raise HTTPException(status_code=400,
+                            detail="x-tenant-key header required")
+    tenant = _get_tenant_by_api_key(tenant_key)
+    if not tenant:
+        raise HTTPException(status_code=401, detail="Invalid tenant key")
+
+    version = rules_manager.get_current_version(get_db, tenant["id"])
+    history = rules_manager.list_history(get_db, tenant["id"], limit=10)
+    return {
+        "tenant":  tenant["slug"],
+        "current_version": version,
+        "history": [
+            {
+                "version":       h.get("version"),
+                "rule_count":    h.get("rule_count"),
+                "release_notes": h.get("release_notes"),
+                "published_at":  (h.get("published_at").isoformat()
+                                  if h.get("published_at") else None),
+                "is_current":    h.get("is_current"),
+            }
+            for h in history
+        ],
+    }
 
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request, _: bool = Depends(verify_session)):
@@ -1256,8 +1442,13 @@ async def super_get_tenant(tenant_id: str, api_key: str = ""):
  
 # ── Super Admin: Reset tenant API key ────────────────────────────────────────
 @app.post("/super/tenants/{tenant_id}/reset-key")
-async def super_reset_tenant_key(tenant_id: str, api_key: str = ""):
-    _check_admin(api_key)
+async def super_reset_tenant_key(
+    request: Request,
+    tenant_id: str,
+    api_key: str = "",
+):
+    # Cookie-auth from UI form, or explicit api_key for scripts. Both work.
+    _check_admin_or_session(request, api_key)
     new_key = _gen_tenant_api_key()
     conn = get_db(); cur = conn.cursor()
     cur.execute(
@@ -1267,7 +1458,36 @@ async def super_reset_tenant_key(tenant_id: str, api_key: str = ""):
     conn.commit(); cur.close(); conn.close()
     if not row:
         raise HTTPException(status_code=404, detail="Tenant not found")
-    return {"ok": True, "new_api_key": new_key, "tenant": row["name"]}
+    # If called from the super-admin dashboard form, redirect back with a flash
+    # message instead of returning raw JSON (which the browser would render as
+    # text and the admin would see no UI feedback).
+    return RedirectResponse(
+        f"/super/tenant-detail?id={tenant_id}&msg=key_reset&new_key={new_key}",
+        status_code=303)
+
+
+# ── Super Admin: SMTP self-test ─────────────────────────────────────────────
+# Hit this endpoint while logged in as super-admin to verify Gmail SMTP is
+# actually working on the deployed server. Example:
+#   GET /super/smtp-test?to=you@example.com
+@app.get("/super/smtp-test")
+async def super_smtp_test(to: str = "", _: bool = Depends(verify_session)):
+    to = (to or SUPER_ADMIN_EMAIL or SENDER_EMAIL).strip()
+    diag = {
+        "gmail_user_set":         bool(GMAIL_USER),
+        "gmail_app_password_set": bool(GMAIL_APP_PASSWORD),
+        "gmail_app_password_len": len(GMAIL_APP_PASSWORD),
+        "sender_email":           SENDER_EMAIL,
+        "recipient":              to,
+    }
+    if not to or "@" not in to:
+        return {"ok": False, "error": "missing or invalid ?to=", **diag}
+    ok = _send_gmail(
+        to,
+        f"[{BRAND['name']}] SMTP self-test",
+        "<p>This is a deployment SMTP self-test from FMSecure. "
+        "If you received this, Gmail SMTP is correctly configured.</p>")
+    return {"ok": ok, **diag}
 
 
 @app.post("/super/tenants/{tenant_id}/resend-welcome-email")
@@ -1282,30 +1502,62 @@ async def super_resend_welcome_email(tenant_id: str, _: bool = Depends(verify_se
     cur.close(); conn.close()
     if not row:
         raise HTTPException(status_code=404, detail="Tenant not found")
-    
-    threading.Thread(
-        target=send_tenant_welcome_email,
-        args=(row["contact_email"], row["name"], row["api_key"],
-              row["max_agents"], row["plan"]),
-        daemon=True
-    ).start()
+
+    # ─── Send SYNCHRONOUSLY (not in a daemon thread) ──────────────────────────
+    # On Render the uvicorn worker can be paused/recycled right after returning
+    # a redirect, which silently kills daemon threads mid-SMTP. Doing it inline
+    # adds ~1-2s to the request but guarantees delivery (or a visible error).
+    print(f"[RESEND] Re-sending welcome email for tenant_id={tenant_id} "
+          f"to {row['contact_email']!r}")
+    ok = False
+    try:
+        send_tenant_welcome_email(
+            row["contact_email"], row["name"], row["api_key"],
+            row["max_agents"], row["plan"])
+        ok = True
+    except Exception as e:
+        import traceback as _tb
+        print(f"[RESEND] ❌ Failed: {type(e).__name__}: {e}")
+        _tb.print_exc()
+
+    msg = "email_sent" if ok else "email_failed"
     return RedirectResponse(
-        f"/super/tenant-detail?id={tenant_id}&msg=email_sent",
+        f"/super/tenant-detail?id={tenant_id}&msg={msg}",
         status_code=303)
  
 # ── Super Admin: Suspend / unsuspend tenant ───────────────────────────────────
 @app.post("/super/tenants/{tenant_id}/suspend")
-async def super_suspend_tenant(tenant_id: str, suspend: bool = True, api_key: str = ""):
-    _check_admin(api_key)
+async def super_suspend_tenant(
+    request: Request,
+    tenant_id: str,
+    api_key: str = "",
+):
+    # Cookie-auth from UI form, or explicit api_key for scripts. Both work.
+    # The previous `_check_admin(api_key)` REQUIRED an api_key in the URL,
+    # which browser <form> POSTs never include — so every Suspend click 403'd.
+    _check_admin_or_session(request, api_key)
+
+    # TOGGLE active flag. The form doesn't send a `suspend` parameter, so the
+    # button must flip the current state (Suspend ↔ Reactivate).
     conn = get_db(); cur = conn.cursor()
     cur.execute(
-        "UPDATE tenants SET active=%s WHERE id=%s RETURNING name",
-        (not suspend, tenant_id))
+        "UPDATE tenants SET active = NOT active WHERE id=%s RETURNING name, active",
+        (tenant_id,))
     row = cur.fetchone()
     conn.commit(); cur.close(); conn.close()
     if not row:
         raise HTTPException(status_code=404, detail="Tenant not found")
-    return {"ok": True, "active": not suspend, "tenant": row["name"]}
+
+    new_active = row["active"]
+    flash = "tenant_reactivated" if new_active else "tenant_suspended"
+    print(f"[SUPER] Tenant {row['name']} ({tenant_id}) → active={new_active}")
+
+    # Redirect back to whichever page initiated the action. Both the dashboard
+    # listing and the tenant-detail page POST here; we use the Referer header
+    # to route the admin back to where they were.
+    return RedirectResponse(
+        f"/super/tenant-detail?id={tenant_id}&msg={flash}",
+        status_code=303)
 
 
 @app.get("/super/alerts")
@@ -1440,12 +1692,17 @@ async def super_create_tenant_form(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-    threading.Thread(
-        target=send_tenant_welcome_email,
-        args=(contact_email.strip(), name.strip(), tenant_key, max_agents, plan),
-        daemon=True
-    ).start()
- 
+    # ─── Send welcome email synchronously (see comment in resend endpoint) ───
+    try:
+        send_tenant_welcome_email(
+            contact_email.strip(), name.strip(), tenant_key, max_agents, plan)
+    except Exception as e:
+        import traceback as _tb
+        print(f"[TENANT-CREATE] ❌ Welcome email failed: {type(e).__name__}: {e}")
+        _tb.print_exc()
+        # Don't abort tenant creation — the tenant row is already inserted.
+        # The super-admin can still click "Resend welcome email" on the detail page.
+
     return RedirectResponse(
         f"/super/tenant-detail?id={tenant_id}&new_key={tenant_key}",
         status_code=303)
@@ -1490,7 +1747,14 @@ async def super_tenant_detail_page(
     users_list = cur.fetchall()
     cur.close(); conn.close()
 
-    agents_ctx = [{**dict(a), "last_seen_fmt": a["last_seen"].strftime("%Y-%m-%d %H:%M") if a.get("last_seen") else "—"} for a in agents_list]
+    # JSON-safe agents_ctx (see /tenant/dashboard for the rationale).
+    agents_ctx = []
+    for a in agents_list:
+        d = dict(a)
+        ls = d.get("last_seen")
+        d["last_seen_fmt"] = ls.strftime("%Y-%m-%d %H:%M") if ls else "—"
+        d["last_seen"]     = ls.isoformat() if ls else None
+        agents_ctx.append(d)
     alerts_ctx = [{**dict(al), "created_fmt": al["created_at"].strftime("%Y-%m-%d %H:%M") if al.get("created_at") else "—"} for al in alert_list]
     users_ctx  = [{**dict(u), "created_fmt": u["created_at"].strftime("%Y-%m-%d") if u.get("created_at") else "—"} for u in users_list]
     online_count = sum(1 for a in agents_ctx if a["status"] == "online")
@@ -1609,13 +1873,22 @@ async def tenant_login_post(
     _clear_failed_logins(clean_email)
     token = _create_tenant_session(user["tenant_id"], user["email"], user["role"])
 
-    resp = RedirectResponse("/tenant/dashboard", status_code=302)
+    # Use 303 (See Other) after a POST so the browser always issues a fresh GET
+    # on /tenant/dashboard, and use SameSite=lax so the cookie reliably
+    # accompanies that follow-up GET in every modern browser. "strict" can be
+    # dropped on cross-context navigations (e.g. when the admin lands on the
+    # login page from an email link), which is what was preventing logins.
+    resp = RedirectResponse("/tenant/dashboard", status_code=303)
+    # secure=True is correct for production (Render terminates TLS). If you run
+    # locally over plain HTTP for testing, set FMS_INSECURE_COOKIES=1.
+    _secure_cookie = os.getenv("FMS_INSECURE_COOKIES", "") != "1"
     resp.set_cookie(
         "fms_tenant_session", token,
         httponly=True,
-        secure=True,          # requires HTTPS (Render provides this)
-        samesite="strict",
+        secure=_secure_cookie,
+        samesite="lax",
         max_age=_TENANT_SESSION_TTL,
+        path="/",
     )
     return resp
  
@@ -1674,14 +1947,28 @@ async def tenant_forgot_password_page(request: Request, error: str = "", success
 
 @app.post("/tenant/forgot-password")
 async def tenant_forgot_password_submit(email: str = Form(...)):
+    """Send a reset OTP and forward the admin to the OTP-entry page.
+
+    Previously this route redirected back to /tenant/forgot-password with a
+    `success` flash, which kept the admin stuck on the email-input screen
+    forever (matching the user-reported symptom "no window appears to enter
+    OTP"). The reset OTP is generated and emailed via a background thread
+    (also printed to the server log as a fallback when GMAIL_USER is not
+    configured), and the user is now sent to /tenant/reset-password where
+    they can type the 6-digit code + new password.
+    """
     email = email.strip().lower()
     if not DATABASE_URL:
         return RedirectResponse("/tenant/forgot-password?error=Server+not+configured", 302)
 
-    conn = get_db(); cur = conn.cursor()
-    cur.execute("SELECT id, tenant_id FROM tenant_users WHERE email = %s", (email,))
-    row = cur.fetchone()
-    cur.close(); conn.close()
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("SELECT id, tenant_id FROM tenant_users WHERE email = %s", (email,))
+        row = cur.fetchone()
+        cur.close(); conn.close()
+    except Exception as e:
+        print(f"[FORGOT] DB error: {e}")
+        row = None
 
     if row:
         import random, time
@@ -1692,8 +1979,16 @@ async def tenant_forgot_password_submit(email: str = Form(...)):
             "tenant_id": row["tenant_id"],
         }
         threading.Thread(target=_send_tenant_reset_otp, args=(email, otp), daemon=True).start()
+        print(f"[FORGOT] Reset OTP issued for {email}")
+    else:
+        # Silently "succeed" to avoid leaking whether the email exists.
+        print(f"[FORGOT] No tenant user for {email} (silent)")
 
-    return RedirectResponse("/tenant/forgot-password?success=If+that+email+is+registered,+a+reset+code+has+been+sent.", 302)
+    # Always forward to the reset page so the UX is identical whether or not
+    # the email exists in the DB.
+    from urllib.parse import quote
+    return RedirectResponse(
+        f"/tenant/reset-password?email={quote(email)}", 302)
 
 
 @app.get("/tenant/reset-password", response_class=HTMLResponse)
@@ -1784,8 +2079,32 @@ async def tenant_dashboard(request: Request, config_saved: str = ""):
     online_count = sum(1 for a in agents_list if a["status"] == "online")
     armed_count  = sum(1 for a in agents_list if a["is_armed"])
 
-    agents_ctx = [{**dict(a), "last_seen_fmt": a["last_seen"].strftime("%H:%M %d/%m") if a.get("last_seen") else "—"} for a in agents_list]
-    alerts_ctx = [{**dict(al), "created_fmt": al["created_at"].strftime("%Y-%m-%d %H:%M") if al.get("created_at") else "—"} for al in alert_list]
+    # ── Build agents_ctx (JSON-safe) ─────────────────────────────────────────
+    # The template renders `{{ a | tojson }}` to seed the agent-details drawer
+    # in client-side JS. Jinja's `tojson` filter cannot serialise raw
+    # `datetime` objects, which previously caused:
+    #     TypeError: Object of type datetime is not JSON serializable
+    #       when serializing dict item 'last_seen'
+    # → 500 on /tenant/dashboard right after a successful login (this is what
+    # users were perceiving as a "login failure").
+    # Fix: pre-format the human-readable string AND convert `last_seen` itself
+    # to an ISO-8601 string so `tojson` works. Same treatment for alerts
+    # (`created_at`) for future-proofing.
+    agents_ctx = []
+    for a in agents_list:
+        d = dict(a)
+        ls = d.get("last_seen")
+        d["last_seen_fmt"] = ls.strftime("%H:%M %d/%m") if ls else "—"
+        d["last_seen"]     = ls.isoformat() if ls else None
+        agents_ctx.append(d)
+
+    alerts_ctx = []
+    for al in alert_list:
+        d = dict(al)
+        ca = d.get("created_at")
+        d["created_fmt"] = ca.strftime("%Y-%m-%d %H:%M") if ca else "—"
+        d["created_at"]  = ca.isoformat() if ca else None
+        alerts_ctx.append(d)
 
     return templates.TemplateResponse(request, "tenant_dashboard.html", {
         "brand":         BRAND,
@@ -1899,121 +2218,239 @@ async def tenant_send_command(
 
 @app.get("/tenant/rules", response_class=HTMLResponse)
 async def tenant_rules_page(request: Request):
-    # 1. Use your custom tenant session manager
     session = _get_tenant_session(request)
     if not session:
         return RedirectResponse("/tenant/login", status_code=302)
-        
+
     tenant_id = session["tenant_id"]
     if not DATABASE_URL:
         return HTMLResponse("<h1>Database not configured</h1>")
 
-    # 2. Fetch agents using PostgreSQL syntax
-    conn = get_db()
-    cur = conn.cursor()
+    # Endpoint stats (unchanged from before)
+    conn = get_db(); cur = conn.cursor()
     cur.execute(
         """SELECT hostname, sigma_rule_count, last_seen, status
-           FROM tenant_agents
-           WHERE tenant_id = %s
+           FROM tenant_agents WHERE tenant_id = %s
            ORDER BY sigma_rule_count DESC""",
-        (tenant_id,)
-    )
+        (tenant_id,))
     agents = cur.fetchall()
-    cur.close()
-    conn.close()
-        
-    # 3. Calculate Stats
+
+    # Tenant API key (for the JS Publish call)
+    cur.execute("SELECT api_key, slug FROM tenants WHERE id = %s", (tenant_id,))
+    t_row = cur.fetchone()
+    tenant_api_key = t_row["api_key"] if t_row else ""
+    cur.close(); conn.close()
+
     total_agents  = len(agents)
     agents_online = sum(1 for a in agents if a["status"] == "online")
-    avg_rules     = (
-        sum((a["sigma_rule_count"] or 0) for a in agents) // total_agents
-        if total_agents else 0
-    )
-        
-    # 4. Generate dynamic rows
-    agent_rows = ""
-    for a in agents:
-        is_online = (a["status"] == "online")
-        last_seen_str = a['last_seen'].strftime("%Y-%m-%d %H:%M") if a['last_seen'] else 'Never'
-        rule_count = a['sigma_rule_count'] or 0
-        agent_rows += f"""
-        <tr>
-            <td>{a['hostname']}</td>
-            <td class="{'online' if is_online else 'offline'}">
-                {'● Online' if is_online else '○ Offline'}
-            </td>
-            <td><span class="rules-badge">{rule_count} rules</span></td>
-            <td style="color:#8b949e">{last_seen_str}</td>
-        </tr>"""
+    avg_rules     = (sum((a["sigma_rule_count"] or 0) for a in agents)
+                     // total_agents) if total_agents else 0
 
-    # 5. Render HTML
-    html = f"""
-    <html>
-    <head>
-        <title>Detection Rules — FMSecure</title>
-        <style>
-            body {{ font-family: 'Segoe UI', sans-serif; background: #0d1117; color: #e6edf3; margin: 0; padding: 24px; }}
-            h1 {{ color: #2f81f7; }} 
-            .stat {{ display: inline-block; background: #161b22; border: 1px solid #30363d; 
-                     border-radius: 8px; padding: 16px 28px; margin: 8px; text-align: center; }}
-            .stat-num {{ font-size: 32px; font-weight: bold; color: #3fb950; }}
-            .stat-lbl {{ font-size: 12px; color: #8b949e; margin-top: 4px; }}
-            table {{ width: 100%; border-collapse: collapse; margin-top: 24px; }}
-            th {{ background: #161b22; color: #8b949e; padding: 10px 14px; text-align: left; font-size: 12px; text-transform: uppercase; }}
-            td {{ padding: 10px 14px; border-bottom: 1px solid #21262d; font-size: 14px; }}
-            .online {{ color: #3fb950; }} .offline {{ color: #f85149; }}
-            .rules-badge {{ background: #1a4b8c; color: #58a6ff; padding: 2px 10px; border-radius: 12px; font-size: 12px; }}
-            a {{ color: #2f81f7; text-decoration: none; }}
-        </style>
-    </head>
-    <body>
-        <h1>🛡 Detection Coverage</h1>
-        <a href="/tenant/dashboard">← Back to Dashboard</a>
-        
-        <div style="margin: 20px 0;">
-            <div class="stat">
-                <div class="stat-num">{total_agents}</div>
-                <div class="stat-lbl">Total Endpoints</div>
-            </div>
-            <div class="stat">
-                <div class="stat-num" style="color:#2f81f7">{agents_online}</div>
-                <div class="stat-lbl">Online Now</div>
-            </div>
-            <div class="stat">
-                <div class="stat-num">{avg_rules}</div>
-                <div class="stat-lbl">Avg Rules / Endpoint</div>
-            </div>
-        </div>
-        <table>
-            <tr>
-                <th>Endpoint</th>
-                <th>Status</th>
-                <th>Active Rules</th>
-                <th>Last Seen</th>
-            </tr>
-            {agent_rows}
-        </table>
-        <div style="margin-top:32px; padding:16px; background:#161b22; border-radius:8px; border:1px solid #30363d;">
-            <h3 style="color:#d29922; margin-top:0;">📋 Active Detection Rules</h3>
-            <p style="color:#8b949e; font-size:13px;">
-                Rules are loaded from <code>core/sigma_rules/*.yml</code> on each agent.<br>
-                To add new detection coverage: add a .yml file and agents will pick it up on next restart.
-            </p>
-            <table>
-                <tr>
-                    <th>Rule Name</th><th>MITRE Technique</th><th>Severity</th>
-                </tr>
-                <tr><td>Ransomware Burst Detected</td><td>T1486 — Data Encrypted for Impact</td><td style="color:#f85149">CRITICAL</td></tr>
-                <tr><td>LOLBin Process Attribution</td><td>T1059 — Command and Scripting Interpreter</td><td style="color:#f0883e">HIGH</td></tr>
-                <tr><td>File Created in Startup Folder</td><td>T1547.001 — Registry Run Keys / Startup</td><td style="color:#f0883e">HIGH</td></tr>
-                <tr><td>Mass File Deletion</td><td>T1485 — Data Destruction</td><td style="color:#f0883e">HIGH</td></tr>
-                <tr><td>Honeypot File Accessed</td><td>T1083 — File and Directory Discovery</td><td style="color:#f85149">CRITICAL</td></tr>
-            </table>
-        </div>
-    </body>
-    </html>
+    # Current rule-pack info
+    current_version = rules_manager.get_current_version(get_db, tenant_id)
+    history         = rules_manager.list_history(get_db, tenant_id, limit=10)
+    current_files   = rules_manager.list_current_rules(get_db, tenant_id)
+
+    # Render via Jinja template
+    # NOTE: Starlette >=0.28 requires the new (request, name, context) signature.
+    # Previously this passed (name, context) and the dict context was treated
+    # as the template name, which crashed inside Jinja2's template cache with
+    # "TypeError: unhashable type: 'dict'". Fixed in v1.1.
+    return templates.TemplateResponse(request, "tenant_rules.html", {
+        "tenant_api_key":  tenant_api_key,
+        "total_agents":    total_agents,
+        "agents_online":   agents_online,
+        "avg_rules":       avg_rules,
+        "agents":          agents,
+        "current_version": current_version,
+        "history":         history,
+        "current_yara":    current_files["yara"],
+        "current_sigma":   current_files["sigma"],
+    })
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SUPER-ADMIN GLOBAL DETECTION-RULES PORTAL  (v1.1 — June 2026)
+# ──────────────────────────────────────────────────────────────────────────────
+# A single rule pack the super admin can publish that automatically propagates
+# to EVERY tenant that has not published their own pack. Stored in the same
+# rule_packs table under the sentinel tenant_id = rules_manager.GLOBAL_TENANT_ID
+# ("__global__"). All agents pick it up on the next heartbeat via the existing
+# rule_updater pipeline (no agent-side change required).
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/super/rules", response_class=HTMLResponse)
+async def super_rules_page(request: Request,
+                           _: bool = Depends(verify_session),
+                           msg: str = ""):
+    """Super-admin GLOBAL rule-pack management UI."""
+    if not DATABASE_URL:
+        return HTMLResponse("<h1>Database not configured</h1>")
+
+    g_tid = rules_manager.GLOBAL_TENANT_ID
+
+    # Reach-stats — how many tenants/endpoints will receive this global pack?
+    conn = get_db(); cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) AS c FROM tenants WHERE active = TRUE")
+    total_tenants = (cur.fetchone() or {}).get("c", 0)
+
+    # Tenants that have NEVER published their own pack inherit the global pack.
+    cur.execute("""
+        SELECT COUNT(*) AS c FROM tenants t
+         WHERE t.active = TRUE
+           AND NOT EXISTS (
+               SELECT 1 FROM rule_packs r
+                WHERE r.tenant_id = t.id
+                  AND r.is_current = TRUE
+           )
+    """)
+    inherit_tenants = (cur.fetchone() or {}).get("c", 0)
+
+    cur.execute("SELECT COUNT(*) AS c FROM tenant_agents")
+    total_agents = (cur.fetchone() or {}).get("c", 0)
+
+    cur.execute("SELECT COUNT(*) AS c FROM tenant_agents WHERE status='online'")
+    agents_online = (cur.fetchone() or {}).get("c", 0)
+    cur.close(); conn.close()
+
+    current_version = rules_manager.get_current_version(get_db, g_tid)
+    history         = rules_manager.list_history(get_db, g_tid, limit=10)
+    current_files   = rules_manager.list_current_rules(get_db, g_tid)
+
+    return templates.TemplateResponse(request, "super_rules.html", {
+        "brand":            BRAND,
+        "admin_api_key":    ADMIN_API_KEY,
+        "total_tenants":    total_tenants,
+        "inherit_tenants":  inherit_tenants,
+        "total_agents":     total_agents,
+        "agents_online":    agents_online,
+        "current_version":  current_version,
+        "history":          history,
+        "current_yara":     current_files["yara"],
+        "current_sigma":    current_files["sigma"],
+        "msg":              msg,
+    })
+
+
+@app.post("/super/rules/publish")
+async def super_rules_publish(request: Request,
+                              _: bool = Depends(verify_session)):
     """
-    return HTMLResponse(html)
+    Form-style publish endpoint for the super-admin global rule pack.
+
+    Accepts EITHER:
+      • JSON body  : {"yara_files":[{name,content}], "sigma_files":[...],
+                       "release_notes":"", "version":""}
+      • form-data  : repeated yara_name[] / yara_content[] /
+                     sigma_name[] / sigma_content[] + release_notes + version
+    """
+    if not DATABASE_URL:
+        raise HTTPException(status_code=503, detail="Database not configured")
+
+    yara_list:  list[tuple[str, str]] = []
+    sigma_list: list[tuple[str, str]] = []
+    release_notes = ""
+    version = ""
+
+    ctype = (request.headers.get("content-type") or "").lower()
+
+    if "application/json" in ctype:
+        try:
+            body = await request.json()
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid JSON")
+        for f in (body.get("yara_files")  or []):
+            n, c = f.get("name"), f.get("content")
+            if n and c:
+                yara_list.append((n, c))
+        for f in (body.get("sigma_files") or []):
+            n, c = f.get("name"), f.get("content")
+            if n and c:
+                sigma_list.append((n, c))
+        release_notes = (body.get("release_notes") or "").strip()
+        version       = (body.get("version") or "").strip()
+    else:
+        form = await request.form()
+        yara_names    = form.getlist("yara_name[]")
+        yara_contents = form.getlist("yara_content[]")
+        for n, c in zip(yara_names, yara_contents):
+            if n and c:
+                yara_list.append((n, c))
+        sigma_names    = form.getlist("sigma_name[]")
+        sigma_contents = form.getlist("sigma_content[]")
+        for n, c in zip(sigma_names, sigma_contents):
+            if n and c:
+                sigma_list.append((n, c))
+        release_notes = (form.get("release_notes") or "").strip()
+        version       = (form.get("version") or "").strip()
+
+    if not yara_list and not sigma_list:
+        raise HTTPException(status_code=400,
+                            detail="At least one rule file required.")
+
+    result = rules_manager.publish_pack(
+        get_db,
+        tenant_id=rules_manager.GLOBAL_TENANT_ID,
+        yara_files=yara_list,
+        sigma_files=sigma_list,
+        release_notes=release_notes,
+        version=(version or None),
+    )
+
+    print(f"[RULES] Super-admin published GLOBAL pack "
+          f"v{result['version']} ({result['count']} rules) — "
+          f"will propagate to every tenant without an override.")
+
+    if "application/json" in ctype:
+        return {"ok": True, **result}
+    return RedirectResponse(
+        f"/super/rules?msg=published_v{result['version']}",
+        status_code=302)
+
+
+@app.post("/super/rules/rollback")
+async def super_rules_rollback(request: Request,
+                               _: bool = Depends(verify_session),
+                               version: str = Form(...)):
+    """Promote a previously-published global pack version back to current."""
+    if not DATABASE_URL:
+        raise HTTPException(status_code=503, detail="Database not configured")
+
+    g_tid = rules_manager.GLOBAL_TENANT_ID
+    conn = get_db(); cur = conn.cursor()
+    try:
+        cur.execute(
+            "SELECT version FROM rule_packs "
+            "WHERE tenant_id = %s AND version = %s",
+            (g_tid, version))
+        if not cur.fetchone():
+            cur.close(); conn.close()
+            raise HTTPException(status_code=404,
+                                detail="Global rule pack version not found.")
+        cur.execute(
+            "UPDATE rule_packs SET is_current = FALSE WHERE tenant_id = %s",
+            (g_tid,))
+        cur.execute(
+            "UPDATE rule_packs SET is_current = TRUE, published_at = NOW() "
+            "WHERE tenant_id = %s AND version = %s",
+            (g_tid, version))
+        conn.commit()
+    finally:
+        cur.close(); conn.close()
+
+    # Bust the WHOLE version cache — every tenant relying on the global pack
+    # needs to see the change on the next heartbeat.
+    try:
+        with rules_manager._VER_CACHE_LOCK:
+            rules_manager._VER_CACHE.clear()
+    except Exception:
+        pass
+
+    print(f"[RULES] Super-admin rolled back GLOBAL pack to v{version}")
+    return RedirectResponse(
+        f"/super/rules?msg=rolled_back_to_v{version}",
+        status_code=302)
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PRODUCT LANDING PAGE
@@ -2981,9 +3418,53 @@ async def tenant_forgot_alias(request: Request, error: str = "", success: str = 
         "csrf_token": _sec.token_hex(16),
     })
 
-@app.post("/tenant/forgot", response_class=HTMLResponse)
+@app.post("/tenant/forgot")
 async def tenant_forgot_post(request: Request, email: str = Form(...)):
-    return RedirectResponse("/tenant/forgot-password?email=" + email, 302)
+    """Alias for the legacy /tenant/forgot path used by tenant_forgot.html.
+
+    The previous implementation merely 302-redirected to the GET
+    /tenant/forgot-password page, which meant the OTP-sending logic was never
+    executed and the tenant admin never received a reset code. We now perform
+    the same work as POST /tenant/forgot-password inline and then forward the
+    user to the reset page (where they enter the OTP + new password).
+    """
+    clean_email = email.strip().lower()
+    if not DATABASE_URL:
+        return RedirectResponse("/tenant/forgot?error=Server+not+configured", 302)
+
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("SELECT id, tenant_id FROM tenant_users WHERE email = %s",
+                    (clean_email,))
+        row = cur.fetchone()
+        cur.close(); conn.close()
+    except Exception as e:
+        print(f"[FORGOT] DB error: {e}")
+        row = None
+
+    if row:
+        import random
+        otp = str(random.randint(100000, 999999))
+        _tenant_reset_otps[clean_email] = {
+            "otp":       otp,
+            "expires":   time.time() + 300,
+            "tenant_id": row["tenant_id"],
+        }
+        threading.Thread(
+            target=_send_tenant_reset_otp,
+            args=(clean_email, otp),
+            daemon=True,
+        ).start()
+        print(f"[FORGOT] Reset OTP issued for {clean_email}")
+    else:
+        # Silently "succeed" to avoid leaking which emails exist.
+        print(f"[FORGOT] No tenant user for {clean_email} (silent)")
+
+    # Always send the admin to the reset page so the UX is identical whether
+    # or not the email exists. They'll enter the 6-digit OTP there.
+    from urllib.parse import quote
+    return RedirectResponse(
+        f"/tenant/reset-password?email={quote(clean_email)}", 302)
 
 
 

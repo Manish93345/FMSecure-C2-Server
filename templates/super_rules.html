@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Global Detection Rules — FMSecure Super Admin</title>
+<style>
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #0d1117;
+         color: #e6edf3; margin: 0; padding: 24px; }
+  h1 { color: #d29922; margin-top: 0; }
+  h2 { color: #e6edf3; border-bottom: 1px solid #21262d; padding-bottom: 8px;
+       margin-top: 32px; }
+  a { color: #2f81f7; text-decoration: none; }
+  .row { display: flex; gap: 16px; flex-wrap: wrap; margin: 20px 0; }
+  .stat { background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+          padding: 16px 28px; text-align: center; min-width: 160px; }
+  .stat-num { font-size: 28px; font-weight: bold; color: #3fb950; }
+  .stat-lbl { font-size: 11px; color: #8b949e; margin-top: 4px;
+              letter-spacing: 0.5px; text-transform: uppercase; }
+  .pill { display: inline-block; padding: 3px 10px; border-radius: 12px;
+          font-size: 12px; font-weight: 600; }
+  .pill.current { background: #1a4b8c; color: #58a6ff; }
+  .pill.global  { background: #5c3a0a; color: #f0b429; }
+  .banner { background: #1a2d4a; border: 1px solid #2f81f7;
+            border-left: 4px solid #2f81f7; padding: 14px 18px;
+            border-radius: 6px; margin-bottom: 20px; font-size: 14px; }
+  .banner.amber { background: #2a2308; border-color: #d29922; border-left-color: #d29922; }
+  table { width: 100%; border-collapse: collapse; margin-top: 16px;
+          background: #161b22; border: 1px solid #21262d; border-radius: 8px; }
+  th { background: #0d1117; color: #8b949e; padding: 10px 14px;
+       text-align: left; font-size: 11px; text-transform: uppercase;
+       letter-spacing: 0.8px; }
+  td { padding: 10px 14px; border-bottom: 1px solid #21262d; font-size: 13px; }
+  tr:last-child td { border-bottom: none; }
+  .file-block { background: #0d1117; border: 1px solid #30363d;
+                border-radius: 6px; padding: 12px; margin-bottom: 12px; }
+  .file-block input[type=text] { width: 280px; padding: 6px 10px;
+        background: #0d1117; color: #e6edf3; border: 1px solid #30363d;
+        border-radius: 4px; font-family: 'Courier New', monospace; }
+  .file-block textarea { width: 100%; min-height: 180px; margin-top: 8px;
+        padding: 10px; font-family: 'Courier New', Consolas, monospace;
+        font-size: 12px; background: #010409; color: #79c0ff;
+        border: 1px solid #30363d; border-radius: 4px; box-sizing: border-box;
+        resize: vertical; }
+  .file-block .remove { float: right; background: transparent; color: #f85149;
+        border: 1px solid #f85149; padding: 4px 10px; border-radius: 4px;
+        cursor: pointer; font-size: 11px; }
+  .btn { display: inline-block; padding: 10px 20px; border-radius: 6px;
+         border: none; cursor: pointer; font-weight: 600; font-size: 14px;
+         margin-right: 8px; }
+  .btn.primary { background: #d29922; color: #1a1a1a; }
+  .btn.primary:hover { background: #f0b429; }
+  .btn.ghost { background: transparent; color: #2f81f7; border: 1px solid #30363d; }
+  .btn.ghost:hover { border-color: #2f81f7; }
+  .btn.danger { background: transparent; color: #f85149; border: 1px solid #f85149;
+                padding: 4px 10px; font-size: 12px; }
+  textarea#release_notes, input#version_input {
+        width: 100%; padding: 8px 10px; background: #010409;
+        color: #e6edf3; border: 1px solid #30363d; border-radius: 4px;
+        box-sizing: border-box; font-family: inherit; }
+  textarea#release_notes { min-height: 50px; }
+  #status_msg { margin-top: 12px; padding: 10px 14px; border-radius: 6px;
+                display: none; font-size: 13px; }
+  #status_msg.ok    { background: #0d3a1c; color: #3fb950; display: block; }
+  #status_msg.err   { background: #3a0d0d; color: #f85149; display: block; }
+  code { font-family: 'Courier New', monospace; color: #79c0ff; }
+  details { margin: 10px 0; }
+  summary { cursor: pointer; color: #2f81f7; }
+  .tab-bar { display: flex; gap: 4px; margin-top: 16px; }
+  .tab { padding: 10px 20px; background: #161b22; border: 1px solid #30363d;
+         border-bottom: none; border-radius: 8px 8px 0 0; cursor: pointer;
+         color: #8b949e; font-weight: 600; }
+  .tab.active { background: #0d1117; color: #d29922; border-color: #d29922;
+                border-bottom: 1px solid #0d1117; margin-bottom: -1px; }
+  .tab-content { background: #161b22; border: 1px solid #30363d;
+                 border-radius: 0 10px 10px 10px; padding: 20px; }
+  .tab-content.hidden { display: none; }
+</style>
+</head>
+<body>
+
+<h1>🛡 Global Detection Rules — Super Admin</h1>
+<a href="/super/dashboard">← Back to Super Dashboard</a>
+
+{% if msg %}
+  <div class="banner" style="margin-top:16px;">
+    {{ msg.replace('_', ' ').replace('published', '✅ Published global pack').replace('rolled back to', '↩ Rolled back global pack to') }}
+  </div>
+{% endif %}
+
+<div class="banner amber" style="margin-top:16px;">
+  <strong>What is a global rule pack?</strong> Rules you publish here are
+  pushed to <em>every tenant</em> whose admin has <em>not</em> published their own
+  custom pack. Tenant-specific packs always override the global pack for
+  that tenant. Use this page when a new malware family or attack technique
+  needs to be covered across every endpoint your platform protects.
+</div>
+
+<!-- ─── Top stats ─────────────────────────────────────────────────── -->
+<div class="row">
+  <div class="stat">
+    <div class="stat-num">{{ total_tenants }}</div>
+    <div class="stat-lbl">Active Tenants</div>
+  </div>
+  <div class="stat">
+    <div class="stat-num" style="color:#d29922">{{ inherit_tenants }}</div>
+    <div class="stat-lbl">Inheriting Global Pack</div>
+  </div>
+  <div class="stat">
+    <div class="stat-num">{{ total_agents }}</div>
+    <div class="stat-lbl">Total Endpoints</div>
+  </div>
+  <div class="stat">
+    <div class="stat-num" style="color:#2f81f7">{{ agents_online }}</div>
+    <div class="stat-lbl">Online Now</div>
+  </div>
+  <div class="stat">
+    <div class="stat-num" style="color:#d29922">
+      {{ current_version or '— none —' }}
+    </div>
+    <div class="stat-lbl">Current Global Version</div>
+  </div>
+</div>
+
+<!-- ─── Tabs: Editor / Existing / History ───────────────────────── -->
+<h2>Publish New Global Pack</h2>
+<p style="color:#8b949e; font-size:13px;">
+  Add YARA / Sigma rules below and click <strong>Publish Global Pack</strong>.
+  Every endpoint whose tenant is inheriting the global pack will hot-reload
+  the new rules within ~10 seconds of its next heartbeat. Tenants who have
+  their own custom pack are unaffected.
+</p>
+
+<div class="tab-bar">
+  <div class="tab active" onclick="showTab('editor')">✏️ New Global Pack</div>
+  <div class="tab"        onclick="showTab('existing')">📋 Current Global Pack</div>
+  <div class="tab"        onclick="showTab('history')">🕓 Version History</div>
+</div>
+
+<!-- TAB: Editor -->
+<div class="tab-content" id="tab-editor">
+  <h3>YARA Rules <span style="color:#8b949e;font-weight:normal;font-size:13px">
+      — file-content signatures (.yar)</span></h3>
+  <div id="yara_files"></div>
+  <button class="btn ghost" onclick="addFile('yara')">＋ Add YARA File</button>
+
+  <h3 style="margin-top: 32px;">Sigma Rules
+    <span style="color:#8b949e;font-weight:normal;font-size:13px">
+      — behavioural detections (.yml)</span></h3>
+  <div id="sigma_files"></div>
+  <button class="btn ghost" onclick="addFile('sigma')">＋ Add Sigma File</button>
+
+  <h3 style="margin-top: 32px;">Release Notes</h3>
+  <textarea id="release_notes"
+    placeholder="e.g. Added APT41 RuralBytes ransomware family + 3 new LOLBin detections"></textarea>
+
+  <h3 style="margin-top: 24px;">Pack Version
+    <span style="color:#8b949e;font-weight:normal;font-size:13px">
+      — optional, auto-generated if blank</span></h3>
+  <input type="text" id="version_input"
+         placeholder="e.g. 2026.06.21-emergency-apt41 (leave blank for auto)">
+
+  <div style="margin-top: 24px;">
+    <button class="btn primary" onclick="publishPack()">🚀 Publish Global Pack</button>
+    <button class="btn ghost"   onclick="loadFromCurrent()">↻ Prefill from Current Global Pack</button>
+  </div>
+  <div id="status_msg"></div>
+</div>
+
+<!-- TAB: Existing -->
+<div class="tab-content hidden" id="tab-existing">
+  <h3>Current Global Pack —
+    <code>v{{ current_version or '(no global pack yet)' }}</code>
+  </h3>
+  {% if not current_yara and not current_sigma %}
+    <p style="color:#8b949e">
+      No global rule pack has been published yet. Tenants who have not
+      published their own pack are running with the rules bundled inside
+      the agent .exe at install time. Use the <strong>New Global Pack</strong>
+      tab to publish the first one.
+    </p>
+  {% endif %}
+  {% for fname, body in current_yara %}
+    <details>
+      <summary><code>yara/{{ fname }}</code></summary>
+      <pre style="background:#010409; padding:12px; border-radius:6px;
+                  color:#79c0ff; overflow-x:auto;
+                  font-size:12px;">{{ body }}</pre>
+    </details>
+  {% endfor %}
+  {% for fname, body in current_sigma %}
+    <details>
+      <summary><code>sigma/{{ fname }}</code></summary>
+      <pre style="background:#010409; padding:12px; border-radius:6px;
+                  color:#79c0ff; overflow-x:auto;
+                  font-size:12px;">{{ body }}</pre>
+    </details>
+  {% endfor %}
+</div>
+
+<!-- TAB: History -->
+<div class="tab-content hidden" id="tab-history">
+  <p style="color:#8b949e;font-size:13px;">
+    The last 10 global packs are kept so you can roll back if a new pack
+    causes false positives. Rollback re-marks the chosen version as current
+    and busts all in-memory caches; every endpoint will receive it on the
+    next heartbeat.
+  </p>
+  <table>
+    <tr>
+      <th>Version</th><th>Rules</th><th>Notes</th><th>Published</th><th></th>
+    </tr>
+    {% for h in history %}
+      <tr>
+        <td><code>{{ h['version'] }}</code></td>
+        <td>{{ h['rule_count'] }}</td>
+        <td style="color:#8b949e">{{ h['release_notes'] or '—' }}</td>
+        <td style="color:#8b949e">
+          {{ h['published_at'].strftime("%Y-%m-%d %H:%M") if h['published_at'] else '' }}
+        </td>
+        <td>
+          {% if h['is_current'] %}
+            <span class="pill global">Current</span>
+          {% else %}
+            <form method="post" action="/super/rules/rollback"
+                  style="display:inline"
+                  onsubmit="return confirm('Roll back the global pack to v' + this.elements['version'].value + '? Every tenant inheriting the global pack will receive these rules on the next heartbeat.');">
+              <input type="hidden" name="version" value="{{ h['version'] }}">
+              <button class="btn danger" type="submit">Roll back</button>
+            </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+  </table>
+</div>
+
+<!-- ─── Script ─────────────────────────────────────────────────── -->
+<script>
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+  event.currentTarget.classList.add('active');
+  document.getElementById('tab-' + name).classList.remove('hidden');
+}
+
+function addFile(kind, name='', body='') {
+  const container = document.getElementById(kind + '_files');
+  const div  = document.createElement('div');
+  div.className = 'file-block';
+  const placeholder_name = kind === 'yara'
+      ? 'e.g. fmsecure_APT41_NewSample.yar'
+      : 'e.g. fmsecure_lolbin_pattern.yml';
+  const placeholder_body = kind === 'yara'
+      ? 'rule NewMalware {\n    meta:\n        author = "fmsecure-team"\n        date = "2026-06-21"\n    strings:\n        $a = "evil_marker"\n    condition:\n        $a\n}'
+      : 'title: New Suspicious Behaviour\nlevel: high\ndetection:\n    selection:\n        fmsecure.event_type|contains: "suspicious"\n    condition: selection';
+  div.innerHTML = `
+    <button class="remove" onclick="this.parentElement.remove()">Remove</button>
+    <input type="text" class="fname" placeholder="${placeholder_name}" value="${name}">
+    <textarea class="fbody" placeholder="${placeholder_body}">${body}</textarea>
+  `;
+  container.appendChild(div);
+}
+
+function collect(kind) {
+  return Array.from(document.querySelectorAll('#' + kind + '_files .file-block'))
+    .map(b => ({
+      name:    b.querySelector('.fname').value.trim(),
+      content: b.querySelector('.fbody').value
+    }))
+    .filter(f => f.name && f.content);
+}
+
+function publishPack() {
+  const yara_files  = collect('yara');
+  const sigma_files = collect('sigma');
+  const release_notes = document.getElementById('release_notes').value.trim();
+  const version       = document.getElementById('version_input').value.trim();
+  const msg = document.getElementById('status_msg');
+  msg.className = '';
+  msg.textContent = '';
+
+  if (!yara_files.length && !sigma_files.length) {
+    msg.className = 'err';
+    msg.textContent = '❌ Add at least one YARA or Sigma file before publishing.';
+    return;
+  }
+
+  msg.className = 'ok';
+  msg.textContent = '⏳ Publishing global rule pack…';
+
+  fetch('/super/rules/publish', {
+    method:  'POST',
+    headers: { 'Content-Type':'application/json' },
+    credentials: 'same-origin',
+    body:    JSON.stringify({ yara_files, sigma_files, release_notes, version })
+  })
+  .then(r => r.json().then(j => ({ok: r.ok, body: j})))
+  .then(({ok, body}) => {
+    if (!ok) {
+      msg.className = 'err';
+      msg.textContent = '❌ ' + (body.detail || 'Publish failed');
+      return;
+    }
+    msg.className = 'ok';
+    msg.textContent =
+      `✅ Published global pack v${body.version} — ${body.count} rules. ` +
+      `All inheriting endpoints will hot-reload within ~10 seconds.`;
+    setTimeout(() => location.reload(), 2000);
+  })
+  .catch(e => {
+    msg.className = 'err';
+    msg.textContent = '❌ Network error: ' + e;
+  });
+}
+
+function loadFromCurrent() {
+  document.getElementById('yara_files').innerHTML  = '';
+  document.getElementById('sigma_files').innerHTML = '';
+  {% for fname, body in current_yara %}
+    addFile('yara', {{ fname|tojson }}, {{ body|tojson }});
+  {% endfor %}
+  {% for fname, body in current_sigma %}
+    addFile('sigma', {{ fname|tojson }}, {{ body|tojson }});
+  {% endfor %}
+}
+
+// Start with one empty block of each
+addFile('yara');
+addFile('sigma');
+</script>
+
+</body>
+</html>

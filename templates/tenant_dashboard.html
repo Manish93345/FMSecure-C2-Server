@@ -295,7 +295,7 @@ canvas { max-width:100%;display:block; }
               <div class="empty-state">
                 <div class="empty-state-icon">📡</div>
                 <div class="empty-state-title">No endpoints enrolled yet</div>
-                <div class="empty-state-desc">Install the FMSecure agent on your Windows endpoints and set the <code style="font-family:var(--font-mono);color:var(--cyan);font-size:12px;">FMSECURE_TENANT_KEY</code> environment variable to <strong>{{ tenant.tenant_key }}</strong></div>
+                <div class="empty-state-desc">Install the FMSecure agent on your Windows endpoints and set the <code style="font-family:var(--font-mono);color:var(--cyan);font-size:12px;">FMSECURE_TENANT_KEY</code> environment variable to <strong>{{ tenant.api_key }}</strong></div>
               </div>
             </td>
           </tr>
@@ -578,7 +578,7 @@ canvas { max-width:100%;display:block; }
         <div style="padding:16px 20px;background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r-md);margin-bottom:16px;">
           <div style="font-size:12px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px;">Tenant API Key</div>
           <div style="display:flex;align-items:center;gap:10px;">
-            <code style="font-family:var(--font-mono);font-size:13px;color:var(--cyan);background:var(--bg3);padding:8px 14px;border-radius:var(--r-sm);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" id="api-key-display">{{ tenant.tenant_key[:8] }}••••••••••••••••••••••••</code>
+            <code style="font-family:var(--font-mono);font-size:13px;color:var(--cyan);background:var(--bg3);padding:8px 14px;border-radius:var(--r-sm);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" id="api-key-display">{{ tenant.api_key[:8] }}••••••••••••••••••••••••</code>
             <button onclick="toggleApiKey()" class="btn btn-secondary btn-sm">Reveal</button>
             <button onclick="copyApiKey()" class="btn btn-secondary btn-sm">Copy</button>
           </div>
@@ -855,7 +855,7 @@ function switchTab(btn, paneId) {
 }
 
 // ── API Key ──────────────────────────────────────────────────────────────
-const FULL_KEY = '{{ tenant.tenant_key }}';
+const FULL_KEY = '{{ tenant.api_key }}';
 let keyRevealed = false;
 function toggleApiKey() {
   keyRevealed = !keyRevealed;
@@ -932,7 +932,7 @@ function confirmErasure() {
   fetch('/api/v1/tenant/data', {
     method:  'DELETE',
     headers: {
-      'x-tenant-key':   '{{ tenant.tenant_key }}',
+      'x-tenant-key':   '{{ tenant.api_key }}',
       'x-requested-by': '{{ session_email }}'
     }
   })
