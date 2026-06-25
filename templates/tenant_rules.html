@@ -21,6 +21,7 @@
   .pill.current { background: #1a4b8c; color: #58a6ff; }
   .pill.online  { background: #0d3a1c; color: #3fb950; }
   .pill.offline { background: #3a0d0d; color: #f85149; }
+  .pill.readonly{ background: #2d1f08; color: #d29922; border: 1px solid #d29922; }
   table { width: 100%; border-collapse: collapse; margin-top: 16px;
           background: #161b22; border: 1px solid #21262d; border-radius: 8px; }
   th { background: #0d1117; color: #8b949e; padding: 10px 14px;
@@ -28,36 +29,6 @@
        letter-spacing: 0.8px; }
   td { padding: 10px 14px; border-bottom: 1px solid #21262d; font-size: 13px; }
   tr:last-child td { border-bottom: none; }
-  .editor-card { background: #161b22; border: 1px solid #30363d;
-                 border-radius: 10px; padding: 20px; margin-top: 16px; }
-  .editor-card h3 { margin-top: 0; color: #e6edf3; }
-  .file-block { background: #0d1117; border: 1px solid #30363d;
-                border-radius: 6px; padding: 12px; margin-bottom: 12px; }
-  .file-block input[type=text] { width: 250px; padding: 6px 10px;
-        background: #0d1117; color: #e6edf3; border: 1px solid #30363d;
-        border-radius: 4px; font-family: 'Courier New', monospace; }
-  .file-block textarea { width: 100%; min-height: 180px; margin-top: 8px;
-        padding: 10px; font-family: 'Courier New', Consolas, monospace;
-        font-size: 12px; background: #010409; color: #79c0ff;
-        border: 1px solid #30363d; border-radius: 4px; box-sizing: border-box;
-        resize: vertical; }
-  .file-block .remove { float: right; background: transparent; color: #f85149;
-        border: 1px solid #f85149; padding: 4px 10px; border-radius: 4px;
-        cursor: pointer; font-size: 11px; }
-  .btn { display: inline-block; padding: 10px 20px; border-radius: 6px;
-         border: none; cursor: pointer; font-weight: 600; font-size: 14px;
-         margin-right: 8px; }
-  .btn.primary { background: #238636; color: #fff; }
-  .btn.primary:hover { background: #2ea043; }
-  .btn.ghost { background: transparent; color: #2f81f7; border: 1px solid #30363d; }
-  .btn.ghost:hover { border-color: #2f81f7; }
-  textarea#release_notes { width: 100%; padding: 8px 10px; background: #010409;
-        color: #e6edf3; border: 1px solid #30363d; border-radius: 4px;
-        box-sizing: border-box; min-height: 50px; font-family: inherit; }
-  #status_msg { margin-top: 12px; padding: 10px 14px; border-radius: 6px;
-                display: none; font-size: 13px; }
-  #status_msg.ok    { background: #0d3a1c; color: #3fb950; display: block; }
-  #status_msg.err   { background: #3a0d0d; color: #f85149; display: block; }
   code { font-family: 'Courier New', monospace; color: #79c0ff; }
   details { margin: 10px 0; }
   summary { cursor: pointer; color: #2f81f7; }
@@ -70,12 +41,31 @@
   .tab-content { background: #161b22; border: 1px solid #30363d;
                  border-radius: 0 10px 10px 10px; padding: 20px; }
   .tab-content.hidden { display: none; }
+  .notice { background: #1a2e4a; border: 1px solid #2f81f7; color: #cfe8ff;
+            padding: 14px 18px; border-radius: 8px; margin: 20px 0;
+            font-size: 13.5px; }
+  .notice strong { color: #58a6ff; }
 </style>
 </head>
 <body>
 
-<h1>🛡 Detection Rules — Live Update Center</h1>
+<h1>🛡 Detection Rules — Read-only View</h1>
 <a href="/tenant/dashboard">← Back to Dashboard</a>
+
+<!-- ─── Read-only notice ────────────────────────────────────────────── -->
+<div class="notice">
+  <strong>ℹ️ Read-only access.</strong>
+  Detection rules (YARA / Sigma) are managed centrally by FMSecure's
+  <strong>Super Admin</strong>. As a tenant administrator you can view the
+  rule pack currently deployed to your endpoints, see version history, and
+  monitor which endpoints have received the latest update — but publishing
+  new rules is restricted to the platform team to ensure detection quality
+  and prevent accidental endpoint disruption.
+  <br><br>
+  Need a new YARA signature or Sigma rule deployed?
+  Contact <a href="mailto:security@fmsecure.in">security@fmsecure.in</a>
+  with the IOC details and we'll publish it organisation-wide.
+</div>
 
 <!-- ─── Top stats ─────────────────────────────────────────────────── -->
 <div class="row">
@@ -123,54 +113,28 @@
   {% endfor %}
 </table>
 
-<!-- ─── Tabs: Editor / Existing / History ───────────────────────── -->
-<h2>Rule Pack Management</h2>
+<!-- ─── Tabs: Current pack / History ─────────────────────────────── -->
+<h2>Rule Pack <span class="pill readonly" style="vertical-align:middle;margin-left:8px;">READ-ONLY</span></h2>
 <p style="color:#8b949e; font-size:13px;">
-  Add, edit, or remove YARA / Sigma rules below and click
-  <strong>Publish</strong>. Every enrolled endpoint will receive the new pack
-  within ~10 seconds of its next heartbeat. No download, no reinstall —
-  the agent hot-reloads detection engines automatically and writes a
-  <code>RULE_UPDATE</code> log entry.
+  Inspect the rule pack currently active on your enrolled endpoints, and
+  browse the history of published versions. Every enrolled endpoint
+  automatically hot-reloads the latest pack within ~10 seconds of its next
+  heartbeat — no agent reinstall is ever required.
 </p>
 
 <div class="tab-bar">
-  <div class="tab active" onclick="showTab('editor')">✏️ New Pack Editor</div>
-  <div class="tab"        onclick="showTab('existing')">📋 Currently Published</div>
+  <div class="tab active" onclick="showTab('existing')">📋 Currently Published</div>
   <div class="tab"        onclick="showTab('history')">🕓 Version History</div>
 </div>
 
-<!-- TAB: Editor -->
-<div class="tab-content" id="tab-editor">
-  <h3>YARA Rules <span style="color:#8b949e;font-weight:normal;font-size:13px">
-      — file-content signatures (.yar)</span></h3>
-  <div id="yara_files"></div>
-  <button class="btn ghost" onclick="addFile('yara')">＋ Add YARA File</button>
-
-  <h3 style="margin-top: 32px;">Sigma Rules
-    <span style="color:#8b949e;font-weight:normal;font-size:13px">
-      — behavioural detections (.yml)</span></h3>
-  <div id="sigma_files"></div>
-  <button class="btn ghost" onclick="addFile('sigma')">＋ Add Sigma File</button>
-
-  <h3 style="margin-top: 32px;">Release Notes</h3>
-  <textarea id="release_notes"
-    placeholder="e.g. Added APT41 RuralBytes ransomware family + 3 new LOLBin detections"></textarea>
-
-  <div style="margin-top: 24px;">
-    <button class="btn primary" onclick="publishPack()">🚀 Publish to All Endpoints</button>
-    <button class="btn ghost"   onclick="loadFromCurrent()">↻ Prefill from Current Pack</button>
-  </div>
-  <div id="status_msg"></div>
-</div>
-
 <!-- TAB: Existing -->
-<div class="tab-content hidden" id="tab-existing">
+<div class="tab-content" id="tab-existing">
   <h3>Currently Published — v{{ current_version or '— (no pack yet)' }}</h3>
   {% if not current_yara and not current_sigma %}
     <p style="color:#8b949e">
       No rule pack has been published yet for your tenant. Endpoints are
-      running with the rules bundled inside the .exe at install time.
-      Use the <strong>Editor</strong> tab to publish your first pack.
+      running with the default rule pack bundled inside the FMSecure agent
+      at install time.
     </p>
   {% endif %}
   {% for fname, body in current_yara %}
@@ -215,99 +179,13 @@
   </table>
 </div>
 
-<!-- ─── Script ─────────────────────────────────────────────────── -->
 <script>
-const TENANT_API_KEY = "{{ tenant_api_key }}";
-
 function showTab(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
   event.currentTarget.classList.add('active');
   document.getElementById('tab-' + name).classList.remove('hidden');
 }
-
-function addFile(kind, name='', body='') {
-  const container = document.getElementById(kind + '_files');
-  const div  = document.createElement('div');
-  div.className = 'file-block';
-  const placeholder_name = kind === 'yara'
-      ? 'e.g. fmsecure_NewMalware.yar'
-      : 'e.g. fmsecure_new_behaviour.yml';
-  const placeholder_body = kind === 'yara'
-      ? 'rule NewMalware {\n    meta:\n        author = "you"\n    strings:\n        $a = "evil_marker"\n    condition:\n        $a\n}'
-      : 'title: New Behaviour\nlevel: high\ndetection:\n    selection:\n        fmsecure.event_type|contains: "suspicious"\n    condition: selection';
-  div.innerHTML = `
-    <button class="remove" onclick="this.parentElement.remove()">Remove</button>
-    <input type="text" class="fname" placeholder="${placeholder_name}" value="${name}">
-    <textarea class="fbody" placeholder="${placeholder_body}">${body}</textarea>
-  `;
-  container.appendChild(div);
-}
-
-function collect(kind) {
-  return Array.from(document.querySelectorAll('#' + kind + '_files .file-block'))
-    .map(b => ({
-      name:    b.querySelector('.fname').value.trim(),
-      content: b.querySelector('.fbody').value
-    }))
-    .filter(f => f.name && f.content);
-}
-
-function publishPack() {
-  const yara_files  = collect('yara');
-  const sigma_files = collect('sigma');
-  const release_notes = document.getElementById('release_notes').value.trim();
-  const msg = document.getElementById('status_msg');
-  msg.className = '';
-  msg.textContent = '';
-
-  if (!yara_files.length && !sigma_files.length) {
-    msg.className = 'err';
-    msg.textContent = '❌ Add at least one YARA or Sigma file before publishing.';
-    return;
-  }
-
-  msg.className = 'ok';
-  msg.textContent = '⏳ Publishing rule pack…';
-
-  fetch('/api/rules/publish', {
-    method:  'POST',
-    headers: { 'Content-Type':'application/json', 'x-tenant-key': TENANT_API_KEY },
-    body:    JSON.stringify({ yara_files, sigma_files, release_notes })
-  })
-  .then(r => r.json().then(j => ({ok: r.ok, body: j})))
-  .then(({ok, body}) => {
-    if (!ok) {
-      msg.className = 'err';
-      msg.textContent = '❌ ' + (body.detail || 'Publish failed');
-      return;
-    }
-    msg.className = 'ok';
-    msg.textContent =
-      `✅ Published v${body.version} — ${body.count} rules. ` +
-      `All online endpoints will hot-reload within ~10 seconds.`;
-    setTimeout(() => location.reload(), 2000);
-  })
-  .catch(e => {
-    msg.className = 'err';
-    msg.textContent = '❌ Network error: ' + e;
-  });
-}
-
-function loadFromCurrent() {
-  document.getElementById('yara_files').innerHTML  = '';
-  document.getElementById('sigma_files').innerHTML = '';
-  {% for fname, body in current_yara %}
-    addFile('yara', {{ fname|tojson }}, {{ body|tojson }});
-  {% endfor %}
-  {% for fname, body in current_sigma %}
-    addFile('sigma', {{ fname|tojson }}, {{ body|tojson }});
-  {% endfor %}
-}
-
-// Start with one empty block of each
-addFile('yara');
-addFile('sigma');
 </script>
 
 </body>

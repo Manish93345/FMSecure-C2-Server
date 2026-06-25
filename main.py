@@ -1168,44 +1168,43 @@ class RulePackBody(BaseModel):
 @app.post("/api/rules/publish")
 async def publish_rule_pack(request: Request, body: RulePackBody):
     """
-    Tenant-admin facing: publish a new rule pack for the calling tenant.
-    Authenticated via x-tenant-key header (same key the agents use).
+    Tenant rule publishing is DISABLED (v2.5.1, June 2026).
 
-    For UI-driven publishing (forms), see /tenant/rules below.
+    Detection-rule curation is restricted to the FMSecure Super Admin to
+    guarantee detection-quality and prevent accidental endpoint disruption
+    across the customer base. Tenant administrators retain read-only access
+    to the rule pack via /tenant/rules and the read-only /api/rules/status
+    endpoint below — but they can no longer publish new YARA / Sigma rules.
+
+    This endpoint is intentionally kept (rather than removed) so older
+    agents / scripts receive a clear, structured 403 error instead of a
+    silent 404. To publish a new global pack, the Super Admin uses
+    /super/rules and POST /super/rules/publish.
     """
+    # Identify the caller for the audit log (best-effort — never raises).
+    tenant_slug = ""
     tenant_key = request.headers.get("x-tenant-key", "")
-    if not tenant_key:
-        raise HTTPException(status_code=400,
-                            detail="x-tenant-key header required")
-    tenant = _get_tenant_by_api_key(tenant_key)
-    if not tenant:
-        raise HTTPException(status_code=401, detail="Invalid tenant key")
-    if not DATABASE_URL:
-        raise HTTPException(status_code=503, detail="Database not configured")
+    if tenant_key:
+        try:
+            tenant = _get_tenant_by_api_key(tenant_key)
+            if tenant:
+                tenant_slug = tenant.get("slug", "")
+        except Exception:
+            pass
 
-    yara_list  = [(f.get("name", ""), f.get("content", ""))
-                  for f in body.yara_files
-                  if (f.get("name") and f.get("content"))]
-    sigma_list = [(f.get("name", ""), f.get("content", ""))
-                  for f in body.sigma_files
-                  if (f.get("name") and f.get("content"))]
+    print(f"[RULES] ⛔ Tenant publish attempt rejected "
+          f"(slug={tenant_slug or 'unknown'}, ip={request.client.host}). "
+          f"Tenants are read-only — use /super/rules as Super Admin.")
 
-    if not yara_list and not sigma_list:
-        raise HTTPException(status_code=400,
-                            detail="At least one rule file required.")
-
-    result = rules_manager.publish_pack(
-        get_db,
-        tenant_id=tenant["id"],
-        yara_files=yara_list,
-        sigma_files=sigma_list,
-        release_notes=body.release_notes,
-        version=(body.version or None),
+    raise HTTPException(
+        status_code=403,
+        detail=(
+            "Publishing detection rules is restricted to the FMSecure "
+            "Super Admin. Tenant administrators have read-only access to "
+            "the rule pack. Contact security@fmsecure.in to request a new "
+            "YARA / Sigma signature for organisation-wide deployment."
+        ),
     )
-
-    print(f"[RULES] Tenant {tenant['slug']} published "
-          f"v{result['version']} ({result['count']} rules)")
-    return {"ok": True, **result}
 
 
 @app.get("/api/rules/status")
