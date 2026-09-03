@@ -851,6 +851,20 @@ def send_tenant_welcome_email(org_email: str, org_name: str, api_key: str, max_a
 # ══════════════════════════════════════════════════════════════════════════════
 # AUTH PAGES
 # ══════════════════════════════════════════════════════════════════════════════
+
+# ---------- Health check route (UptimeRobot keep-alive) ----------
+@app.get("/health")
+@app.head("/health")   # kuch bots HEAD request bhejte hain
+async def health_check():
+    """
+    Ultra-lightweight health endpoint.
+    - Koi database call nahi
+    - Koi template render nahi
+    - Sirf 200 OK return karta hai
+    """
+    return {"status": "ok", "timestamp": time.time()}
+
+
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request, error: str = ""):
     return templates.TemplateResponse(request, "auth_login.html", {
